@@ -122,8 +122,8 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 
 
 ## Soldiers a brute takes when it reaches the squad: a slice, not a nibble.
-static func brute_bite(squad_count: int) -> int:
-	return maxi(3, int(float(squad_count) * BRUTE_BITE_FRACTION))
+static func brute_bite(squad_count: int, fraction: float = BRUTE_BITE_FRACTION) -> int:
+	return maxi(3, int(float(squad_count) * fraction))
 
 
 ## The squad size a competent player is modelled to have at the boss. The

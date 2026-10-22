@@ -51,3 +51,28 @@ static func sphere(radius: float, color: Color) -> MeshInstance3D:
 	mi.mesh = mesh
 	mi.material_override = flat(color)
 	return mi
+
+
+static func cone(radius: float, height: float, color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.0
+	mesh.bottom_radius = radius
+	mesh.height = height
+	mesh.radial_segments = 8
+	mesh.rings = 1
+	mi.mesh = mesh
+	mi.material_override = flat(color)
+	return mi
+
+
+static func torus(inner: float, outer: float, color: Color, unshaded: bool = false) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = inner
+	mesh.outer_radius = outer
+	mesh.rings = 16
+	mesh.ring_segments = 8
+	mi.mesh = mesh
+	mi.material_override = flat(color, unshaded)
+	return mi

@@ -12,6 +12,7 @@ signal boss_spawned(boss: Boss)
 signal boss_hit(boss: Boss, is_core: bool)
 signal boss_killed(level: int, squad_left: int)
 signal level_started(level: int)
+signal perk_pick_due
 
 enum Phase { GATES, BOSS, CLEAR }
 
@@ -41,6 +42,11 @@ var bullets: Node3D
 var gen: Difficulty
 ## Set by the game so hit resolution can read the squad's damage output.
 var squad: Squad
+var perks: Perks
+var meta: Meta
+## Endless: no bosses, no squad reset, gates forever. Levels tick every
+## GATES_PER_LEVEL gates for difficulty and the HUD.
+var endless := false
 
 var level := 1
 var level_distance := 0.0
@@ -49,6 +55,7 @@ var world_speed := 8.0
 
 var _next_gate := 0
 var _next_wave := 0
+var _gates_passed := 0
 var _boss_spawned := false
 var _chew_timer := 0.0
 var _clear_timer := 0.0
@@ -66,15 +73,17 @@ func reset(seed_value: int) -> void:
 	gen = Difficulty.new(seed_value)
 	_clear_actors()
 	world_speed = Difficulty.world_speed(1)
+	_gates_passed = 0
 	start_level(1)
 
 
 func start_level(n: int) -> void:
 	level = n
-	level_distance = 0.0
 	phase = Phase.GATES
-	_next_gate = 0
-	_next_wave = 0
+	if not endless or n == 1:
+		level_distance = 0.0
+		_next_gate = 0
+		_next_wave = 0
 	_boss_spawned = false
 	_chew_timer = 0.0
 	boss = null
@@ -148,15 +157,19 @@ func nearest_upcoming_gate() -> Gate:
 func try_hit(b: Bullet) -> bool:
 	var z_lo := minf(b.prev_z, b.position.z) - 0.35
 	var z_hi := maxf(b.prev_z, b.position.z) + 0.35
-	for z in zombies:
+	for z in zombies.duplicate():
 		if z.position.z < z_lo or z.position.z > z_hi:
 			continue
-		if absf(z.position.x - b.position.x) > z.radius:
+		if absf(z.position.x - b.position.x) > z.radius * b.radius_mult:
 			continue
 		if z.take_damage(b.damage):
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			z.die()
+			if b.hits_left > 1:
+				# Piercing: keep flying, but never count the same kill twice.
+				b.hits_left -= 1
+				continue
 		return true
 	if boss != null and boss.alive and boss.position.z >= z_lo - 0.6 and boss.position.z <= z_hi + 0.6:
 		if absf(boss.position.x - b.position.x) <= Boss.BODY_RADIUS:
@@ -172,37 +185,52 @@ func try_hit(b: Bullet) -> bool:
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
 			var cost := Difficulty.effective_step_cost(level, squad.dps() if squad != null else 0.0)
+			if perks != null:
+				cost *= perks.step_cost_mult()
 			if g.register_hit(i, b.damage, cost):
 				gate_stepped.emit(g, i)
 			return true
 	return false
 
 
+## In endless mode gate counters never reset, so the level and the index
+## inside it are derived from the running counter.
+func _gate_level(n: int) -> int:
+	return 1 + n / Difficulty.GATES_PER_LEVEL if endless else level
+
+
+func _gate_index(n: int) -> int:
+	return n % Difficulty.GATES_PER_LEVEL if endless else n
+
+
 func _spawn() -> void:
 	var count := squad.count if squad != null else 1
-	while _next_gate < Difficulty.GATES_PER_LEVEL and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
-		var pair := gen.make_gate_pair(level, _next_gate, count)
+	var limit := 1 << 30 if endless else Difficulty.GATES_PER_LEVEL
+	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
+		var pair := gen.make_gate_pair(_gate_level(_next_gate), _gate_index(_next_gate), count)
 		var g := Gate.new()
 		g.setup(pair[0], pair[1])
+		g.index = _gate_index(_next_gate)
 		g.position = Vector3(0.0, 0.0, -(Difficulty.gate_distance(_next_gate) - level_distance))
 		add_child(g)
 		gates.append(g)
 		_next_gate += 1
-	while _next_wave < Difficulty.GATES_PER_LEVEL and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
+	while _next_wave < limit and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
 		_spawn_wave(_next_wave, count)
 		_next_wave += 1
-	if not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
+	if not endless and not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
 		_boss_spawned = true
 		boss = Boss.new()
 		boss.setup(Difficulty.boss_hp(level))
+		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
 		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
 		add_child(boss)
 		boss_spawned.emit(boss)
 
 
-func _spawn_wave(index: int, count: int) -> void:
-	var spec := Difficulty.wave_for(level, index, count)
-	var base_z := -(Difficulty.wave_distance(index) - level_distance)
+func _spawn_wave(n: int, count: int) -> void:
+	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
+	var base_z := -(Difficulty.wave_distance(n) - level_distance)
 	for i in range(spec.count):
 		_spawn_zombie(spec, base_z - gen.rng.randf_range(0.0, 7.0), false)
 	for i in range(spec.brutes):
@@ -219,18 +247,29 @@ func _spawn_zombie(spec: Dictionary, z: float, brute: bool) -> void:
 
 
 func _move_gates(delta: float, p_squad: Squad) -> void:
+	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0)
 	for g in gates.duplicate():
 		g.position.z += world_speed * delta
 		if not g.passed:
-			if g.position.z >= REVEAL_Z:
+			if g.position.z >= reveal_z:
 				g.reveal_all()
 			if g.position.z >= 0.0:
 				var index := 0 if p_squad.position.x < 0.0 else 1
 				var panel: GateMath.GatePanel = g.choose(index)
 				var before := p_squad.count
 				var after := GateMath.apply(before, panel)
+				if after > 0:
+					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
+						after += meta.gate_bonus()
+					if perks != null:
+						after += perks.recruit_per_gate()
 				p_squad.set_count(after)
+				_gates_passed += 1
 				gate_passed.emit(panel, before, after)
+				if endless and _gates_passed % Difficulty.GATES_PER_LEVEL == 0:
+					start_level(level + 1)
+				if after > 0 and Perks.is_pick_gate(g.index):
+					perk_pick_due.emit()
 		if g.position.z > DESPAWN_Z:
 			gates.erase(g)
 			g.queue_free()
@@ -244,7 +283,14 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		if z.position.z >= BITE_Z and absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius:
 			zombies.erase(z)
 			z.consume()
-			var bite: int = Difficulty.brute_bite(p_squad.count) if z.brute else z.bite
+			var bite: int = z.bite
+			if z.brute:
+				var fraction := Difficulty.BRUTE_BITE_FRACTION
+				if meta != null:
+					fraction = meta.brute_bite_fraction(fraction)
+				if perks != null:
+					fraction *= perks.brute_bite_mult()
+				bite = Difficulty.brute_bite(p_squad.count, fraction)
 			p_squad.add(-bite)
 			squad_bitten.emit(bite, z.brute)
 		elif z.position.z > DESPAWN_Z:

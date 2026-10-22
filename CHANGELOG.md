@@ -3,6 +3,31 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.3 (run 3)
+
+Perks, coins and shop, endless mode, shotguns, and real characters.
+
+- Title menu with Play, Endless (unlocks after clearing level 3), Shop and
+  a squad picker. Game-over card shows coins earned and has a Menu button.
+- Perk cards after the third and sixth gate of every level: nine perks,
+  three offered, stacking to a cap, run-long. Keys 1 to 3 on desktop.
+- Coins paid per run; shop with eight permanent upgrades: recruits,
+  firepower, gate bonus, armor, boss slayer, coin magnet, scout, shotgun
+  squad. Shotguns fire three pellets in a fan.
+- Endless mode: no bosses, no squad reset, separate best score.
+- Soldiers, zombies, brutes and the boss rebuilt as proper figures with
+  legs, arms, helmets, visors, packs, red eyes, plates, spikes, fists and
+  a ringed core. Guns recoil, legs run, zombies shamble.
+- Save file now holds coins, upgrades, squad type and the endless best.
+- Smoke bot takes perks and can run endless; screenshots cover the shop
+  and perk cards.
+- Balance, bot with no upgrades, taking the first perk offered: squad at
+  the boss on levels 1 to 9 was 100, 215, 84, 334, 424, 98, 64, 55, 41;
+  reached level 9 at six minutes with 18 soldiers left. Perks make the bot
+  far stronger than in 0.2, so bosses on levels 4 and 5 fall fast and the
+  wall is the level 6+ waves. Endless: level 7 at three minutes, peak
+  squad about 650, still alive. Perk and shop balance is a run 4 item.
+
 ## 0.2 (run 2)
 
 Levels, bosses, feel, and sound.

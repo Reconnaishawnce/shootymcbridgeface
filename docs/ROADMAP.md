@@ -42,14 +42,21 @@ Definition of done for every run:
 - Deferred to run 3: endless mode as a selectable unlock (needs a mode
   picker on the title card).
 
-## Run 3: perks and meta
+## Run 3: perks, meta, modes, characters (done)
 
-- Mode picker on the title card: Levels (default) and Endless (unlocked by
-  clearing level 3), the latter using the run 1 endless regulators.
-- Mid-run perk picks every three gates: three cards, pick one.
-- Coins earned per run. Meta shop with about eight upgrades.
-- Peak squad, best level and total kills on the title card.
-- Unlock the first alternate squad type (shotgunners).
+- Title menu: Play, Endless (unlocked by clearing level 3), Shop, squad
+  picker. Game-over card pays coins and has a Menu button.
+- Perk picks after the third and sixth gate of each level: three cards
+  from a pool of nine, seeded, stacking to a cap, run-long.
+- Coins per run and a shop with eight permanent upgrades including the
+  shotgun squad.
+- Endless mode: no bosses, no reset, gates forever, separate best.
+- Characters rebuilt from primitives: running soldiers with helmets,
+  visors, packs and recoiling guns; hunched red-eyed zombies; plated
+  brutes; a spiked, fisted boss with a ringed core. Detail falls off
+  behind the front of the squad to keep draw calls down.
+- Smoke bot takes perks and can run endless; screenshot walkthrough covers
+  the shop and the perk cards.
 
 ## Run 4: shareable and daily
 
@@ -57,6 +64,8 @@ Definition of done for every run:
 - Share sheet from the game-over card.
 - Branching lanes with a minimap.
 - Zombie types that interact with gates (thief, tank).
+- Medic squad type; a second boss type.
+- Phone feedback pass: steering sensitivity, perk balance, shop prices.
 
 ## Run 5: polish and the weird one
 

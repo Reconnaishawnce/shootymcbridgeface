@@ -7,6 +7,8 @@ const POST := Color(0.25, 0.25, 0.28)
 
 var panels: Array = []
 var passed := false
+## 0-based position inside its level; decides perk picks.
+var index := 0
 var _views: Array[GatePanelView] = []
 
 

@@ -1,38 +1,50 @@
 class_name Squad
 extends Node3D
 ## The player. Holds the logical soldier count, lays out the visible soldiers,
-## steers on drag input and auto-fires down the lane.
+## steers on drag input and auto-fires down the lane. Rifles fire one tracer
+## per shot; shotguns fire three pellets in a fan for more total damage.
 
 signal count_changed(new_count: int)
 signal wiped_out
 
 const LANE_HALF := 2.6
-const MAX_VISUAL := 50
+const MAX_VISUAL := 36
+## Soldiers in the front rings get the detailed build.
+const DETAILED := 19
 const STEER_LERP := 16.0
 const MAX_SHOTS_PER_SECOND := 30.0
 const DPS_PER_SOLDIER := 2.5
+const SHOTGUN_PELLETS := 3
+const SHOTGUN_DAMAGE_MULT := 1.35
+const SHOTGUN_SPREAD := 1.6
 
 var count := 1
 var target_x := 0.0
 var active := false
 var world: World
+var perks: Perks
+var meta: Meta
+var squad_type := "rifle"
 
 var _soldiers: Array[Soldier] = []
 var _fire_accum := 0.0
 var _fire_index := 0
 
 
-func reset() -> void:
+func reset(start_count: int = 1) -> void:
 	target_x = 0.0
 	position.x = 0.0
 	_fire_accum = 0.0
-	set_count(1)
+	for s in _soldiers:
+		s.queue_free()
+	_soldiers.clear()
+	set_count(start_count)
 
 
-## New level: back to one soldier where you stand.
-func redeploy() -> void:
+## New level: back to the starting squad where you stand.
+func redeploy(start_count: int) -> void:
 	_fire_accum = 0.0
-	set_count(1)
+	set_count(start_count)
 
 
 func set_count(n: int) -> void:
@@ -57,27 +69,40 @@ func nudge(dx: float) -> void:
 	target_x = clampf(target_x + dx, -LANE_HALF, LANE_HALF)
 
 
+func is_shotgun() -> bool:
+	return squad_type == "shotgun"
+
+
+func _fire_mult() -> float:
+	return perks.fire_rate_mult() if perks != null else 1.0
+
+
+func _damage_mult() -> float:
+	var m := meta.damage_mult() if meta != null else 1.0
+	return m * (SHOTGUN_DAMAGE_MULT if is_shotgun() else 1.0)
+
+
 ## Damage per second of the whole squad. Linear in count by design.
 func dps() -> float:
-	return float(count) * DPS_PER_SOLDIER
+	return float(count) * DPS_PER_SOLDIER * _fire_mult() * _damage_mult()
 
 
-## Total tracer rate. Capped so a huge squad stays cheap to render.
+## Total shots per second. Capped so a huge squad stays cheap to render.
 func shots_per_second() -> float:
-	return minf(dps(), MAX_SHOTS_PER_SECOND)
+	return minf(float(count) * DPS_PER_SOLDIER * _fire_mult(), MAX_SHOTS_PER_SECOND)
 
 
-## Damage per tracer rises once the rate cap is hit, so DPS stays linear.
-func damage_per_bullet() -> float:
+## Damage per shot rises once the rate cap is hit, so DPS stays linear.
+func damage_per_shot() -> float:
 	if count <= 0:
 		return 0.0
-	return maxf(1.0, dps() / shots_per_second())
+	return dps() / shots_per_second()
 
 
 func _sync_visuals() -> void:
 	var want := mini(count, MAX_VISUAL)
 	while _soldiers.size() < want:
-		var s := Soldier.new()
+		var s := Soldier.new(_soldiers.size() < DETAILED, is_shotgun())
 		add_child(s)
 		_soldiers.append(s)
 	while _soldiers.size() > want:
@@ -103,9 +128,23 @@ func _fire(delta: float) -> void:
 			return
 		_fire_index = (_fire_index + 1) % _soldiers.size()
 		var s := _soldiers[_fire_index]
-		var b := Bullet.new()
-		b.damage = damage_per_bullet()
-		b.world = world
-		world.bullets.add_child(b)
-		b.global_position = s.muzzle_world_position()
+		var origin := s.muzzle_world_position()
+		if is_shotgun():
+			var per := damage_per_shot() / float(SHOTGUN_PELLETS)
+			for i in range(SHOTGUN_PELLETS):
+				var spread := (float(i) - float(SHOTGUN_PELLETS - 1) * 0.5) * SHOTGUN_SPREAD
+				_spawn_bullet(origin, per, spread, 0.9)
+		else:
+			_spawn_bullet(origin, damage_per_shot(), 0.0, 1.0)
 		s.flash()
+
+
+func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> void:
+	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0))
+	b.damage = damage
+	b.vx = vx
+	b.world = world
+	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0
+	b.hits_left = 1 + (perks.pierce() if perks != null else 0)
+	world.bullets.add_child(b)
+	b.global_position = origin

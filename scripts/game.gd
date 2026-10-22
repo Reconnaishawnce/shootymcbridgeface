@@ -1,18 +1,20 @@
 class_name Game
 extends Node3D
 ## Root controller. Builds the whole scene in code (no editor needed), owns
-## the title / running / game-over state machine, pause, scoring and input.
+## the title / running / choosing / game-over state machine, pause, modes,
+## perks, the wallet and shop, scoring and input.
 ##
-## Smoke mode (`godot --headless ++ --smoke`) auto-starts, plays like a
-## competent person (shoots what is close, lines up the better panel, tracks
-## the boss core) and quits after a fixed number of frames with a JSON
-## summary, so CI can prove the game loop runs end to end.
+## Smoke mode (`godot --headless ++ --smoke [--endless]`) auto-starts, plays
+## like a competent person (shoots what is close, lines up the better
+## panel, tracks the boss core, takes the first perk) and quits after a
+## fixed number of frames with a JSON summary, so CI can prove the game
+## loop runs end to end.
 ##
 ## Screenshot mode (`godot ++ --shots=DIR`, needs a real renderer, e.g. under
-## xvfb with software GL) walks title, play, boss and game over, saves a PNG
-## of each into DIR and quits. Used to eyeball layout without a phone.
+## xvfb with software GL) walks title, shop, play, perks, boss, level clear,
+## level two, pause and game over, saves a PNG of each into DIR and quits.
 
-enum State { TITLE, RUNNING, GAME_OVER }
+enum State { TITLE, RUNNING, CHOOSING, GAME_OVER }
 
 const SMOKE_FRAMES := 900
 const SMOKE_SEED := 12345
@@ -21,37 +23,49 @@ const RETRY_LOCKOUT := 0.6
 const KEY_STEER_SPEED := 7.0
 
 var state: int = State.TITLE
+var mode := "levels"
 var total_distance := 0.0
 var kills := 0
 var score := 0
 var bonus := 0
 var best := 0
 var best_level := 0
+var best_endless := 0
+var coins := 0
 var peak_squad := 1
 var gates_passed := 0
 var bosses_killed := 0
 var run_seed := 0
 var smoke := false
+var squad_type := "rifle"
 
 var camera: Camera3D
 var world: World
 var squad: Squad
 var hud: Hud
 var sfx: Sfx
+var meta := Meta.new()
+var perks := Perks.new()
 
 var _frames := 0
 var _smoke_frames := SMOKE_FRAMES
+var _smoke_endless := false
 var _shots_dir := ""
 var _since_game_over := 0.0
 var _shake := 0.0
 var _drag_scale := 0.015
 var _fov_tween: Tween
 var _quitting := false
+var _offer: Array = []
+## The auto-player takes the first perk at once, except while the
+## screenshot walkthrough wants to look at the cards.
+var _bot_auto_perk := true
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	smoke = args.has("--smoke")
+	_smoke_endless = args.has("--endless")
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
@@ -59,6 +73,12 @@ func _ready() -> void:
 			_shots_dir = a.get_slice("=", 1)
 	best = SaveData.load_best()
 	best_level = SaveData.load_best_level()
+	best_endless = SaveData.load_best_endless()
+	coins = SaveData.load_coins()
+	meta.levels = SaveData.load_upgrades()
+	squad_type = SaveData.load_squad_type()
+	if squad_type == "shotgun" and not meta.shotgun_unlocked():
+		squad_type = "rifle"
 	# Headless CI has no audio device; the dummy driver releases playbacks
 	# on its own thread and can report them as leaked at exit. Keep the
 	# auto-player silent so its exit is deterministic.
@@ -66,9 +86,9 @@ func _ready() -> void:
 	_build_scene()
 	_drag_scale = (Squad.LANE_HALF * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
 	hud.set_sound(Sfx.enabled)
-	hud.show_title(best, best_level)
+	show_title()
 	if smoke:
-		start_run()
+		start_run("endless" if _smoke_endless else "levels")
 	elif _shots_dir != "":
 		_shots_walkthrough()
 
@@ -103,6 +123,7 @@ func _build_scene() -> void:
 	add_child(sfx)
 
 	world = World.new()
+	world.meta = meta
 	add_child(world)
 	world.gate_passed.connect(_on_gate_passed)
 	world.gate_stepped.connect(_on_gate_stepped)
@@ -112,9 +133,11 @@ func _build_scene() -> void:
 	world.boss_hit.connect(_on_boss_hit)
 	world.boss_killed.connect(_on_boss_killed)
 	world.level_started.connect(_on_level_started)
+	world.perk_pick_due.connect(_on_perk_pick_due)
 
 	squad = Squad.new()
 	squad.world = world
+	squad.meta = meta
 	world.squad = squad
 	add_child(squad)
 	squad.count_changed.connect(_on_count_changed)
@@ -123,13 +146,55 @@ func _build_scene() -> void:
 
 	hud = Hud.new()
 	add_child(hud)
+	hud.play_pressed.connect(start_run)
+	hud.shop_opened.connect(open_shop)
+	hud.shop_closed.connect(show_title)
+	hud.buy_pressed.connect(buy_upgrade)
+	hud.squad_toggled.connect(toggle_squad)
+	hud.menu_pressed.connect(show_title)
+	hud.perk_chosen.connect(_on_perk_chosen)
 	hud.pause_pressed.connect(pause_game)
 	hud.resume_pressed.connect(resume_game)
 	hud.quit_pressed.connect(quit_to_title)
 	hud.sound_toggled.connect(_on_sound_toggled)
 
 
-func start_run() -> void:
+# --- menus -----------------------------------------------------------------
+
+func show_title() -> void:
+	state = State.TITLE
+	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked())
+
+
+func open_shop() -> void:
+	sfx.play("click")
+	hud.show_shop(meta, coins)
+
+
+func buy_upgrade(id: String) -> void:
+	var left := meta.buy(id, coins)
+	if left == coins:
+		return
+	coins = left
+	SaveData.save_coins(coins)
+	SaveData.save_upgrades(meta.levels)
+	sfx.play("gate_good", -4.0)
+	hud.show_shop(meta, coins)
+
+
+func toggle_squad() -> void:
+	if not meta.shotgun_unlocked():
+		return
+	squad_type = "shotgun" if squad_type == "rifle" else "rifle"
+	SaveData.save_squad_type(squad_type)
+	sfx.play("click")
+	show_title()
+
+
+# --- run lifecycle ---------------------------------------------------------
+
+func start_run(p_mode: String = "levels") -> void:
+	mode = p_mode
 	run_seed = SMOKE_SEED if smoke else randi()
 	total_distance = 0.0
 	kills = 0
@@ -139,8 +204,13 @@ func start_run() -> void:
 	gates_passed = 0
 	bosses_killed = 0
 	_shake = 0.0
+	perks = Perks.new()
+	squad.perks = perks
+	squad.squad_type = squad_type
+	world.perks = perks
+	world.endless = mode == "endless"
 	state = State.RUNNING
-	squad.reset()
+	squad.reset(meta.start_squad())
 	world.reset(run_seed)
 	squad.active = true
 	hud.show_running()
@@ -149,21 +219,26 @@ func start_run() -> void:
 
 
 func end_run() -> void:
-	if state != State.RUNNING:
+	if state != State.RUNNING and state != State.CHOOSING:
 		return
 	state = State.GAME_OVER
 	squad.active = false
 	_since_game_over = 0.0
-	# The auto-player must not pollute a real player's records.
-	var records := {"new_best_score": false, "new_best_level": false}
+	var earned := int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
+	# The auto-player must not pollute a real player's records or wallet.
+	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
 	if not smoke:
-		records = SaveData.record_run(score, world.level)
+		records = SaveData.record_run(score, world.level, world.endless)
+		coins = SaveData.add_coins(earned)
 	if records.new_best_score:
 		best = score
 	if records.new_best_level:
 		best_level = world.level
+	if records.new_best_endless:
+		best_endless = score
+	var is_best: bool = records.new_best_endless if world.endless else records.new_best_score
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, best, records.new_best_score, world.level, int(total_distance), kills, peak_squad)
+	hud.show_game_over(score, best_endless if world.endless else best, is_best, world.level, int(total_distance), kills, peak_squad, earned, world.endless)
 	sfx.play("wipe")
 	_shake = 1.0
 
@@ -187,15 +262,10 @@ func resume_game() -> void:
 func quit_to_title() -> void:
 	get_tree().paused = false
 	hud.show_paused(false)
-	if state == State.RUNNING:
-		# Leaving mid-run still counts: the score stands.
-		state = State.GAME_OVER
-		squad.active = false
-		SaveData.record_run(score, world.level)
-		best = maxi(best, score)
-		best_level = maxi(best_level, world.level)
-	state = State.TITLE
-	hud.show_title(best, best_level)
+	if state == State.RUNNING or state == State.CHOOSING:
+		# Leaving mid-run still counts: the score and coins stand.
+		end_run()
+	show_title()
 	sfx.play("click")
 
 
@@ -205,6 +275,8 @@ func _notification(what: int) -> void:
 		if state == State.RUNNING and not get_tree().paused:
 			pause_game()
 
+
+# --- frame -----------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	_frames += 1
@@ -228,24 +300,29 @@ func _tick_run(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch and event.pressed:
-		_try_start()
+		_try_retry()
 	elif event is InputEventScreenDrag and state == State.RUNNING:
 		squad.nudge(event.relative.x * _drag_scale)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
-			_try_start()
+			if state == State.TITLE:
+				start_run("levels")
+			else:
+				_try_retry()
 		elif event.keycode == KEY_ESCAPE or event.keycode == KEY_P:
 			if get_tree().paused:
 				resume_game()
 			else:
 				pause_game()
+		elif state == State.CHOOSING and event.keycode >= KEY_1 and event.keycode <= KEY_3:
+			var i: int = event.keycode - KEY_1
+			if i < _offer.size():
+				_on_perk_chosen(_offer[i])
 
 
-func _try_start() -> void:
-	if state == State.TITLE:
-		start_run()
-	elif state == State.GAME_OVER and _since_game_over >= RETRY_LOCKOUT:
-		start_run()
+func _try_retry() -> void:
+	if state == State.GAME_OVER and _since_game_over >= RETRY_LOCKOUT:
+		start_run(mode)
 
 
 func _keyboard_steer(delta: float) -> void:
@@ -276,6 +353,8 @@ func _punch(amount: float) -> void:
 	_fov_tween.tween_property(camera, "fov", 55.0 - amount, 0.08)
 	_fov_tween.tween_property(camera, "fov", 55.0, 0.25)
 
+
+# --- world events ----------------------------------------------------------
 
 func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void:
 	gates_passed += 1
@@ -342,10 +421,36 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 
 
 func _on_level_started(level: int) -> void:
-	if level > 1:
-		squad.redeploy()
-		hud.show_banner("LEVEL %d" % level, 1.0)
+	if level <= 1:
+		return
+	hud.show_banner("LEVEL %d" % level, 1.0)
+	if not world.endless:
+		squad.redeploy(meta.start_squad())
 		sfx.play("spawn")
+
+
+func _on_perk_pick_due() -> void:
+	if state != State.RUNNING:
+		return
+	_offer = perks.offer(world.gen.rng)
+	if _offer.is_empty():
+		return
+	state = State.CHOOSING
+	squad.active = false
+	hud.show_perks(_offer)
+	sfx.play("level_clear", -6.0, 1.3)
+
+
+func _on_perk_chosen(id: String) -> void:
+	if state != State.CHOOSING or not _offer.has(id):
+		return
+	perks.take(id)
+	_offer = []
+	state = State.RUNNING
+	squad.active = true
+	hud.show_running()
+	hud.show_banner(Perks.title(id), 0.8)
+	sfx.play("gate_good")
 
 
 func _on_count_changed(new_count: int) -> void:
@@ -364,8 +469,14 @@ func _on_sound_toggled(on: bool) -> void:
 		sfx.play("click")
 
 
+# --- smoke and screenshots ------------------------------------------------
+
 func _smoke_tick() -> void:
 	if _quitting:
+		return
+	if state == State.CHOOSING:
+		if _bot_auto_perk:
+			_on_perk_chosen(_offer[0])
 		return
 	if _frames < _smoke_frames and state == State.RUNNING:
 		_bot_steer()
@@ -375,10 +486,12 @@ func _smoke_tick() -> void:
 	if _frames >= _smoke_frames or state == State.GAME_OVER:
 		var summary := {
 			"frames": _frames,
+			"mode": mode,
 			"level": world.level,
 			"distance": int(total_distance),
 			"gates": gates_passed,
 			"bosses": bosses_killed,
+			"perks": perks.stacks,
 			"kills": kills,
 			"squad": squad.count,
 			"peak_squad": peak_squad,
@@ -408,28 +521,39 @@ func _bot_steer() -> void:
 func _shots_walkthrough() -> void:
 	DirAccess.make_dir_recursive_absolute(_shots_dir)
 	await _capture("1_title.png", 20)
+	open_shop()
+	await _capture("2_shop.png", 5)
+	show_title()
 	smoke = true
-	start_run()
-	await _capture("2_play_early.png", 240)
-	await _capture("3_play_mid.png", 600)
-	# Run until the boss fight is on, then grab it.
+	start_run("levels")
+	await _capture("3_play_early.png", 240)
+	_bot_auto_perk = false
+	for i in range(3000):
+		if state == State.CHOOSING:
+			break
+		await get_tree().process_frame
+	await _capture("4_perks.png", 5)
+	if state == State.CHOOSING:
+		_on_perk_chosen(_offer[0])
+	_bot_auto_perk = true
+	await _capture("5_play_mid.png", 300)
 	for i in range(3000):
 		if world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0:
 			break
 		await get_tree().process_frame
-	await _capture("4_boss.png", 5)
+	await _capture("6_boss.png", 5)
 	for i in range(3000):
 		if world.phase != World.Phase.BOSS:
 			break
 		await get_tree().process_frame
-	await _capture("5_level_clear.png", 20)
-	await _capture("6_level_two.png", 400)
+	await _capture("7_level_clear.png", 20)
+	await _capture("8_level_two.png", 400)
 	pause_game()
-	await _capture("7_paused.png", 5)
+	await _capture("9_paused.png", 5)
 	resume_game()
 	smoke = false
 	squad.set_count(0)
-	await _capture("8_game_over.png", 30)
+	await _capture("10_game_over.png", 30)
 	_quit_with(0)
 
 

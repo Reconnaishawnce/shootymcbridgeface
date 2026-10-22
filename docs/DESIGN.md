@@ -51,19 +51,36 @@ other way, and your aim as a resource you have to spend wisely.
   fire from a modelled squad of 100 + 20 per level.
 - Clearing a level pays `150 x level + 5 x soldiers left`. The run ends
   when the count hits zero.
+- After the third and sixth gate of a level the game stops and offers
+  three perk cards drawn from a pool of nine, seeded by the run. Perks
+  stack to a cap and last the run. Rapid fire and big bullets change the
+  guns; piercing lets a bullet survive a kill; gate whisperer cuts step
+  cost; recruiter adds a soldier at every gate; thick skin, long sight,
+  core sight and greed do what they say.
+- Every run pays coins: a quarter per kill, 25 per boss, 2 per gate,
+  times the greed perk and the coin magnet upgrade. The shop sells eight
+  permanent upgrades at a cost that grows 1.7x per level: recruits
+  (start squad), firepower, gate bonus, armor, boss slayer, coin magnet,
+  scout, and the shotgun squad.
+- Shotguns fire three pellets in a fan per shot for 1.35x total damage.
+  Better against crowds, same against gates.
+- Endless mode (unlocked by reaching level 4) has no bosses and no reset.
+  Levels tick every eight gates for difficulty and the HUD; the run 1
+  regulators (multipliers vanish past 150 soldiers, halving gates, brute
+  health scaling) keep it from exploding.
 
 ## Balance notes
 
-The built-in auto-player (`++ --smoke`) picks the better panel, shoots
-whatever is close and tracks the boss core. It is a strong proxy for a
-practised human; a newcomer lands well below it.
+The built-in auto-player (`++ --smoke`, add `--endless` for that mode)
+picks the better panel, shoots whatever is close, tracks the boss core and
+takes the first perk offered. It is a strong proxy for a practised human;
+a newcomer lands well below it.
 
-| Metric | Run 2 result (bot) |
+| Metric | Run 3 result (bot, no upgrades) |
 |---|---|
-| Squad at each boss, levels 1 to 5 | 82, 69, 66, 136, 60 |
-| Boss fight length | 10 to 20 s |
-| Level reached before wipe | 6, at the boss, after 3.9 minutes |
-| Peak squad | ~150 |
+| Levels: squad at each boss, 1 to 9 | 100, 215, 84, 334, 424, 98, 64, 55, 41 |
+| Levels: after 6 minutes | level 9, 18 soldiers, still alive |
+| Endless: after 3 minutes | level 7, ~650 peak, still alive |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side
@@ -84,8 +101,7 @@ Grouped by what they add. Starred items are the first to build.
 - Formation choice: wide line, column, wedge, each with a cost.
 
 ### Make runs varied
-- ★ Mid-run perk picks every few gates (ricochet, piercing, extra soldier
-  per gate), the Vampire Survivors engine.
+- ★ Mid-run perk picks every third gate (built).
 - Branching lanes with a tiny minimap.
 - Zombie types that interact with gates: thieves that steal a bonus, tanks
   that block the lane so you cannot farm the gate behind them.
@@ -93,12 +109,12 @@ Grouped by what they add. Starred items are the first to build.
 
 ### Keep people coming back
 - ★ Levels with a boss and a squad reset (built).
-- ★ Small meta upgrade shop paid with run coins (starting squad, damage,
-  gate bonus). About eight upgrades. No gacha.
+- ★ Small meta upgrade shop paid with run coins (built, eight upgrades).
 - Daily seeded run with a shareable score code. The generator is already
   seeded, so this is cheap.
-- Endless mode as a separate, post-levels option.
-- Unlockable squad types: shotgunners, a medic that revives one per wave.
+- ★ Endless mode as an unlock (built).
+- Unlockable squad types: shotgunners (built), a medic that revives one
+  per wave.
 
 ### Strange twists that could be the hook
 - Play as the horde: gates grow your zombies, soldiers are the obstacle.
@@ -108,6 +124,12 @@ Grouped by what they add. Starred items are the first to build.
 
 ## Art direction
 
-Flat-shaded low-poly primitives on purpose. Readability over fidelity. If
-real models arrive later they replace primitives one class at a time
-without touching the logic.
+Flat-shaded low-poly primitives on purpose, but assembled into characters:
+soldiers have running legs, a vest and chest plate, helmet and visor,
+backpack, and two arms on a gun that recoils; zombies hunch forward with
+arms out, red eyes, a shirt from a dull palette and shambling legs; brutes
+add shoulder plates; the boss has legs, fists, a jaw, spikes and a ringed
+core. The front of the squad gets the detailed build and the crowd behind
+it a cheaper one, which keeps a 36-soldier squad near 400 draw calls.
+Readability over fidelity: blue is yours, green is theirs, yellow is a
+target.

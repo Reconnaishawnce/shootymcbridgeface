@@ -833,4 +833,9 @@ func _quit_with(code: int) -> void:
 	sfx.stop_all()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	get_tree().quit(code)
+	# Free the whole scene first so the shared materials have no users
+	# left, then drop the cache itself.
+	get_tree().root.remove_child(self)
+	free()
+	Mats.clear()
+	Engine.get_main_loop().quit(code)

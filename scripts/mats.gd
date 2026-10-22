@@ -15,6 +15,13 @@ static func _cache() -> Dictionary:
 	return Engine.get_meta(CACHE_KEY)
 
 
+## Drop every cached material. Called on the way out so nothing is still
+## referenced when the engine checks for leaked resources at exit.
+static func clear() -> void:
+	if Engine.has_meta(CACHE_KEY):
+		Engine.remove_meta(CACHE_KEY)
+
+
 static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 	var cache := _cache()
 	var key := "%s|%s" % [color.to_html(true), unshaded]

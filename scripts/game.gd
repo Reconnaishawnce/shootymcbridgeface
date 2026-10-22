@@ -46,10 +46,17 @@ var hud: Hud
 var sfx: Sfx
 var meta := Meta.new()
 var perks := Perks.new()
+## The upgrades in force for the current run: the real ones, or a blank
+## set for the daily so everyone plays the same game.
+var run_meta := Meta.new()
+var daily_day := 0
+var daily_results: Dictionary = {}
+var _last_result := {}
 
 var _frames := 0
 var _smoke_frames := SMOKE_FRAMES
 var _smoke_endless := false
+var _smoke_daily := false
 var _shots_dir := ""
 var _since_game_over := 0.0
 var _shake := 0.0
@@ -66,6 +73,7 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	smoke = args.has("--smoke")
 	_smoke_endless = args.has("--endless")
+	_smoke_daily = args.has("--daily")
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
@@ -77,8 +85,10 @@ func _ready() -> void:
 	coins = SaveData.load_coins()
 	meta.levels = SaveData.load_upgrades()
 	squad_type = SaveData.load_squad_type()
-	if squad_type == "shotgun" and not meta.shotgun_unlocked():
+	if not meta.squad_unlocked(squad_type):
 		squad_type = "rifle"
+	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
+	daily_results = Daily.prune(SaveData.load_daily(), daily_day)
 	# Headless CI has no audio device; the dummy driver releases playbacks
 	# on its own thread and can report them as leaked at exit. Keep the
 	# auto-player silent so its exit is deterministic.
@@ -88,7 +98,7 @@ func _ready() -> void:
 	hud.set_sound(Sfx.enabled)
 	show_title()
 	if smoke:
-		start_run("endless" if _smoke_endless else "levels")
+		start_run("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels"))
 	elif _shots_dir != "":
 		_shots_walkthrough()
 
@@ -126,6 +136,8 @@ func _build_scene() -> void:
 	world.meta = meta
 	add_child(world)
 	world.gate_passed.connect(_on_gate_passed)
+	world.gate_robbed.connect(_on_gate_robbed)
+	world.spit_landed.connect(_on_spit_landed)
 	world.gate_stepped.connect(_on_gate_stepped)
 	world.zombie_killed.connect(_on_zombie_killed)
 	world.squad_bitten.connect(_on_squad_bitten)
@@ -148,6 +160,8 @@ func _build_scene() -> void:
 	add_child(hud)
 	hud.play_pressed.connect(start_run)
 	hud.shop_opened.connect(open_shop)
+	hud.daily_opened.connect(open_daily)
+	hud.copy_pressed.connect(copy_result)
 	hud.shop_closed.connect(show_title)
 	hud.buy_pressed.connect(buy_upgrade)
 	hud.squad_toggled.connect(toggle_squad)
@@ -163,7 +177,39 @@ func _build_scene() -> void:
 
 func show_title() -> void:
 	state = State.TITLE
-	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked())
+	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"))
+
+
+func open_daily() -> void:
+	sfx.play("click")
+	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
+	daily_results = Daily.prune(daily_results, daily_day)
+	hud.show_daily(daily_day, daily_results)
+
+
+## Put the last result (or today's daily best) on the clipboard.
+func copy_result() -> void:
+	var text := ""
+	if state == State.GAME_OVER and not _last_result.is_empty():
+		text = _result_text(_last_result)
+	elif daily_results.has(daily_day):
+		var r: Dictionary = daily_results[daily_day]
+		text = Daily.share_text(daily_day, int(r.score), int(r.level), int(r.kills), int(r.peak))
+	if text == "":
+		hud.toast("Nothing to copy yet")
+		return
+	DisplayServer.clipboard_set(text)
+	hud.toast("Copied!")
+	sfx.play("click")
+
+
+func _result_text(r: Dictionary) -> String:
+	match r.mode:
+		"daily":
+			return Daily.share_text(daily_day, r.score, r.level, r.kills, r.peak)
+		"endless":
+			return "Shooty McBridgeface endless\nScore %d · %d m · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.distance, r.kills, r.peak]
+	return "Shooty McBridgeface\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.level, r.kills, r.peak]
 
 
 func open_shop() -> void:
@@ -183,9 +229,7 @@ func buy_upgrade(id: String) -> void:
 
 
 func toggle_squad() -> void:
-	if not meta.shotgun_unlocked():
-		return
-	squad_type = "shotgun" if squad_type == "rifle" else "rifle"
+	squad_type = meta.next_squad(squad_type)
 	SaveData.save_squad_type(squad_type)
 	sfx.play("click")
 	show_title()
@@ -196,6 +240,13 @@ func toggle_squad() -> void:
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
 	run_seed = SMOKE_SEED if smoke else randi()
+	# The daily: one seed for everyone, no upgrades, rifles.
+	run_meta = Meta.new() if mode == "daily" else meta
+	if mode == "daily":
+		daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
+		run_seed = Daily.seed_for_day(daily_day)
+	squad.meta = run_meta
+	world.meta = run_meta
 	total_distance = 0.0
 	kills = 0
 	score = 0
@@ -206,11 +257,12 @@ func start_run(p_mode: String = "levels") -> void:
 	_shake = 0.0
 	perks = Perks.new()
 	squad.perks = perks
-	squad.squad_type = squad_type
+	squad.squad_type = "rifle" if mode == "daily" else squad_type
 	world.perks = perks
+	world.perk_count = 0
 	world.endless = mode == "endless"
 	state = State.RUNNING
-	squad.reset(meta.start_squad())
+	squad.reset(run_meta.start_squad())
 	world.reset(run_seed)
 	squad.active = true
 	hud.show_running()
@@ -224,21 +276,35 @@ func end_run() -> void:
 	state = State.GAME_OVER
 	squad.active = false
 	_since_game_over = 0.0
-	var earned := int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
+	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
+	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
-	if not smoke:
-		records = SaveData.record_run(score, world.level, world.endless)
-		coins = SaveData.add_coins(earned)
-	if records.new_best_score:
-		best = score
-	if records.new_best_level:
-		best_level = world.level
-	if records.new_best_endless:
-		best_endless = score
-	var is_best: bool = records.new_best_endless if world.endless else records.new_best_score
+	var is_best := false
+	var shown_best := best
+	if mode == "daily":
+		var prev := int(daily_results.get(daily_day, {}).get("score", 0))
+		if not smoke:
+			var out := Daily.record(daily_results, daily_day, score, world.level, kills, peak_squad)
+			daily_results = out.results
+			is_best = out.new_best
+			SaveData.save_daily(daily_results)
+			SaveData.record_run(score, world.level, true)
+		shown_best = maxi(prev, score)
+	else:
+		if not smoke:
+			records = SaveData.record_run(score, world.level, world.endless)
+			coins = SaveData.add_coins(earned)
+		if records.new_best_score:
+			best = score
+		if records.new_best_level:
+			best_level = world.level
+		if records.new_best_endless:
+			best_endless = score
+		is_best = records.new_best_endless if world.endless else records.new_best_score
+		shown_best = best_endless if world.endless else best
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, best_endless if world.endless else best, is_best, world.level, int(total_distance), kills, peak_squad, earned, world.endless)
+	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode)
 	sfx.play("wipe")
 	_shake = 1.0
 
@@ -369,6 +435,20 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 		sfx.play("gate_bad", -4.0)
 
 
+func _on_gate_robbed(gate: Gate, index: int) -> void:
+	sfx.play("gate_bad", -2.0, 1.3)
+	hud.show_float("ROBBED!", false)
+	Burst.spawn(world, gate.panel_position(index) + Vector3(0.0, 0.0, 0.3), Zombie.THIEF_SKIN, 8, 0.12, 4.0, 0.4)
+
+
+func _on_spit_landed(hit: bool) -> void:
+	sfx.play("hit", -2.0, 0.6)
+	var at := squad.position + Vector3(0.0, 0.3, 0.0) if hit else squad.position + Vector3(2.0, 0.3, 0.0)
+	Burst.spawn(world, at, Spit.COLOR, 10, 0.14, 4.0, 0.5)
+	if hit:
+		_shake = minf(1.0, _shake + 0.5)
+
+
 func _on_gate_stepped(gate: Gate, index: int) -> void:
 	sfx.play("step", -8.0, randf_range(0.95, 1.1))
 	Burst.spawn(world, gate.panel_position(index) + Vector3(0.0, 0.0, 0.3), GatePanelView.CHOSEN, 4, 0.1, 3.0, 0.3)
@@ -425,7 +505,7 @@ func _on_level_started(level: int) -> void:
 		return
 	hud.show_banner("LEVEL %d" % level, 1.0)
 	if not world.endless:
-		squad.redeploy(meta.start_squad())
+		squad.redeploy(run_meta.start_squad())
 		sfx.play("spawn")
 
 
@@ -445,6 +525,7 @@ func _on_perk_chosen(id: String) -> void:
 	if state != State.CHOOSING or not _offer.has(id):
 		return
 	perks.take(id)
+	world.perk_count = perks.total()
 	_offer = []
 	state = State.RUNNING
 	squad.active = true
@@ -509,6 +590,11 @@ func _bot_steer() -> void:
 	if world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
 		squad.target_x = clampf(world.boss.position.x + world.boss.core_x, -Squad.LANE_HALF, Squad.LANE_HALF)
 		return
+	# A thief about to reach a gate outranks everything else.
+	for z in world.zombies:
+		if z.is_thief():
+			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
+			return
 	var z := world.nearest_zombie(22.0)
 	var g := world.nearest_upcoming_gate()
 	if z != null and (g == null or z.position.z > g.position.z):
@@ -523,6 +609,8 @@ func _shots_walkthrough() -> void:
 	await _capture("1_title.png", 20)
 	open_shop()
 	await _capture("2_shop.png", 5)
+	open_daily()
+	await _capture("2b_daily.png", 5)
 	show_title()
 	smoke = true
 	start_run("levels")

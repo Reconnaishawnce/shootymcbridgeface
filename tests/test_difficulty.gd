@@ -33,6 +33,12 @@ func test_curves_are_bounded_and_increasing() -> void:
 	check_eq(Difficulty.wave_for(5, 0).brutes, 0, "no brutes on any level's opener")
 	check(Difficulty.wave_for(2, 2).brutes >= 1, "brutes from level 2")
 	check(Difficulty.wave_for(1, 4).brutes >= 1, "brutes late in level 1")
+	check_eq(Difficulty.wave_for(1, 3).thieves, 0, "no thieves on level 1")
+	check(Difficulty.wave_for(2, 1).thieves >= 1, "thieves from level 2 on odd gates")
+	check_eq(Difficulty.wave_for(2, 0).thieves, 0, "no thieves on the opener")
+	check_eq(Difficulty.wave_for(2, 2).tanks, 0, "no tanks on level 2")
+	check_eq(Difficulty.wave_for(3, 2).tanks, 1, "a tank on level 3 gate 3")
+	check(Difficulty.wave_for(3, 2, 300).tank_hp > Difficulty.wave_for(3, 2, 1).tank_hp * 5.0, "tanks soak a big squad")
 	check(Difficulty.wave_for(1, 2, 200).count > Difficulty.wave_for(1, 2, 1).count, "big squads draw crowds")
 	check(Difficulty.wave_for(1, 2, 100000).count <= Difficulty.MAX_WAVE, "wave capped")
 	check(Difficulty.wave_for(1, 2, 500).brute_hp > Difficulty.wave_for(1, 2, 1).brute_hp * 10.0, "brutes soak a big squad")
@@ -42,10 +48,24 @@ func test_curves_are_bounded_and_increasing() -> void:
 
 func test_boss_curve() -> void:
 	var last := 0.0
-	for level in range(1, 20):
+	for level in range(1, 20, 2):
 		var hp := Difficulty.boss_hp(level)
-		check(hp > last, "boss hp grows at level %d" % level)
+		check(hp > last, "walker hp grows at level %d" % level)
 		last = hp
+	last = 0.0
+	for level in range(2, 20, 2):
+		var hp := Difficulty.boss_hp(level)
+		check(hp > last, "spitter hp grows at level %d" % level)
+		last = hp
+	check(Difficulty.boss_hp(2) < Difficulty.boss_hp(3), "spitters carry less than the next walker")
+	check(Difficulty.boss_hp(3, 5) > Difficulty.boss_hp(3, 0), "perks make bosses tougher")
+	check_near(Difficulty.boss_hp(3, 5) / Difficulty.boss_hp(3, 0), 1.3, 0.001, "6% per perk")
+	check_eq(Difficulty.spit_bite(10), 2, "spit bite floor")
+	check_eq(Difficulty.spit_bite(100), 8, "spit bite scales")
+	check_eq(Difficulty.boss_kind(1), Boss.Kind.WALKER, "odd levels walk")
+	check_eq(Difficulty.boss_kind(2), Boss.Kind.SPITTER, "even levels spit")
+	check_eq(Difficulty.tank_bite(10), 5, "tank bite floor")
+	check_eq(Difficulty.tank_bite(200), 30, "tank bite scales")
 	check_near(Difficulty.boss_hp(1), 100.0 * 2.5 * 7.0, 0.001, "level 1 boss is 7 s of a 100 squad")
 	check_eq(Difficulty.boss_bite(10), 2, "boss bite floor")
 	check_eq(Difficulty.boss_bite(100), 12, "boss bite scales")

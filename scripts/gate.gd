@@ -50,6 +50,13 @@ func panel_position(index: int) -> Vector3:
 	return _views[index].global_position
 
 
+## A thief got here: knock the panel down and show it.
+func rob(index: int) -> void:
+	GateMath.steal(panels[index])
+	_views[index].refresh(panels[index])
+	_views[index].pop()
+
+
 func reveal_all() -> void:
 	for i in range(2):
 		if not panels[i].revealed:

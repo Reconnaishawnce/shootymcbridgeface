@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.4 (run 4)
+
+Daily run, copy-to-share, thieves and tanks, the spitter boss, medics.
+
+- Daily: same seed for everyone per UTC day, no upgrades, rifles only.
+  Daily card with the last seven days; best of the day counts. Copy
+  result button on the daily card and on every game-over card.
+- Thieves sprint away toward the next gate and knock its better panel
+  down on arrival. Tanks are wide, slow bullet sponges with a scrap shield.
+- Even-level boss is now the spitter: holds 24 m back, sways, lobs globs
+  that land where you were. Odd levels keep the walker.
+- Medic squad unlock in the shop: a revived soldier every three seconds,
+  25% less from brutes and tanks, 0.85x damage, white vest with a cross.
+  Squad button cycles through unlocked squads.
+- Balance: recruiter capped at two stacks; boss health grows 6% per perk
+  taken; spitter carries 70% health; spit takes 8% of the squad.
+- Balance, bot with no upgrades, first perk offered: squad at the boss on
+  levels 1 to 8 was 100, 118, 53, 42, 143, 134, 62, 63; boss fights ran
+  9 to 27 s with the spitters the long ones; reached level 9 at six
+  minutes with 17 soldiers. Endless: level 7 at three minutes, peak about
+  350, 89 left. Daily (seeded): level 3 at 90 s.
+
 ## 0.3 (run 3)
 
 Perks, coins and shop, endless mode, shotguns, and real characters.

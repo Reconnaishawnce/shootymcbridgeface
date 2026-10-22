@@ -33,6 +33,7 @@ func test_maxed_perks_leave_the_pool() -> void:
 	for i in range(30):
 		check(not p.offer(rng).has("pierce"), "maxed perk never offered")
 	check_eq(p.total(), 2, "total stacks")
+	check_eq(int(Perks.CATALOG["recruit"]["max"]), 2, "recruiter capped at two")
 
 
 func test_effects_scale_with_stacks() -> void:

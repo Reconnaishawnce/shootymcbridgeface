@@ -9,7 +9,7 @@ const CATALOG := {
 	"big": {"name": "BIG BULLETS", "desc": "+40% bullet size", "max": 2},
 	"pierce": {"name": "PIERCING", "desc": "Bullets pass through a kill", "max": 2},
 	"whisper": {"name": "GATE WHISPERER", "desc": "Gates step up 25% faster", "max": 3},
-	"recruit": {"name": "RECRUITER", "desc": "+1 soldier at every gate", "max": 3},
+	"recruit": {"name": "RECRUITER", "desc": "+1 soldier at every gate", "max": 2},
 	"skin": {"name": "THICK SKIN", "desc": "Brutes eat a third less", "max": 2},
 	"sight": {"name": "LONG SIGHT", "desc": "Hidden gates show from farther", "max": 2},
 	"core": {"name": "CORE SIGHT", "desc": "Boss core takes +1x damage", "max": 3},

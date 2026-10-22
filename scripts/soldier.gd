@@ -10,6 +10,8 @@ extends Node3D
 
 const BODY := Color(0.22, 0.45, 0.85)
 const SHOTGUN_BODY := Color(0.95, 0.52, 0.16)
+const MEDIC_BODY := Color(0.92, 0.92, 0.9)
+const CROSS := Color(0.9, 0.15, 0.15)
 const SKIN := Color(0.93, 0.76, 0.6)
 const SKIN_DARK := Color(0.42, 0.28, 0.2)
 const PANTS := Color(0.16, 0.18, 0.24)
@@ -22,6 +24,7 @@ const PACK := Color(0.28, 0.3, 0.22)
 
 var target_offset := Vector3.ZERO
 var detailed := true
+var squad_type := "rifle"
 var shotgun := false
 
 var _muzzle: MeshInstance3D
@@ -33,15 +36,20 @@ var _phase := randf() * TAU
 var _stride := randf_range(11.0, 13.5)
 
 
-func _init(p_detailed: bool = true, p_shotgun: bool = false) -> void:
+func _init(p_detailed: bool = true, p_type: String = "rifle") -> void:
 	detailed = p_detailed
-	shotgun = p_shotgun
+	squad_type = p_type
+	shotgun = p_type == "shotgun"
 	_build()
 
 
 func _build() -> void:
 	var skin := SKIN.lerp(SKIN_DARK, randf() * randf())
-	var vest := SHOTGUN_BODY if shotgun else BODY
+	var vest := BODY
+	if shotgun:
+		vest = SHOTGUN_BODY
+	elif squad_type == "medic":
+		vest = MEDIC_BODY
 
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
@@ -92,6 +100,13 @@ func _build() -> void:
 	var pack := Mats.box(Vector3(0.22, 0.26, 0.13), vest.darkened(0.35))
 	pack.position = Vector3(0.0, 0.8, 0.21)
 	add_child(pack)
+	if squad_type == "medic":
+		var cross_v := Mats.box(Vector3(0.06, 0.18, 0.03), CROSS)
+		cross_v.position = Vector3(0.0, 0.8, 0.285)
+		add_child(cross_v)
+		var cross_h := Mats.box(Vector3(0.18, 0.06, 0.03), CROSS)
+		cross_h.position = Vector3(0.0, 0.8, 0.285)
+		add_child(cross_h)
 	var visor := Mats.box(Vector3(0.2, 0.07, 0.05), VISOR)
 	visor.position = Vector3(0.0, 1.2, -0.15)
 	add_child(visor)

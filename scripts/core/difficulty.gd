@@ -34,6 +34,20 @@ const MAX_WAVE := 32
 const MAX_BRUTES := 6
 const BRUTE_BITE_FRACTION := 0.08
 const BRUTE_HP_PER_SOLDIER := 2.0
+const TANK_HP_PER_SOLDIER := 6.0
+const TANK_BITE_FRACTION := 0.15
+const MAX_THIEVES := 3
+## Thieves sprint away from the squad toward the next gate at this absolute
+## speed; the world scrolls the other way, so they close on the gate at
+## roughly this minus the world speed.
+const THIEF_SPEED := 14.0
+## Boss health grows with the perks taken, so a stacked run still has to
+## earn its boss kills.
+const BOSS_HP_PER_PERK := 0.06
+## The spitter never reaches you, so it carries less health than the walker.
+const SPITTER_HP_MULT := 0.7
+## What one glob of spit takes if it lands on the squad.
+const SPIT_BITE_FRACTION := 0.08
 ## Above this squad size the good side stops offering multipliers and the bad
 ## side leans on halving, so a level cannot snowball out of range.
 const BIG_SQUAD := 150
@@ -110,14 +124,29 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 	if (level >= 2 and index >= 2) or index >= GATES_PER_LEVEL / 2:
 		brutes = 1 + int(lv / 2.0) + int(ix / 4.0) + int(squad_count / 60.0)
 	var hp := 1.0 + ix * 0.15 + lv * 0.35
+	# Thieves run for the next gate and knock its value down: from level 2,
+	# on gates that are not the opener, one or two of them.
+	var thieves := 0
+	if level >= 2 and index >= 1 and index % 2 == 1:
+		thieves = 1 + int(lv / 4.0)
+	# Tanks are bullet sponges that shield the gate behind them: from level
+	# 3, every third gate.
+	var tanks := 0
+	if level >= 3 and index >= 2 and index % 3 == 2:
+		tanks = 1
 	return {
 		"count": mini(2 + int(ix * 0.9 + lv) + int(squad_count / 12.0), MAX_WAVE),
 		"hp": hp,
 		# A brute soaks about a second of the whole squad's fire whatever its
 		# size, so brutes stay a threat to a thousand soldiers.
 		"brute_hp": hp * 4.0 + float(squad_count) * BRUTE_HP_PER_SOLDIER,
+		# A tank soaks several seconds of fire; you go round it or through it.
+		"tank_hp": hp * 6.0 + float(squad_count) * TANK_HP_PER_SOLDIER,
+		"thief_hp": hp * 1.5,
 		"speed": 1.5 + minf(lv * 0.15 + ix * 0.04, 1.5),
 		"brutes": mini(brutes, MAX_BRUTES),
+		"thieves": mini(thieves, MAX_THIEVES),
+		"tanks": tanks,
 	}
 
 
@@ -133,8 +162,26 @@ static func expected_squad(level: int) -> int:
 	return 100 + 20 * (level - 1)
 
 
-static func boss_hp(level: int) -> float:
-	return float(expected_squad(level)) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
+static func boss_hp(level: int, perk_count: int = 0) -> float:
+	var base := float(expected_squad(level)) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
+	if boss_kind(level) == Boss.Kind.SPITTER:
+		base *= SPITTER_HP_MULT
+	return base * (1.0 + BOSS_HP_PER_PERK * float(perk_count))
+
+
+## Soldiers one landed glob of spit takes.
+static func spit_bite(squad_count: int) -> int:
+	return maxi(2, int(float(squad_count) * SPIT_BITE_FRACTION))
+
+
+## Bosses alternate: odd levels get the walker, even levels the spitter.
+static func boss_kind(level: int) -> int:
+	return Boss.Kind.SPITTER if level % 2 == 0 else Boss.Kind.WALKER
+
+
+## Soldiers a tank takes when it reaches the squad.
+static func tank_bite(squad_count: int) -> int:
+	return maxi(5, int(float(squad_count) * TANK_BITE_FRACTION))
 
 
 ## Soldiers the boss chews per bite once it has reached the squad.

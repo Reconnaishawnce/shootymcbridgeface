@@ -7,6 +7,8 @@ extends CanvasLayer
 ## only buttons catch.
 
 signal play_pressed(mode: String)
+signal daily_opened
+signal copy_pressed
 signal shop_opened
 signal shop_closed
 signal buy_pressed(id: String)
@@ -43,6 +45,12 @@ var _endless_button: Button
 var _squad_button: Button
 
 var _shop_card: Control
+var _daily_card: Control
+var _daily_title: Label
+var _daily_lines: Label
+var _toast: Label
+var _toast_tween: Tween
+var _over_copy: Button
 var _shop_coins: Label
 var _shop_rows: Dictionary = {}
 
@@ -147,6 +155,7 @@ func _init() -> void:
 
 	_build_title(root)
 	_build_shop(root)
+	_build_daily(root)
 	_build_perks(root)
 	_build_over(root)
 	_build_pause(root)
@@ -166,6 +175,9 @@ func _build_title(root: Control) -> void:
 	_endless_button = _button("ENDLESS", 36)
 	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
 	box.add_child(_endless_button)
+	var daily := _button("DAILY", 36)
+	daily.pressed.connect(func() -> void: daily_opened.emit())
+	box.add_child(daily)
 	_squad_button = _button("SQUAD: RIFLES", 30)
 	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
 	box.add_child(_squad_button)
@@ -215,6 +227,37 @@ func _build_shop(root: Control) -> void:
 	box.add_child(back)
 
 
+func _build_daily(root: Control) -> void:
+	_daily_card = _card(root)
+	_daily_card.visible = false
+	var box: VBoxContainer = _daily_card.get_meta("box")
+	_daily_title = _label(48, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_daily_title)
+	var blurb := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+	blurb.text = "Same gates for everyone today.\nNo upgrades, rifles only. Best of the day counts."
+	box.add_child(blurb)
+	_daily_lines = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_daily_lines)
+	var play := _button("PLAY TODAY", 40)
+	play.pressed.connect(func() -> void: play_pressed.emit("daily"))
+	box.add_child(play)
+	var copy := _button("COPY TODAY'S RESULT", 28)
+	copy.pressed.connect(func() -> void: copy_pressed.emit())
+	box.add_child(copy)
+	var back := _button("BACK", 34)
+	back.pressed.connect(func() -> void: shop_closed.emit())
+	box.add_child(back)
+	_toast = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
+	_toast.anchor_left = 0.0
+	_toast.anchor_right = 1.0
+	_toast.anchor_top = 0.86
+	_toast.anchor_bottom = 0.86
+	_toast.offset_bottom = 60.0
+	_toast.modulate.a = 0.0
+	_toast.add_theme_color_override("font_color", COIN)
+	root.add_child(_toast)
+
+
 func _build_perks(root: Control) -> void:
 	_perk_card = _card(root)
 	_perk_card.visible = false
@@ -242,6 +285,9 @@ func _build_over(root: Control) -> void:
 	box.add_child(_over_lines)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_prompt)
+	_over_copy = _button("COPY RESULT", 28)
+	_over_copy.pressed.connect(func() -> void: copy_pressed.emit())
+	box.add_child(_over_copy)
 	var menu := _button("MENU", 30)
 	menu.pressed.connect(func() -> void: menu_pressed.emit())
 	box.add_child(menu)
@@ -282,6 +328,7 @@ func set_sound(on: bool) -> void:
 func _hide_cards() -> void:
 	_title_card.visible = false
 	_shop_card.visible = false
+	_daily_card.visible = false
 	_perk_card.visible = false
 	_over_card.visible = false
 	_pause_card.visible = false
@@ -303,8 +350,36 @@ func show_title(best: int, best_level: int, best_endless: int, coins: int, endle
 	_endless_button.disabled = not endless_unlocked
 	_endless_button.text = "ENDLESS" if endless_unlocked else "ENDLESS  (clear level %d)" % Meta.ENDLESS_UNLOCK_LEVEL
 	_squad_button.visible = shotgun_unlocked
-	_squad_button.text = "SQUAD: SHOTGUNS" if squad_type == "shotgun" else "SQUAD: RIFLES"
+	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
 	_coins_title.text = "%d COINS" % coins
+
+
+## [param results] maps day number to {score, level, kills, peak}.
+func show_daily(day: int, results: Dictionary) -> void:
+	_hide_cards()
+	_daily_card.visible = true
+	_daily_title.text = Daily.label(day)
+	var lines := []
+	var days := results.keys()
+	days.sort()
+	days.reverse()
+	for d in days:
+		var r: Dictionary = results[d]
+		var tag := "today" if int(d) == day else "#%d" % int(d)
+		lines.append("%s   %d pts   level %d" % [tag, int(r.get("score", 0)), int(r.get("level", 0))])
+	if lines.is_empty():
+		lines.append("No result yet today.")
+	_daily_lines.text = "\n".join(lines)
+
+
+func toast(text: String) -> void:
+	_toast.text = text
+	_toast.modulate.a = 1.0
+	if _toast_tween != null:
+		_toast_tween.kill()
+	_toast_tween = create_tween()
+	_toast_tween.tween_interval(1.2)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.4)
 
 
 func show_shop(meta: Meta, coins: int) -> void:
@@ -345,15 +420,20 @@ func show_running() -> void:
 		_prompt_tween.kill()
 
 
-func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, endless: bool) -> void:
+func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String) -> void:
 	_hide_cards()
 	_over_card.visible = true
 	_pause_button.visible = false
 	_boss_box.visible = false
 	_over_title.text = "WIPED OUT"
 	var head := "NEW BEST!  %d" % score if is_best else "Score %d   (best %d)" % [score, best]
-	var where := "Endless   %d m" % distance if endless else "Level %d   %d m" % [level, distance]
-	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n+%d coins" % [head, where, kills, peak, coins_earned]
+	var where := "Level %d   %d m" % [level, distance]
+	if mode == "endless":
+		where = "Endless   %d m" % distance
+	elif mode == "daily":
+		where = "Daily   level %d   %d m" % [level, distance]
+	var coins_line := "no coins in the daily" if mode == "daily" else "+%d coins" % coins_earned
+	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	_over_prompt.text = "TAP TO RETRY"
 	_pulse_prompt()
 	if is_best:

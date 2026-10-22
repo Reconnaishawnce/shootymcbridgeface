@@ -47,9 +47,22 @@ the same key (see below).
   greed. On desktop press 1, 2 or 3.
 - **Endless**: unlocked by clearing level 3. No bosses, no reset, gates
   forever, separate best score.
+- **Daily**: the same gates for everyone on a given UTC day, no upgrades,
+  rifles only. Your best of the day is kept for a week on the Daily card.
+  Copy the one-line result to paste anywhere; the game-over card has a
+  copy button too.
+- **Bosses** alternate: odd levels get the walker that chews you once it
+  arrives, even levels get the spitter that holds back and lobs globs at
+  where you were standing.
+- **Thieves** sprint away from you toward the next gate and knock its
+  better panel down if they get there. **Tanks** are slow bullet sponges
+  that shield the gate behind them.
+- **Squads**: rifles (balanced), shotguns (three pellets, more damage),
+  medics (less damage, a revived soldier every three seconds, brutes bite
+  for less). The latter two are shop unlocks.
 - **Coins and shop**: every run pays coins (kills, bosses, gates). The shop
-  on the title screen sells eight permanent upgrades, including the
-  shotgun squad, which fires three pellets in a fan for more total damage.
+  on the title screen sells nine permanent upgrades, including the shotgun
+  and medic squads.
 - Score is metres travelled plus ten per kill plus a bonus per level
   cleared. Best score, best level, endless best, coins and upgrades are
   saved locally.

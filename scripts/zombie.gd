@@ -3,10 +3,17 @@ extends Node3D
 ## A walker: hunched torso, arms out, red eyes, shambling legs. Reaches the
 ## squad, eats [member bite] soldiers, and is spent. Brutes are bigger, with
 ## shoulder plates, and take a slice of the squad instead of a nibble.
+## Thieves sprint the other way, toward the next gate, and knock its value
+## down if they get there. Tanks are wide bullet sponges that shield the
+## gate behind them.
+
+enum Kind { NORMAL, BRUTE, THIEF, TANK }
 
 const SKIN := Color(0.45, 0.65, 0.35)
 const SKIN_PALE := Color(0.62, 0.72, 0.45)
 const BRUTE_SKIN := Color(0.46, 0.34, 0.3)
+const THIEF_SKIN := Color(0.85, 0.75, 0.3)
+const TANK_SKIN := Color(0.35, 0.4, 0.45)
 const SHIRTS := [
 	Color(0.5, 0.2, 0.2), Color(0.35, 0.35, 0.4), Color(0.4, 0.3, 0.2),
 	Color(0.35, 0.2, 0.4), Color(0.2, 0.35, 0.3), Color(0.55, 0.45, 0.2),
@@ -27,6 +34,7 @@ var homing := 1.8
 ## arrives as a crowd instead of a single stacked column.
 var lane_offset := 0.0
 var bite := 1
+var kind: int = Kind.NORMAL
 var brute := false
 var radius := 0.55
 var alive := true
@@ -45,22 +53,64 @@ func _init() -> void:
 	add_child(_body)
 
 
-func setup(p_hp: float, p_speed: float, p_brute: bool) -> void:
-	brute = p_brute
+func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
+	kind = p_kind
+	brute = kind == Kind.BRUTE
 	max_hp = p_hp
 	hp = max_hp
-	speed = p_speed * (0.7 if brute else 1.0)
-	bite = 3 if brute else 1
-	radius = 0.85 if brute else 0.55
-	homing = 1.2 if brute else 1.8
-	_base_scale = 1.7 if brute else 1.0
+	match kind:
+		Kind.BRUTE:
+			speed = p_speed * 0.7
+			bite = 3
+			radius = 0.85
+			homing = 1.2
+			_base_scale = 1.7
+		Kind.THIEF:
+			speed = p_speed
+			bite = 1
+			radius = 0.4
+			homing = 3.0
+			_base_scale = 0.8
+		Kind.TANK:
+			speed = p_speed * 0.45
+			bite = 5
+			radius = 1.25
+			homing = 0.6
+			_base_scale = 2.1
+		_:
+			speed = p_speed
+			bite = 1
+			radius = 0.55
+			homing = 1.8
+			_base_scale = 1.0
 	_body.scale = Vector3.ONE * _base_scale
 	_build()
+	if is_thief():
+		# Thieves run away from the squad, so they face down the lane.
+		_body.rotation.y = PI
+
+
+func is_thief() -> bool:
+	return kind == Kind.THIEF
+
+
+func is_tank() -> bool:
+	return kind == Kind.TANK
 
 
 func _build() -> void:
-	var skin := BRUTE_SKIN if brute else SKIN.lerp(SKIN_PALE, randf())
-	var shirt: Color = PLATE if brute else SHIRTS[randi() % SHIRTS.size()]
+	var skin := SKIN.lerp(SKIN_PALE, randf())
+	var shirt: Color = SHIRTS[randi() % SHIRTS.size()]
+	match kind:
+		Kind.BRUTE:
+			skin = BRUTE_SKIN
+			shirt = PLATE
+		Kind.THIEF:
+			skin = THIEF_SKIN
+			shirt = Color(0.2, 0.2, 0.22)
+		Kind.TANK:
+			skin = TANK_SKIN
+			shirt = PLATE
 
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
@@ -101,6 +151,16 @@ func _build() -> void:
 			var pad := Mats.box(Vector3(0.3, 0.14, 0.3), PLATE)
 			pad.position = Vector3(side * 0.3, 1.06, 0.05)
 			_body.add_child(pad)
+	elif is_tank():
+		# A slab of scrap held out front: the thing that eats your bullets.
+		var shield := Mats.box(Vector3(1.1, 0.9, 0.12), PLATE.lightened(0.15))
+		shield.position = Vector3(0.0, 0.8, 0.42)
+		_body.add_child(shield)
+	elif is_thief():
+		# A sack over the shoulder: it is here to take, not to bite.
+		var sack := Mats.sphere(0.16, Color(0.5, 0.38, 0.2))
+		sack.position = Vector3(-0.22, 1.05, -0.1)
+		_body.add_child(sack)
 
 	var bar_bg := Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
 	bar_bg.position.y = 1.6
@@ -148,7 +208,7 @@ func _process(delta: float) -> void:
 	if not alive:
 		return
 	# A stumbling lurch so a wave reads as a crowd, not a grid.
-	var t := Time.get_ticks_msec() * 0.001 * 7.0 + _phase
+	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() else 7.0) + _phase
 	_body.rotation.z = sin(t * 0.8) * 0.08
 	_body.position.y = absf(sin(t * 0.5)) * 0.05
 	for i in range(_legs.size()):

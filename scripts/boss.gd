@@ -5,7 +5,15 @@ extends Node3D
 ## through the core deal [member core_mult] damage, so tracking it with your
 ## steering is the skill.
 
+enum Kind { WALKER, SPITTER }
+
 const BODY_RADIUS := 1.7
+## The spitter holds this far away and lobs at you instead of walking in.
+const SPITTER_HOLD_Z := -24.0
+const SPIT_INTERVAL := 3.0
+## The spitter is a smaller target that swings its whole body side to side.
+const SPITTER_SWAY := 1.8
+const SPITTER_SWAY_SPEED := 1.1
 const CORE_RADIUS := 0.42
 const CORE_MULT := 3.0
 const CORE_SWAY := 1.1
@@ -15,12 +23,17 @@ const SKIN := Color(0.55, 0.3, 0.28)
 const DARK := Color(0.3, 0.16, 0.15)
 const CORE_COLOR := Color(1.0, 0.85, 0.2)
 const EYE := Color(1.0, 0.15, 0.1)
+const SPITTER_SKIN := Color(0.4, 0.55, 0.3)
 
 var hp := 100.0
 var max_hp := 100.0
 var alive := true
 var core_x := 0.0
 var core_mult := CORE_MULT
+var kind: int = Kind.WALKER
+## Body sway (spitter only), applied to position.x by the world.
+var sway_x := 0.0
+var spit_timer := SPIT_INTERVAL * 0.6
 
 var _body: Node3D
 var _core: MeshInstance3D
@@ -82,9 +95,22 @@ func _init() -> void:
 	_body.add_child(_core)
 
 
-func setup(p_hp: float) -> void:
+func setup(p_hp: float, p_kind: int = Kind.WALKER) -> void:
+	kind = p_kind
 	max_hp = p_hp
 	hp = p_hp
+	if kind == Kind.SPITTER:
+		# Sickly green, no fists, a wide maw: it does not need to reach you.
+		for c in _body.get_children():
+			if c is MeshInstance3D and c != _core and c != _ring and c.material_override == Mats.flat(SKIN):
+				c.material_override = Mats.flat(SPITTER_SKIN)
+		var maw := Mats.sphere(0.42, Color(0.1, 0.05, 0.05))
+		maw.position = Vector3(0.0, 3.5, 0.62)
+		_body.add_child(maw)
+
+
+func is_spitter() -> bool:
+	return kind == Kind.SPITTER
 
 
 func is_core_hit(x: float) -> bool:
@@ -112,6 +138,8 @@ func _process(delta: float) -> void:
 		return
 	var t := Time.get_ticks_msec() * 0.001
 	core_x = sin(t * CORE_SPEED + _phase) * CORE_SWAY
+	if is_spitter():
+		sway_x = sin(t * SPITTER_SWAY_SPEED + _phase * 0.5) * SPITTER_SWAY
 	_core.position.x = core_x
 	_ring.position.x = core_x
 	_core.scale = Vector3.ONE * (1.0 + 0.15 * sin(t * 9.0))

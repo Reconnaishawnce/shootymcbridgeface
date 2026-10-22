@@ -17,6 +17,11 @@ const DPS_PER_SOLDIER := 2.5
 const SHOTGUN_PELLETS := 3
 const SHOTGUN_DAMAGE_MULT := 1.35
 const SHOTGUN_SPREAD := 1.6
+## Medics trade a little damage for a steady trickle of revived soldiers
+## and tougher skin against brutes.
+const MEDIC_DAMAGE_MULT := 0.85
+const MEDIC_REVIVE_SECONDS := 3.0
+const MEDIC_BITE_MULT := 0.75
 
 var count := 1
 var target_x := 0.0
@@ -29,6 +34,7 @@ var squad_type := "rifle"
 var _soldiers: Array[Soldier] = []
 var _fire_accum := 0.0
 var _fire_index := 0
+var _revive_timer := 0.0
 
 
 func reset(start_count: int = 1) -> void:
@@ -73,13 +79,26 @@ func is_shotgun() -> bool:
 	return squad_type == "shotgun"
 
 
+func is_medic() -> bool:
+	return squad_type == "medic"
+
+
+## Extra multiplier on what a brute or tank takes.
+func bite_mult() -> float:
+	return MEDIC_BITE_MULT if is_medic() else 1.0
+
+
 func _fire_mult() -> float:
 	return perks.fire_rate_mult() if perks != null else 1.0
 
 
 func _damage_mult() -> float:
 	var m := meta.damage_mult() if meta != null else 1.0
-	return m * (SHOTGUN_DAMAGE_MULT if is_shotgun() else 1.0)
+	if is_shotgun():
+		m *= SHOTGUN_DAMAGE_MULT
+	elif is_medic():
+		m *= MEDIC_DAMAGE_MULT
+	return m
 
 
 ## Damage per second of the whole squad. Linear in count by design.
@@ -102,7 +121,7 @@ func damage_per_shot() -> float:
 func _sync_visuals() -> void:
 	var want := mini(count, MAX_VISUAL)
 	while _soldiers.size() < want:
-		var s := Soldier.new(_soldiers.size() < DETAILED, is_shotgun())
+		var s := Soldier.new(_soldiers.size() < DETAILED, squad_type)
 		add_child(s)
 		_soldiers.append(s)
 	while _soldiers.size() > want:
@@ -118,6 +137,11 @@ func _process(delta: float) -> void:
 	if not active or count == 0 or world == null:
 		return
 	_fire(delta)
+	if is_medic():
+		_revive_timer += delta
+		if _revive_timer >= MEDIC_REVIVE_SECONDS:
+			_revive_timer -= MEDIC_REVIVE_SECONDS
+			add(1)
 
 
 func _fire(delta: float) -> void:

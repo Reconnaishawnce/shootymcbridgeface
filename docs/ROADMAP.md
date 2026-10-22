@@ -58,21 +58,34 @@ Definition of done for every run:
 - Smoke bot takes perks and can run endless; screenshot walkthrough covers
   the shop and the perk cards.
 
-## Run 4: shareable and daily
+## Run 4: daily, share, new enemies, second boss, medics (done)
 
-- Daily seeded run with a shareable score code and a local leaderboard.
-- Share sheet from the game-over card.
-- Branching lanes with a minimap.
-- Zombie types that interact with gates (thief, tank).
-- Medic squad type; a second boss type.
-- Phone feedback pass: steering sensitivity, perk balance, shop prices.
+- Daily seeded run: one seed per UTC day, no upgrades, rifles only, best
+  of the day kept for a week, result line copies to the clipboard. Copy
+  button on the game-over card for every mode.
+- Thieves that sprint for the next gate and knock its value down; tanks
+  that shield the gate behind them.
+- Spitter boss on even levels: holds back, sways, lobs globs. Walker on
+  odd levels.
+- Medic squad: revives a soldier every three seconds, bites for less,
+  does a little less damage.
+- Balance: recruiter capped at two stacks; boss health grows 6% per perk;
+  spitter carries 70% health; spit takes 8%.
+- Deferred: branching lanes with a minimap. It needs split road geometry,
+  a camera that follows the chosen side, and per-branch gate schedules,
+  which is a run of its own. Android share sheet needs a plugin; the
+  clipboard copy covers it for now.
 
-## Run 5: polish and the weird one
+## Run 5: branching lanes and polish
 
+- Branching lanes: a fork gate splits the road for a stretch, each side
+  with its own gates and waves, a minimap strip previewing both, merge at
+  the end.
 - Real models for soldiers and zombies if available, same classes.
 - Play-as-the-horde mode prototype.
 - Pass-and-play.
 - Performance pass on low-end phones, battery check, 30 fps option.
+- Phone feedback pass: steering sensitivity, perk balance, shop prices.
 
 ## Always
 

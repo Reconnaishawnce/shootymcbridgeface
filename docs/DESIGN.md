@@ -64,6 +64,26 @@ other way, and your aim as a resource you have to spend wisely.
   scout, and the shotgun squad.
 - Shotguns fire three pellets in a fan per shot for 1.35x total damage.
   Better against crowds, same against gates.
+- Bosses alternate by level. Odd: the walker, which closes in and chews
+  12% of the squad every 0.45 s once it arrives. Even: the spitter, which
+  holds 24 m out, sways its whole body across 3.6 m, carries 70% of the
+  walker's health, and lobs a glob every 3 s at where the squad was when
+  it fired; a landed glob takes 8%. Boss health also grows 6% per perk
+  taken, so stacked runs still have to earn their boss kills.
+- Thieves (from level 2, odd gates) spawn on the squad's side of the next
+  gate and sprint toward it at 14 m/s; if one arrives it takes 2 off the
+  better additive panel or a half step off a multiplier. A target that
+  runs away is a different shot from a target that walks at you.
+- Tanks (from level 3, every third gate) are slow, 2.5 m wide, carry six
+  seconds of squad fire plus a squad-scaled soak, and eat 15% if they
+  arrive. They stand between you and the gate: go round, or spend the
+  bullets.
+- Squads: rifles; shotguns fire three pellets in a fan for 1.35x total
+  damage; medics do 0.85x damage, revive one soldier every three seconds
+  and take 25% less from brutes and tanks.
+- The daily uses one seed per UTC day, a blank upgrade set and rifles.
+  Results for the last seven days are kept locally; the best of the day
+  is the one that counts. The result line copies to the clipboard.
 - Endless mode (unlocked by reaching level 4) has no bosses and no reset.
   Levels tick every eight gates for difficulty and the HUD; the run 1
   regulators (multipliers vanish past 150 soldiers, halving gates, brute
@@ -76,11 +96,12 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 3 result (bot, no upgrades) |
+| Metric | Run 4 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 9 | 100, 215, 84, 334, 424, 98, 64, 55, 41 |
-| Levels: after 6 minutes | level 9, 18 soldiers, still alive |
-| Endless: after 3 minutes | level 7, ~650 peak, still alive |
+| Levels: squad at each boss, 1 to 8 | 100, 118, 53, 42, 143, 134, 62, 63 |
+| Levels: after 6 minutes | level 9, 17 soldiers, still alive |
+| Endless: after 3 minutes | level 7, peak ~350, 89 left |
+| Daily: after 90 s | level 3, two bosses down |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side
@@ -103,18 +124,15 @@ Grouped by what they add. Starred items are the first to build.
 ### Make runs varied
 - ★ Mid-run perk picks every third gate (built).
 - Branching lanes with a tiny minimap.
-- Zombie types that interact with gates: thieves that steal a bonus, tanks
-  that block the lane so you cannot farm the gate behind them.
+- ★ Zombie types that interact with gates: thieves and tanks (built).
 - ★ Boss with a shootable weak point that multiplies damage (built).
 
 ### Keep people coming back
 - ★ Levels with a boss and a squad reset (built).
 - ★ Small meta upgrade shop paid with run coins (built, eight upgrades).
-- Daily seeded run with a shareable score code. The generator is already
-  seeded, so this is cheap.
+- ★ Daily seeded run with a shareable result (built).
 - ★ Endless mode as an unlock (built).
-- Unlockable squad types: shotgunners (built), a medic that revives one
-  per wave.
+- ★ Unlockable squad types: shotgunners and medics (built).
 
 ### Strange twists that could be the hook
 - Play as the horde: gates grow your zombies, soldiers are the obstacle.

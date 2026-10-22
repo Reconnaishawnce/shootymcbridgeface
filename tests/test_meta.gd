@@ -36,6 +36,17 @@ func test_effects() -> void:
 	check_near(m.brute_bite_fraction(0.03), 0.02, 0.0001, "armor floors")
 
 
+func test_squad_cycling() -> void:
+	var m := Meta.new()
+	check_eq(m.next_squad("rifle"), "rifle", "nothing unlocked wraps to rifle")
+	m.levels = {"medic": 1}
+	check_eq(m.next_squad("rifle"), "medic", "skips locked shotgun")
+	check_eq(m.next_squad("medic"), "rifle", "wraps")
+	m.levels = {"medic": 1, "shotgun": 1}
+	check_eq(m.next_squad("rifle"), "shotgun", "in order")
+	check(m.squad_unlocked("medic") and not Meta.new().squad_unlocked("medic"), "unlock check")
+
+
 func test_coins_and_endless_unlock() -> void:
 	check_eq(Meta.coins_for_run(40, 2, 10), 10 + 50 + 20, "payout")
 	check(not Meta.endless_unlocked(3), "level 3 reached is not enough")

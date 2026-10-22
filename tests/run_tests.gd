@@ -11,6 +11,8 @@ const TEST_SCRIPTS := [
 	"res://tests/test_sfx.gd",
 	"res://tests/test_perks.gd",
 	"res://tests/test_meta.gd",
+	"res://tests/test_daily.gd",
+	"res://tests/test_gate_math_extra.gd",
 ]
 
 

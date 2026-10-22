@@ -12,8 +12,10 @@ const CATALOG := {
 	"magnet": {"name": "COIN MAGNET", "desc": "+15% coins", "max": 4, "base": 45},
 	"scout": {"name": "SCOUT", "desc": "Hidden gates show 8 m sooner", "max": 3, "base": 55},
 	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 200},
+	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 250},
 }
-const ORDER := ["start", "power", "gate", "armor", "slayer", "magnet", "scout", "shotgun"]
+const ORDER := ["start", "power", "gate", "armor", "slayer", "magnet", "scout", "shotgun", "medic"]
+const SQUAD_TYPES := ["rifle", "shotgun", "medic"]
 const COST_GROWTH := 1.7
 ## Clearing this level unlocks Endless mode.
 const ENDLESS_UNLOCK_LEVEL := 3
@@ -105,3 +107,24 @@ func reveal_bonus() -> float:
 
 func shotgun_unlocked() -> bool:
 	return level("shotgun") >= 1
+
+
+func squad_unlocked(type: String) -> bool:
+	match type:
+		"rifle":
+			return true
+		"shotgun":
+			return level("shotgun") >= 1
+		"medic":
+			return level("medic") >= 1
+	return false
+
+
+## The next unlocked squad type after [param current], wrapping round.
+func next_squad(current: String) -> String:
+	var i := SQUAD_TYPES.find(current)
+	for step in range(1, SQUAD_TYPES.size() + 1):
+		var t: String = SQUAD_TYPES[(i + step) % SQUAD_TYPES.size()]
+		if squad_unlocked(t):
+			return t
+	return "rifle"

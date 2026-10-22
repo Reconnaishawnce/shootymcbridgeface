@@ -15,6 +15,8 @@ const MUL_CAP := 5.0
 const MUL_STEP := 0.5
 ## Multiplier panels are far more valuable per step, so each step costs more.
 const MUL_COST_FACTOR := 3.0
+## What a thief takes off an additive panel.
+const STEAL_AMOUNT := 2.0
 
 
 class GatePanel:
@@ -98,6 +100,17 @@ static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> i
 			Kind.MUL:
 				panel.value = minf(panel.value + MUL_STEP, MUL_CAP)
 	return steps
+
+
+## A thief reached the panel: knock it down a notch. Additive panels lose
+## STEAL_AMOUNT; multipliers lose a half step but never below x1.
+static func steal(panel: GatePanel) -> void:
+	panel.revealed = true
+	match panel.kind:
+		Kind.ADD:
+			panel.value -= STEAL_AMOUNT
+		Kind.MUL:
+			panel.value = maxf(1.0, panel.value - MUL_STEP)
 
 
 ## Index (0 or 1) of the panel that leaves the squad larger. Ties go left.

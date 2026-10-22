@@ -79,6 +79,15 @@ static func save_upgrades(levels: Dictionary) -> void:
 	_write(META, "upgrades", levels)
 
 
+static func load_daily() -> Dictionary:
+	var v = _read(STATS, "daily", {})
+	return v if v is Dictionary else {}
+
+
+static func save_daily(results: Dictionary) -> void:
+	_write(STATS, "daily", results)
+
+
 ## Record a finished run. Returns which records it broke.
 static func record_run(score: int, level: int, endless: bool = false) -> Dictionary:
 	var cfg := _load()

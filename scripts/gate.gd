@@ -7,8 +7,10 @@ const POST := Color(0.25, 0.25, 0.28)
 
 var panels: Array = []
 var passed := false
-## 0-based position inside its level; decides perk picks.
+## 0-based position inside its level.
 var index := 0
+## Steps the player shot each panel up, for the PERFECT bonus.
+var steps_up := [0, 0]
 var _views: Array[GatePanelView] = []
 
 
@@ -41,6 +43,7 @@ func register_hit(index: int, damage: float, step_cost: float) -> bool:
 	var steps := GateMath.register_hit(panels[index], damage, step_cost)
 	_views[index].refresh(panels[index])
 	if steps > 0:
+		steps_up[index] += steps
 		_views[index].pop()
 	return steps > 0
 

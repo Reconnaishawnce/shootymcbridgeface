@@ -27,8 +27,8 @@ other way, and your aim as a resource you have to spend wisely.
 - A run is a sequence of levels. A level is eight gates, a zombie wave
   after each, then a boss. The squad resets to one soldier at the start of
   every level, so growth is bounded per level and the boss is the bar.
-- The world scrolls toward the squad at 8 to 12 m/s during gates and slows
-  to 2.5 m/s for the boss. The squad stays at the origin and steers across
+- The world scrolls toward the squad at 9.5 to 14 m/s during gates and
+  slows to 2.5 m/s for the boss. The squad stays at the origin and steers across
   a six-metre lane.
 - A gate every 32 m. Each gate is two panels. The squad's x position at
   the moment the gate reaches it picks the panel. The first gate of every
@@ -36,8 +36,8 @@ other way, and your aim as a resource you have to spend wisely.
 - Panels are additive (`+n`, `-n`) or multiplicative (`x2`, `x3`, `x0.5`).
   Additive values climb by one per step of bullet damage; multipliers climb
   by 0.5 per step and cost three times as much. A step costs the larger of
-  a level floor and 90% of the squad's damage per second, so farming a gate
-  yields roughly one step per second of committed fire at any squad size.
+  a level floor and 70% of the squad's damage per second, so farming a gate
+  yields about 1.4 steps per second of committed fire at any squad size.
 - A zombie wave sits 26 m after each gate, 6 m before the next one. Waves
   are shielded by the gate in front of them until it passes, then exposed
   for about three seconds. Waves ramp mainly with the gate index inside the
@@ -49,14 +49,30 @@ other way, and your aim as a resource you have to spend wisely.
   2.2 m/s and then chews 12% of the squad every 0.45 s. Its core sways
   across 2.2 m and takes triple damage. Boss health is seven seconds of
   fire from a modelled squad of 100 + 20 per level.
-- Clearing a level pays `150 x level + 5 x soldiers left`. The run ends
-  when the count hits zero.
-- After the third and sixth gate of a level the game stops and offers
-  three perk cards drawn from a pool of nine, seeded by the run. Perks
+- Clearing a level pays `150 x level + 5 x soldiers left`, and a quarter
+  of the survivors carry over to the next level (never below the shop's
+  starting squad). The run ends when the count hits zero.
+- The third and sixth gate of a level is a perk gate: three purple panels
+  across the lane, one perk each, drawn from a pool of nine and seeded by
+  the run. You steer through the one you want at full speed. Nothing
+  stops; the choice is a steering decision like any other gate. Perks
   stack to a cap and last the run. Rapid fire and big bullets change the
   guns; piercing lets a bullet survive a kill; gate whisperer cuts step
   cost; recruiter adds a soldier at every gate; thick skin, long sight,
-  core sight and greed do what they say.
+  core sight and greed do what they say. Bullets pass through perk gates.
+- Dopamine on a timer. Kills within 1.4 s chain into a combo; every five
+  raises a score multiplier up to 4x, with a readout and a draining bar.
+  A wave fully killed before any of it reaches you pays a wave-clear
+  bonus. A panel shot up three or more steps and then walked through is
+  a PERFECT. A bite that leaves you with four or fewer soldiers plays in
+  slow motion for 0.6 s, and the screen edges pulse red while you are
+  down to a handful.
+- Threat from the start. Every gate is followed by a pack of runners
+  (fast, thin, homing) 11 m later and a wave 26 m later. Waves are many
+  bodies with little health, so mowing them is the fun; brutes appear
+  from the third gate of level 1. Walkers barely steer toward you, so
+  lining up the crowd is the player's job. Every level's opener wave is
+  gentler because the squad has just reset.
 - Every run pays coins: a quarter per kill, 25 per boss, 2 per gate,
   times the greed perk and the coin magnet upgrade. The shop sells eight
   permanent upgrades at a cost that grows 1.7x per level: recruits
@@ -96,12 +112,10 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 4 result (bot, no upgrades) |
+| Metric | Run 5 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 8 | 100, 118, 53, 42, 143, 134, 62, 63 |
-| Levels: after 6 minutes | level 9, 17 soldiers, still alive |
-| Endless: after 3 minutes | level 7, peak ~350, 89 left |
-| Daily: after 90 s | level 3, two bosses down |
+| Levels: squad at each boss, 1 to 6 | 69, 100, 57, 242, 25, 29; wiped at the level 6 boss, 4 min |
+| Endless: after 3 minutes | level 8, peak 590, 40 left, best combo 126 |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side
@@ -117,6 +131,7 @@ Grouped by what they add. Starred items are the first to build.
 - ★ Hidden values revealed by proximity or a bullet (built).
 - Values that tick down while you hesitate, or flip when a zombie touches
   the panel.
+- Kill combos, wave-clear and PERFECT bonuses (built in run 5).
 - Dual-resource gates: one side grows the squad, the other grows fire rate.
 - Trade-off gates: `-3 soldiers, +50% damage`.
 - Formation choice: wide line, column, wedge, each with a cost.

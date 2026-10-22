@@ -19,20 +19,27 @@ func test_level_layout() -> void:
 
 
 func test_curves_are_bounded_and_increasing() -> void:
-	check_near(Difficulty.world_speed(1), 8.0, 0.001, "base speed")
-	check(Difficulty.world_speed(100) <= 12.0, "speed capped")
+	check_near(Difficulty.world_speed(1), 9.5, 0.001, "base speed")
+	check(Difficulty.world_speed(100) <= 14.0, "speed capped")
+	check(Difficulty.runner_release_z(1) < -8.0 and Difficulty.runner_release_z(1) > -30.0, "runners released a second out")
+	check(Difficulty.runner_release_z(9) < Difficulty.runner_release_z(1), "faster roads release farther")
 	check(Difficulty.boss_world_speed() < Difficulty.world_speed(1), "boss fight slows the road")
 	check(Difficulty.step_cost(5) > Difficulty.step_cost(1), "step cost grows")
 	check_near(Difficulty.effective_step_cost(1, 1.0), 3.0, 0.001, "floor applies to a tiny squad")
-	check_near(Difficulty.effective_step_cost(1, 100.0), 90.0, 0.001, "big squad pays its own dps")
+	check_near(Difficulty.effective_step_cost(1, 100.0), 70.0, 0.001, "big squad pays most of its dps")
 	check(Difficulty.wave_for(3, 2).count > Difficulty.wave_for(1, 0).count, "waves grow")
 	check(Difficulty.wave_for(3, 2).hp > Difficulty.wave_for(1, 0).hp, "hp grows")
 	check(Difficulty.wave_for(1, 7).count > Difficulty.wave_for(1, 0).count, "waves grow inside a level")
-	check(Difficulty.wave_for(6, 0).count <= 8, "a late level still opens gently (got %d)" % Difficulty.wave_for(6, 0).count)
+	check(Difficulty.wave_for(6, 0).count <= 12, "a late level still opens gently (got %d)" % Difficulty.wave_for(6, 0).count)
 	check_eq(Difficulty.wave_for(1, 0).brutes, 0, "no brutes at the very start")
 	check_eq(Difficulty.wave_for(5, 0).brutes, 0, "no brutes on any level's opener")
-	check(Difficulty.wave_for(2, 2).brutes >= 1, "brutes from level 2")
-	check(Difficulty.wave_for(1, 4).brutes >= 1, "brutes late in level 1")
+	check(Difficulty.wave_for(1, 3).brutes >= 1, "brutes from the fourth gate of level 1")
+	check(Difficulty.wave_for(1, 0).runners >= 1, "runners from the first gate")
+	check(Difficulty.wave_for(1, 6).runners > Difficulty.wave_for(1, 0).runners, "more runners deeper in")
+	check_eq(Difficulty.wave_for(6, 0).runners, 1, "one runner on any opener")
+	check(Difficulty.wave_for(6, 0).hp < Difficulty.wave_for(6, 1).hp, "opener zombies are softer")
+	check(Difficulty.wave_for(1, 0).runner_hp < Difficulty.wave_for(1, 0).hp, "runners are thin")
+	check(Difficulty.wave_clear_bonus(2) > Difficulty.wave_clear_bonus(1), "wave bonus grows")
 	check_eq(Difficulty.wave_for(1, 3).thieves, 0, "no thieves on level 1")
 	check(Difficulty.wave_for(2, 1).thieves >= 1, "thieves from level 2 on odd gates")
 	check_eq(Difficulty.wave_for(2, 0).thieves, 0, "no thieves on the opener")
@@ -42,7 +49,7 @@ func test_curves_are_bounded_and_increasing() -> void:
 	check(Difficulty.wave_for(1, 2, 200).count > Difficulty.wave_for(1, 2, 1).count, "big squads draw crowds")
 	check(Difficulty.wave_for(1, 2, 100000).count <= Difficulty.MAX_WAVE, "wave capped")
 	check(Difficulty.wave_for(1, 2, 500).brute_hp > Difficulty.wave_for(1, 2, 1).brute_hp * 10.0, "brutes soak a big squad")
-	check_eq(Difficulty.brute_bite(10), 3, "brute bite floor")
+	check_eq(Difficulty.brute_bite(10), 2, "brute bite floor")
 	check_eq(Difficulty.brute_bite(1000), 80, "brute bite scales")
 
 
@@ -66,10 +73,12 @@ func test_boss_curve() -> void:
 	check_eq(Difficulty.boss_kind(2), Boss.Kind.SPITTER, "even levels spit")
 	check_eq(Difficulty.tank_bite(10), 5, "tank bite floor")
 	check_eq(Difficulty.tank_bite(200), 30, "tank bite scales")
-	check_near(Difficulty.boss_hp(1), 100.0 * 2.5 * 7.0, 0.001, "level 1 boss is 7 s of a 100 squad")
+	check_near(Difficulty.boss_hp(1), 70.0 * 2.5 * 7.0, 0.001, "level 1 boss is 7 s of a 70 squad")
 	check_eq(Difficulty.boss_bite(10), 2, "boss bite floor")
 	check_eq(Difficulty.boss_bite(100), 12, "boss bite scales")
 	check(Difficulty.level_bonus(2, 10) > Difficulty.level_bonus(1, 10), "bonus grows with level")
+	check_eq(Difficulty.carry_over(100, 1), 25, "a quarter carries over")
+	check_eq(Difficulty.carry_over(3, 2), 2, "never below the starting squad")
 
 
 func test_first_gate_of_every_level_is_a_clear_positive_choice() -> void:

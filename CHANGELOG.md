@@ -3,6 +3,35 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.5 (run 5)
+
+The fun pass, from the first real play session: too easy, flow broken by
+the perk cards, nothing at stake.
+
+- Perk cards are gone. The third and sixth gate of each level is now a
+  purple three-way perk gate you steer through at full speed.
+- Runner packs after every gate: fast, thin, homing. Waves are bigger
+  with softer zombies; brutes from the third gate of level 1; walkers
+  barely steer toward you. Road 20% faster. Every level opener is gentle.
+- Kill combos: kills within 1.4 s chain; every five raise the score
+  multiplier up to 4x, with a readout and a draining bar. Wave-clear
+  bonus for killing a whole wave before it arrives. PERFECT bonus for
+  walking through a panel you shot up three steps.
+- Slow motion when a bite leaves you with four or fewer. Red edge pulse
+  while you are down to a handful or far below your level peak. Every
+  bite shows its cost.
+- Gates: hidden panels and dilemmas from level 1, subtractions to -4 on
+  level 1, multipliers slightly more common, gate farming 40% faster.
+- Boss model lowered to 70 + 15 per level to match the smaller squads
+  that harder waves leave you with. A quarter of the survivors carry over
+  into the next level instead of a hard reset to one.
+- Balance, bot with no upgrades: squad at the boss on levels 1 to 6 was
+  69, 100, 57, 242, 25, 29; died at the level 6 boss after four minutes;
+  best combo 80, 23 perfect gates, 32 waves cleared. Endless: level 8 at
+  three minutes, peak 590, combo 126. The earlier cut of this run killed
+  the bot at level 2 and then level 3, which is how the runner timing bug
+  and the survivor carry-over came about.
+
 ## 0.4 (run 4)
 
 Daily run, copy-to-share, thieves and tanks, the spitter boss, medics.

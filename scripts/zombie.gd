@@ -7,13 +7,14 @@ extends Node3D
 ## down if they get there. Tanks are wide bullet sponges that shield the
 ## gate behind them.
 
-enum Kind { NORMAL, BRUTE, THIEF, TANK }
+enum Kind { NORMAL, BRUTE, THIEF, TANK, RUNNER }
 
 const SKIN := Color(0.45, 0.65, 0.35)
 const SKIN_PALE := Color(0.62, 0.72, 0.45)
 const BRUTE_SKIN := Color(0.46, 0.34, 0.3)
 const THIEF_SKIN := Color(0.85, 0.75, 0.3)
 const TANK_SKIN := Color(0.35, 0.4, 0.45)
+const RUNNER_SKIN := Color(0.75, 0.45, 0.35)
 const SHIRTS := [
 	Color(0.5, 0.2, 0.2), Color(0.35, 0.35, 0.4), Color(0.4, 0.3, 0.2),
 	Color(0.35, 0.2, 0.4), Color(0.2, 0.35, 0.3), Color(0.55, 0.45, 0.2),
@@ -38,6 +39,8 @@ var kind: int = Kind.NORMAL
 var brute := false
 var radius := 0.55
 var alive := true
+## Which wave this zombie belongs to, for wave-clear bonuses. -1 for none.
+var wave_id := -1
 
 var _body: Node3D
 var _bar: MeshInstance3D
@@ -77,11 +80,18 @@ func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
 			radius = 1.25
 			homing = 0.6
 			_base_scale = 2.1
+		Kind.RUNNER:
+			speed = p_speed * 2.6
+			bite = 1
+			radius = 0.45
+			homing = 2.8
+			_base_scale = 0.9
 		_:
 			speed = p_speed
 			bite = 1
 			radius = 0.55
-			homing = 1.8
+			# Walkers drift toward you slowly: lining them up is your job.
+			homing = 1.0
 			_base_scale = 1.0
 	_body.scale = Vector3.ONE * _base_scale
 	_build()
@@ -98,6 +108,10 @@ func is_tank() -> bool:
 	return kind == Kind.TANK
 
 
+func is_runner() -> bool:
+	return kind == Kind.RUNNER
+
+
 func _build() -> void:
 	var skin := SKIN.lerp(SKIN_PALE, randf())
 	var shirt: Color = SHIRTS[randi() % SHIRTS.size()]
@@ -111,6 +125,9 @@ func _build() -> void:
 		Kind.TANK:
 			skin = TANK_SKIN
 			shirt = PLATE
+		Kind.RUNNER:
+			skin = RUNNER_SKIN
+			shirt = Color(0.15, 0.15, 0.18)
 
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
@@ -123,7 +140,7 @@ func _build() -> void:
 
 	var torso := Mats.capsule(0.21, 0.5, shirt)
 	torso.position = Vector3(0.0, 0.76, 0.04)
-	torso.rotation.x = 0.3
+	torso.rotation.x = 0.55 if is_runner() else 0.3
 	_body.add_child(torso)
 
 	var head := Mats.sphere(0.17, skin)
@@ -208,7 +225,7 @@ func _process(delta: float) -> void:
 	if not alive:
 		return
 	# A stumbling lurch so a wave reads as a crowd, not a grid.
-	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() else 7.0) + _phase
+	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() else 7.0) + _phase
 	_body.rotation.z = sin(t * 0.8) * 0.08
 	_body.position.y = absf(sin(t * 0.5)) * 0.05
 	for i in range(_legs.size()):

@@ -12,7 +12,9 @@ signal boss_spawned(boss: Boss)
 signal boss_hit(boss: Boss, is_core: bool)
 signal boss_killed(level: int, squad_left: int)
 signal level_started(level: int)
-signal perk_pick_due
+signal perk_chosen(id: String)
+signal wave_cleared(level: int)
+signal gate_perfect(gate: Gate, index: int)
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 
@@ -38,6 +40,7 @@ const DASH := Color(0.8, 0.78, 0.6)
 const POST := Color(0.35, 0.3, 0.26)
 
 var gates: Array[Gate] = []
+var perk_gates: Array[PerkGate] = []
 var zombies: Array[Zombie] = []
 var boss: Boss = null
 var bullets: Node3D
@@ -57,7 +60,13 @@ var world_speed := 8.0
 
 var _next_gate := 0
 var _next_wave := 0
+var _next_runners := 0
 var _gates_passed := 0
+var _wave_seq := 0
+## wave id -> zombies still alive in it; a wave whose last member dies to
+## a bullet pays a bonus. A member reaching the squad voids the wave.
+var _wave_alive: Dictionary = {}
+var _wave_voided: Dictionary = {}
 var _boss_spawned := false
 var _chew_timer := 0.0
 var _clear_timer := 0.0
@@ -89,6 +98,7 @@ func start_level(n: int) -> void:
 		level_distance = 0.0
 		_next_gate = 0
 		_next_wave = 0
+		_next_runners = 0
 	_boss_spawned = false
 	_chew_timer = 0.0
 	boss = null
@@ -103,6 +113,11 @@ func _clear_actors() -> void:
 	for g in gates:
 		g.queue_free()
 	gates.clear()
+	for pg in perk_gates:
+		pg.queue_free()
+	perk_gates.clear()
+	_wave_alive.clear()
+	_wave_voided.clear()
 	for z in zombies:
 		z.queue_free()
 	zombies.clear()
@@ -132,6 +147,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 				start_level(level + 1)
 	_scroll_dressing(delta)
 	_move_gates(delta, p_squad)
+	_move_perk_gates(delta, p_squad)
 	_move_zombies(delta, p_squad)
 	_move_boss(delta)
 	_move_spits(p_squad)
@@ -174,6 +190,7 @@ func try_hit(b: Bullet) -> bool:
 		if z.take_damage(b.damage):
 			zombies.erase(z)
 			zombie_killed.emit(z)
+			_note_wave_death(z)
 			z.die()
 			if b.hits_left > 1:
 				# Piercing: keep flying, but never count the same kill twice.
@@ -216,13 +233,22 @@ func _spawn() -> void:
 	var count := squad.count if squad != null else 1
 	var limit := 1 << 30 if endless else Difficulty.GATES_PER_LEVEL
 	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
-		var pair := gen.make_gate_pair(_gate_level(_next_gate), _gate_index(_next_gate), count)
-		var g := Gate.new()
-		g.setup(pair[0], pair[1])
-		g.index = _gate_index(_next_gate)
-		g.position = Vector3(0.0, 0.0, -(Difficulty.gate_distance(_next_gate) - level_distance))
-		add_child(g)
-		gates.append(g)
+		var z := -(Difficulty.gate_distance(_next_gate) - level_distance)
+		var offer: Array = perks.offer(gen.rng) if (perks != null and Perks.is_pick_gate(_gate_index(_next_gate))) else []
+		if offer.size() >= 2:
+			var pg := PerkGate.new()
+			pg.setup(offer)
+			pg.position = Vector3(0.0, 0.0, z)
+			add_child(pg)
+			perk_gates.append(pg)
+		else:
+			var pair := gen.make_gate_pair(_gate_level(_next_gate), _gate_index(_next_gate), count)
+			var g := Gate.new()
+			g.setup(pair[0], pair[1])
+			g.index = _gate_index(_next_gate)
+			g.position = Vector3(0.0, 0.0, z)
+			add_child(g)
+			gates.append(g)
 		_next_gate += 1
 	while _next_wave < limit and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
 		_spawn_wave(_next_wave, count)
@@ -240,12 +266,14 @@ func _spawn() -> void:
 func _spawn_wave(n: int, count: int) -> void:
 	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
 	var base_z := -(Difficulty.wave_distance(n) - level_distance)
+	_wave_seq += 1
+	var wave := _wave_seq
 	for i in range(spec.count):
-		_spawn_zombie(spec.hp, spec.speed, Zombie.Kind.NORMAL, base_z - gen.rng.randf_range(0.0, 7.0))
+		_spawn_zombie(spec.hp, spec.speed, Zombie.Kind.NORMAL, base_z - gen.rng.randf_range(0.0, 7.0), wave)
 	for i in range(spec.brutes):
-		_spawn_zombie(spec.brute_hp, spec.speed, Zombie.Kind.BRUTE, base_z - gen.rng.randf_range(4.0, 9.0))
+		_spawn_zombie(spec.brute_hp, spec.speed, Zombie.Kind.BRUTE, base_z - gen.rng.randf_range(4.0, 9.0), wave)
 	for i in range(spec.tanks):
-		_spawn_zombie(spec.tank_hp, spec.speed, Zombie.Kind.TANK, base_z + 3.0)
+		_spawn_zombie(spec.tank_hp, spec.speed, Zombie.Kind.TANK, base_z + 3.0, wave)
 	# Thieves start on the squad's side of the gate ahead and sprint for it.
 	# The gate this wave follows is at wave_distance - WAVE_OFFSET; the next
 	# gate is GATE_SPACING further. Put thieves 14 m short of that next gate.
@@ -254,13 +282,53 @@ func _spawn_wave(n: int, count: int) -> void:
 		_spawn_zombie(spec.thief_hp, spec.speed, Zombie.Kind.THIEF, z)
 
 
-func _spawn_zombie(hp: float, speed: float, kind: int, z: float) -> void:
+## Runners come in a tight pack from one side, released as a gate passes.
+func _spawn_runners(n: int, count: int) -> void:
+	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
+	var base_z := Difficulty.runner_release_z(level)
+	var side := -1.0 if gen.rng.randf() < 0.5 else 1.0
+	for i in range(spec.runners):
+		var zb := Zombie.new()
+		zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
+		zb.lane_offset = gen.rng.randf_range(-0.8, 0.8)
+		zb.position = Vector3(side * gen.rng.randf_range(1.0, LANE_HALF - 0.5), 0.0, base_z - gen.rng.randf_range(0.0, 3.0))
+		add_child(zb)
+		zombies.append(zb)
+
+
+func _spawn_zombie(hp: float, speed: float, kind: int, z: float, wave: int = -1) -> void:
 	var zb := Zombie.new()
 	zb.setup(hp, speed, kind)
+	zb.wave_id = wave
+	if wave >= 0:
+		_wave_alive[wave] = int(_wave_alive.get(wave, 0)) + 1
 	zb.lane_offset = gen.rng.randf_range(-1.1, 1.1)
 	zb.position = Vector3(gen.rng.randf_range(-LANE_HALF + 0.8, LANE_HALF - 0.8), 0.0, z)
 	add_child(zb)
 	zombies.append(zb)
+
+
+func _note_wave_death(z: Zombie) -> void:
+	if z.wave_id < 0:
+		return
+	var left := int(_wave_alive.get(z.wave_id, 1)) - 1
+	_wave_alive[z.wave_id] = left
+	if left <= 0:
+		if not _wave_voided.has(z.wave_id):
+			wave_cleared.emit(level)
+		_wave_alive.erase(z.wave_id)
+		_wave_voided.erase(z.wave_id)
+
+
+func _note_wave_leak(z: Zombie) -> void:
+	if z.wave_id < 0:
+		return
+	_wave_voided[z.wave_id] = true
+	var left := int(_wave_alive.get(z.wave_id, 1)) - 1
+	_wave_alive[z.wave_id] = left
+	if left <= 0:
+		_wave_alive.erase(z.wave_id)
+		_wave_voided.erase(z.wave_id)
 
 
 ## The nearest unpassed gate ahead of [param z] (more negative), or null.
@@ -294,13 +362,42 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 				p_squad.set_count(after)
 				_gates_passed += 1
 				gate_passed.emit(panel, before, after)
+				_spawn_runners(_next_runners, p_squad.count)
+				_next_runners += 1
+				if after > 0 and g.steps_up[index] >= Difficulty.PERFECT_STEPS:
+					gate_perfect.emit(g, index)
 				if endless and _gates_passed % Difficulty.GATES_PER_LEVEL == 0:
 					start_level(level + 1)
-				if after > 0 and Perks.is_pick_gate(g.index):
-					perk_pick_due.emit()
 		if g.position.z > DESPAWN_Z:
 			gates.erase(g)
 			g.queue_free()
+
+
+func _move_perk_gates(delta: float, p_squad: Squad) -> void:
+	for pg in perk_gates.duplicate():
+		pg.position.z += world_speed * delta
+		if not pg.passed and pg.position.z >= 0.0:
+			var id: String = pg.choose(pg.slot_at_x(p_squad.position.x))
+			_gates_passed += 1
+			perk_chosen.emit(id)
+			_spawn_runners(_next_runners, p_squad.count)
+			_next_runners += 1
+			if endless and _gates_passed % Difficulty.GATES_PER_LEVEL == 0:
+				start_level(level + 1)
+		if pg.position.z > DESPAWN_Z:
+			perk_gates.erase(pg)
+			pg.queue_free()
+
+
+## The next perk gate the squad has not passed yet, or null.
+func nearest_upcoming_perk_gate() -> PerkGate:
+	var best: PerkGate = null
+	for pg in perk_gates:
+		if pg.passed:
+			continue
+		if best == null or pg.position.z > best.position.z:
+			best = pg
+	return best
 
 
 func _move_zombies(delta: float, p_squad: Squad) -> void:
@@ -313,6 +410,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * delta)
 		if z.position.z >= BITE_Z and absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius:
 			zombies.erase(z)
+			_note_wave_leak(z)
 			z.consume()
 			var bite: int = z.bite
 			if z.is_tank():
@@ -328,6 +426,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			squad_bitten.emit(bite, z.brute or z.is_tank())
 		elif z.position.z > DESPAWN_Z:
 			zombies.erase(z)
+			_note_wave_leak(z)
 			z.queue_free()
 
 

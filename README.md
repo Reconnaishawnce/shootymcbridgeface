@@ -39,12 +39,20 @@ the same key (see below).
 - Brutes take a slice of your squad when they reach you, not a nibble.
 - **Levels**: eight gates and a boss. Kill the boss before it reaches you;
   once it arrives it chews through the squad. Its glowing core sways side
-  to side and takes triple damage, so track it. Every level starts again
-  from your starting squad.
-- **Perks**: after the third and sixth gate of each level you pick one of
-  three run-long perks: rapid fire, big bullets, piercing, faster gate
-  stepping, a recruit at every gate, thick skin, long sight, core sight,
-  greed. On desktop press 1, 2 or 3.
+  to side and takes triple damage, so track it. A quarter of your survivors
+  march on into the next level; the rest of the squad is rebuilt from
+  gates.
+- **Perk gates**: the third and sixth gate of each level is a purple
+  three-way gate. Steer through the perk you want at full speed. Perks
+  last the run and stack: rapid fire, big bullets, piercing, gate
+  whisperer, recruiter, thick skin, long sight, core sight, greed.
+- **Combos**: kills within 1.4 s of each other chain. Every five kills in
+  a chain raises the score multiplier, up to 4x. Clear a whole wave before
+  any of it reaches you for a bonus. Shoot a gate panel up three steps
+  and walk through it for a PERFECT.
+- **Runners** are fast, thin and they find you. Walkers barely steer, so
+  lining up the crowd is on you. When a bite leaves you with a handful,
+  time slows for a beat.
 - **Endless**: unlocked by clearing level 3. No bosses, no reset, gates
   forever, separate best score.
 - **Daily**: the same gates for everyone on a given UTC day, no upgrades,

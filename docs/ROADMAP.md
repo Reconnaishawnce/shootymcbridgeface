@@ -76,7 +76,24 @@ Definition of done for every run:
   which is a run of its own. Android share sheet needs a plugin; the
   clipboard copy covers it for now.
 
-## Run 5: branching lanes and polish
+## Run 5: make it fun (done)
+
+Driven by the first real play session of 0.3: too easy, not fun, and the
+perk cards broke the flow enough to make the player want to quit.
+
+- Perk cards replaced by perk gates: three panels across the road, steer
+  through the one you want. No stop, ever.
+- Threat from the first ten seconds: runner packs after every gate, bigger
+  waves of softer zombies, brutes from the third gate of level 1, walkers
+  that barely home so lining up is a skill, faster road.
+- Dopamine: kill combos with a multiplier and a draining bar, wave-clear
+  bonuses, PERFECT gates, slow-motion near misses, red danger pulse, a
+  float for every bite.
+- Gates meaner earlier: hidden panels and dilemmas from level 1, bigger
+  subtractions, a few more multipliers. Gate farming 40% faster.
+- Every level's opener wave is gentle, so a reset squad gets a foothold.
+
+## Run 6: branching lanes and polish
 
 - Branching lanes: a fork gate splits the road for a stretch, each side
   with its own gates and waves, a minimap strip previewing both, merge at
@@ -85,7 +102,7 @@ Definition of done for every run:
 - Play-as-the-horde mode prototype.
 - Pass-and-play.
 - Performance pass on low-end phones, battery check, 30 fps option.
-- Phone feedback pass: steering sensitivity, perk balance, shop prices.
+- Second phone feedback pass.
 
 ## Always
 

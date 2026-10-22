@@ -14,7 +14,7 @@ extends Node3D
 ## xvfb with software GL) walks title, shop, play, perks, boss, level clear,
 ## level two, pause and game over, saves a PNG of each into DIR and quits.
 
-enum State { TITLE, RUNNING, CHOOSING, GAME_OVER }
+enum State { TITLE, RUNNING, GAME_OVER }
 
 const SMOKE_FRAMES := 900
 const SMOKE_SEED := 12345
@@ -46,6 +46,11 @@ var hud: Hud
 var sfx: Sfx
 var meta := Meta.new()
 var perks := Perks.new()
+var combo := Combo.new()
+var waves_cleared := 0
+var perfect_gates := 0
+var _run_time := 0.0
+var _level_peak := 1
 ## The upgrades in force for the current run: the real ones, or a blank
 ## set for the daily so everyone plays the same game.
 var run_meta := Meta.new()
@@ -63,10 +68,7 @@ var _shake := 0.0
 var _drag_scale := 0.015
 var _fov_tween: Tween
 var _quitting := false
-var _offer: Array = []
-## The auto-player takes the first perk at once, except while the
-## screenshot walkthrough wants to look at the cards.
-var _bot_auto_perk := true
+var _slowmo_until := 0.0
 
 
 func _ready() -> void:
@@ -145,7 +147,9 @@ func _build_scene() -> void:
 	world.boss_hit.connect(_on_boss_hit)
 	world.boss_killed.connect(_on_boss_killed)
 	world.level_started.connect(_on_level_started)
-	world.perk_pick_due.connect(_on_perk_pick_due)
+	world.perk_chosen.connect(_on_perk_chosen)
+	world.wave_cleared.connect(_on_wave_cleared)
+	world.gate_perfect.connect(_on_gate_perfect)
 
 	squad = Squad.new()
 	squad.world = world
@@ -166,7 +170,6 @@ func _build_scene() -> void:
 	hud.buy_pressed.connect(buy_upgrade)
 	hud.squad_toggled.connect(toggle_squad)
 	hud.menu_pressed.connect(show_title)
-	hud.perk_chosen.connect(_on_perk_chosen)
 	hud.pause_pressed.connect(pause_game)
 	hud.resume_pressed.connect(resume_game)
 	hud.quit_pressed.connect(quit_to_title)
@@ -256,6 +259,13 @@ func start_run(p_mode: String = "levels") -> void:
 	bosses_killed = 0
 	_shake = 0.0
 	perks = Perks.new()
+	combo.reset()
+	waves_cleared = 0
+	perfect_gates = 0
+	_run_time = 0.0
+	_level_peak = 1
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
 	squad.perks = perks
 	squad.squad_type = "rifle" if mode == "daily" else squad_type
 	world.perks = perks
@@ -271,10 +281,13 @@ func start_run(p_mode: String = "levels") -> void:
 
 
 func end_run() -> void:
-	if state != State.RUNNING and state != State.CHOOSING:
+	if state != State.RUNNING:
 		return
 	state = State.GAME_OVER
 	squad.active = false
+	Engine.time_scale = 1.0
+	hud.set_combo(0, 1.0, 0.0)
+	hud.set_danger(0.0)
 	_since_game_over = 0.0
 	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad}
@@ -328,7 +341,7 @@ func resume_game() -> void:
 func quit_to_title() -> void:
 	get_tree().paused = false
 	hud.show_paused(false)
-	if state == State.RUNNING or state == State.CHOOSING:
+	if state == State.RUNNING:
 		# Leaving mid-run still counts: the score and coins stand.
 		end_run()
 	show_title()
@@ -358,10 +371,22 @@ func _process(delta: float) -> void:
 
 
 func _tick_run(delta: float) -> void:
+	_run_time += delta
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
-	score = int(total_distance) + kills * 10 + bonus
+	score = int(total_distance) + bonus
 	hud.update_stats(squad.count, world.level, total_distance, score)
+	hud.set_combo(combo.count if combo.alive(_run_time) else 0, combo.multiplier(), combo.remaining(_run_time))
+	# Danger pulse: the squad is a shadow of what it was this level.
+	var danger := 0.0
+	if squad.count > 0 and squad.count <= 5:
+		danger = 1.0 - float(squad.count - 1) / 5.0
+	elif _level_peak >= 12 and squad.count < _level_peak / 4:
+		danger = 0.5
+	hud.set_danger(danger)
+	if _slowmo_until > 0.0 and Time.get_ticks_msec() * 0.001 >= _slowmo_until:
+		_slowmo_until = 0.0
+		Engine.time_scale = 1.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -380,10 +405,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				resume_game()
 			else:
 				pause_game()
-		elif state == State.CHOOSING and event.keycode >= KEY_1 and event.keycode <= KEY_3:
-			var i: int = event.keycode - KEY_1
-			if i < _offer.size():
-				_on_perk_chosen(_offer[i])
 
 
 func _try_retry() -> void:
@@ -424,6 +445,8 @@ func _punch(amount: float) -> void:
 
 func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void:
 	gates_passed += 1
+	if smoke:
+		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
 	var text := GateMath.label(panel)
 	if after > before:
 		text += "   %d > %d" % [before, after]
@@ -456,7 +479,12 @@ func _on_gate_stepped(gate: Gate, index: int) -> void:
 
 func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
+	var chain := combo.kill(_run_time)
+	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
+	if chain > 0 and chain % Combo.STEP == 0:
+		sfx.play("step", -6.0, 1.0 + 0.08 * float(chain / Combo.STEP))
+		hud.show_float("%d COMBO" % chain, true)
 	var color := Zombie.BRUTE_SKIN if zombie.brute else Zombie.SKIN
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.8, 0.0), color, 10 if zombie.brute else 5, 0.16 if zombie.brute else 0.12)
 
@@ -465,6 +493,13 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	_shake = minf(1.0, _shake + (0.5 if heavy else 0.2))
 	sfx.play("bite", 0.0 if heavy else -6.0)
 	Burst.spawn(world, squad.position + Vector3(0.0, 0.9, -0.5), Soldier.BODY, mini(bite * 3, 24), 0.12, 4.5)
+	hud.show_float("-%d" % bite, false)
+	if smoke:
+		print("SMOKE_BITE ", JSON.stringify({"level": world.level, "bite": bite, "left": squad.count, "frame": _frames}))
+	# A near miss: the bite left you with a handful. Let it land in slow motion.
+	if not smoke and squad.count > 0 and squad.count <= 4 and bite >= 2:
+		Engine.time_scale = 0.35
+		_slowmo_until = Time.get_ticks_msec() * 0.001 + 0.6
 
 
 func _on_boss_spawned(boss: Boss) -> void:
@@ -504,38 +539,39 @@ func _on_level_started(level: int) -> void:
 	if level <= 1:
 		return
 	hud.show_banner("LEVEL %d" % level, 1.0)
+	_level_peak = 1
 	if not world.endless:
-		squad.redeploy(run_meta.start_squad())
+		squad.redeploy(Difficulty.carry_over(squad.count, run_meta.start_squad()))
 		sfx.play("spawn")
 
 
-func _on_perk_pick_due() -> void:
-	if state != State.RUNNING:
-		return
-	_offer = perks.offer(world.gen.rng)
-	if _offer.is_empty():
-		return
-	state = State.CHOOSING
-	squad.active = false
-	hud.show_perks(_offer)
-	sfx.play("level_clear", -6.0, 1.3)
-
-
 func _on_perk_chosen(id: String) -> void:
-	if state != State.CHOOSING or not _offer.has(id):
-		return
 	perks.take(id)
 	world.perk_count = perks.total()
-	_offer = []
-	state = State.RUNNING
-	squad.active = true
-	hud.show_running()
-	hud.show_banner(Perks.title(id), 0.8)
+	hud.show_banner(Perks.title(id), 0.9)
 	sfx.play("gate_good")
+	_punch(3.0)
+
+
+func _on_wave_cleared(level: int) -> void:
+	waves_cleared += 1
+	var b := Difficulty.wave_clear_bonus(level)
+	bonus += b
+	hud.show_float("WAVE CLEAR  +%d" % b, true)
+	sfx.play("spawn", -4.0, 1.2)
+
+
+func _on_gate_perfect(_gate: Gate, _index: int) -> void:
+	perfect_gates += 1
+	bonus += Difficulty.PERFECT_BONUS
+	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
+	sfx.play("level_clear", -8.0, 1.5)
+	_punch(2.0)
 
 
 func _on_count_changed(new_count: int) -> void:
 	peak_squad = maxi(peak_squad, new_count)
+	_level_peak = maxi(_level_peak, new_count)
 
 
 func _on_wiped_out() -> void:
@@ -555,10 +591,6 @@ func _on_sound_toggled(on: bool) -> void:
 func _smoke_tick() -> void:
 	if _quitting:
 		return
-	if state == State.CHOOSING:
-		if _bot_auto_perk:
-			_on_perk_chosen(_offer[0])
-		return
 	if _frames < _smoke_frames and state == State.RUNNING:
 		_bot_steer()
 		return
@@ -573,6 +605,9 @@ func _smoke_tick() -> void:
 			"gates": gates_passed,
 			"bosses": bosses_killed,
 			"perks": perks.stacks,
+			"best_combo": combo.best,
+			"waves_cleared": waves_cleared,
+			"perfect_gates": perfect_gates,
 			"kills": kills,
 			"squad": squad.count,
 			"peak_squad": peak_squad,
@@ -597,6 +632,13 @@ func _bot_steer() -> void:
 			return
 	var z := world.nearest_zombie(22.0)
 	var g := world.nearest_upcoming_gate()
+	var pg := world.nearest_upcoming_perk_gate()
+	if pg != null and (g == null or pg.position.z > g.position.z):
+		if z != null and z.position.z > pg.position.z:
+			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
+		else:
+			squad.target_x = 0.0
+		return
 	if z != null and (g == null or z.position.z > g.position.z):
 		squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
 	elif g != null:
@@ -615,15 +657,12 @@ func _shots_walkthrough() -> void:
 	smoke = true
 	start_run("levels")
 	await _capture("3_play_early.png", 240)
-	_bot_auto_perk = false
 	for i in range(3000):
-		if state == State.CHOOSING:
+		var pg := world.nearest_upcoming_perk_gate()
+		if pg != null and pg.position.z > -16.0:
 			break
 		await get_tree().process_frame
-	await _capture("4_perks.png", 5)
-	if state == State.CHOOSING:
-		_on_perk_chosen(_offer[0])
-	_bot_auto_perk = true
+	await _capture("4_perk_gate.png", 2)
 	await _capture("5_play_mid.png", 300)
 	for i in range(3000):
 		if world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0:

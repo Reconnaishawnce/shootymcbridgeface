@@ -20,15 +20,19 @@ const GATE_SPACING := 32.0
 const WAVE_OFFSET := 26.0
 ## How far past the last gate the boss appears.
 const BOSS_LEAD := 40.0
+const RUNNER_SECONDS := 1.1
+## Committed fire climbs a panel about 1.4 steps a second.
+const STEP_COST_DPS_FRACTION := 0.7
+const MAX_RUNNERS := 10
 
-const HIDDEN_CHANCE := [0.0, 0.2, 0.35, 0.5]
+const HIDDEN_CHANCE := [0.15, 0.25, 0.35, 0.5]
 ## Chance that both panels hurt, so the question becomes which one you can
 ## shoot back into the black.
-const DILEMMA_CHANCE := [0.0, 0.0, 0.15, 0.25]
+const DILEMMA_CHANCE := [0.08, 0.12, 0.18, 0.25]
 ## Chance the bad side of a gate is a halving (x0.5) instead of a subtraction.
 const HALVE_CHANCE := [0.0, 0.0, 0.4, 0.5]
 ## Chance the good side is a multiplier. Low: multipliers compound.
-const MUL2_CHANCE := 0.2
+const MUL2_CHANCE := 0.25
 const MUL3_CHANCE := 0.05
 const MAX_WAVE := 32
 const MAX_BRUTES := 6
@@ -93,7 +97,14 @@ static func boss_distance() -> float:
 
 ## Metres per second the world scrolls toward the squad during gates.
 static func world_speed(level: int) -> float:
-	return clampf(8.0 + float(level - 1) * 0.5, 8.0, 12.0)
+	return clampf(9.5 + float(level - 1) * 0.5, 9.5, 14.0)
+
+
+## Runners are released the moment a gate is passed, this far ahead. They
+## close at the road speed plus their own, so they arrive about a second
+## later: before the wave, after the gate. Never before the gate.
+static func runner_release_z(level: int) -> float:
+	return -(world_speed(level) + 2.0 * 2.6) * RUNNER_SECONDS
 
 
 ## Scroll speed while the boss is on screen: the squad digs in.
@@ -110,7 +121,7 @@ static func step_cost(level: int) -> float:
 ## second of the squad's full damage output. This is the throttle that keeps
 ## gate farming at roughly one step per second no matter how big the squad is.
 static func effective_step_cost(level: int, squad_dps: float) -> float:
-	return maxf(step_cost(level), squad_dps * 0.9)
+	return maxf(step_cost(level), squad_dps * STEP_COST_DPS_FRACTION)
 
 
 ## Zombie wave spec after gate [param index] on [param level], scaled by the
@@ -120,10 +131,10 @@ static func effective_step_cost(level: int, squad_dps: float) -> float:
 static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary:
 	var lv := float(level - 1)
 	var ix := float(index)
+	# Brutes from the fourth gate of level 1, more with level and depth.
 	var brutes := 0
-	if (level >= 2 and index >= 2) or index >= GATES_PER_LEVEL / 2:
+	if index >= 3:
 		brutes = 1 + int(lv / 2.0) + int(ix / 4.0) + int(squad_count / 60.0)
-	var hp := 1.0 + ix * 0.15 + lv * 0.35
 	# Thieves run for the next gate and knock its value down: from level 2,
 	# on gates that are not the opener, one or two of them.
 	var thieves := 0
@@ -134,32 +145,55 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 	var tanks := 0
 	if level >= 3 and index >= 2 and index % 3 == 2:
 		tanks = 1
+	# Many bodies, little health: mowing a crowd is the fun part. The
+	# opener of every level is gentler because the squad has just reset.
+	var hp := 0.8 + ix * 0.1 + lv * 0.3
+	var count := 4 + int(ix * 1.0 + lv * 1.0)
+	var runners := 1 + int(ix / 3.0) + int(lv / 3.0)
+	if index == 0:
+		hp = 0.8 + lv * 0.15
+		count = 3 + int(lv * 0.5)
+		runners = 1
 	return {
-		"count": mini(2 + int(ix * 0.9 + lv) + int(squad_count / 12.0), MAX_WAVE),
+		"count": mini(count + int(squad_count / 10.0), MAX_WAVE),
 		"hp": hp,
 		# A brute soaks about a second of the whole squad's fire whatever its
 		# size, so brutes stay a threat to a thousand soldiers.
-		"brute_hp": hp * 4.0 + float(squad_count) * BRUTE_HP_PER_SOLDIER,
+		"brute_hp": hp * 5.0 + float(squad_count) * BRUTE_HP_PER_SOLDIER,
 		# A tank soaks several seconds of fire; you go round it or through it.
 		"tank_hp": hp * 6.0 + float(squad_count) * TANK_HP_PER_SOLDIER,
 		"thief_hp": hp * 1.5,
-		"speed": 1.5 + minf(lv * 0.15 + ix * 0.04, 1.5),
+		"runner_hp": hp * 0.6,
+		"speed": 2.0 + minf(lv * 0.15 + ix * 0.05, 1.5),
 		"brutes": mini(brutes, MAX_BRUTES),
 		"thieves": mini(thieves, MAX_THIEVES),
 		"tanks": tanks,
+		# Runners: fast, thin, and they find you. The near-miss engine.
+		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS),
 	}
 
 
 ## Soldiers a brute takes when it reaches the squad: a slice, not a nibble.
 static func brute_bite(squad_count: int, fraction: float = BRUTE_BITE_FRACTION) -> int:
-	return maxi(3, int(float(squad_count) * fraction))
+	return maxi(2, int(float(squad_count) * fraction))
+
+
+## Survivors of a level march on: this fraction of the squad left standing
+## after the boss carries over to the next level (never below the shop's
+## starting squad). Finishing strong is rewarded, and a reset squad is not
+## a lone soldier against a level 5 opener.
+const CARRY_OVER_FRACTION := 0.25
+
+
+static func carry_over(squad_left: int, start_squad: int) -> int:
+	return maxi(start_squad, int(float(squad_left) * CARRY_OVER_FRACTION))
 
 
 ## The squad size a competent player is modelled to have at the boss. The
 ## auto-player (optimal play) arrives with roughly 240, 120, 60 on levels
 ## 1 to 3; a person lands below that, so the model sits under the bot.
 static func expected_squad(level: int) -> int:
-	return 100 + 20 * (level - 1)
+	return 70 + 15 * (level - 1)
 
 
 static func boss_hp(level: int, perk_count: int = 0) -> float:
@@ -189,6 +223,16 @@ static func boss_bite(squad_count: int) -> int:
 	return maxi(2, int(float(squad_count) * BOSS_BITE_FRACTION))
 
 
+## Score for clearing a whole wave before any of it reached you.
+static func wave_clear_bonus(level: int) -> int:
+	return 20 + 10 * level
+
+
+## Score for walking through a panel you shot up at least PERFECT_STEPS.
+const PERFECT_STEPS := 3
+const PERFECT_BONUS := 50
+
+
 ## Score bonus for clearing a level with [param squad_left] soldiers.
 static func level_bonus(level: int, squad_left: int) -> int:
 	return level * 150 + squad_left * 5
@@ -207,10 +251,10 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 	var roll := 1.0 if big else rng.randf()
 	match t:
 		0:
-			good = GateMath.add(rng.randi_range(2, 4))
+			good = GateMath.add(rng.randi_range(2, 5))
 			if not is_opener and roll < MUL2_CHANCE:
 				good = GateMath.mul(2.0)
-			bad = GateMath.add(rng.randi_range(-2, 1))
+			bad = GateMath.add(rng.randi_range(-4, 1))
 		1:
 			good = GateMath.add(rng.randi_range(3, 6))
 			if roll < MUL2_CHANCE:

@@ -14,7 +14,6 @@ signal shop_closed
 signal buy_pressed(id: String)
 signal squad_toggled
 signal menu_pressed
-signal perk_chosen(id: String)
 signal pause_pressed
 signal resume_pressed
 signal sound_toggled(on: bool)
@@ -54,8 +53,10 @@ var _over_copy: Button
 var _shop_coins: Label
 var _shop_rows: Dictionary = {}
 
-var _perk_card: Control
-var _perk_buttons: Array[Button] = []
+var _combo: Label
+var _combo_bar: ColorRect
+var _danger: ColorRect
+var _combo_tween: Tween
 
 var _over_card: Control
 var _over_title: Label
@@ -156,7 +157,7 @@ func _init() -> void:
 	_build_title(root)
 	_build_shop(root)
 	_build_daily(root)
-	_build_perks(root)
+	_build_combo(root)
 	_build_over(root)
 	_build_pause(root)
 
@@ -258,21 +259,33 @@ func _build_daily(root: Control) -> void:
 	root.add_child(_toast)
 
 
-func _build_perks(root: Control) -> void:
-	_perk_card = _card(root)
-	_perk_card.visible = false
-	var box: VBoxContainer = _perk_card.get_meta("box")
-	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
-	head.text = "CHOOSE A PERK"
-	box.add_child(head)
-	for i in range(Perks.CARDS):
-		var b := _button("", 30)
-		b.custom_minimum_size = Vector2(560.0, 120.0)
-		b.add_theme_color_override("font_color", GAIN)
-		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.pressed.connect(_on_perk_button.bind(i))
-		box.add_child(b)
-		_perk_buttons.append(b)
+func _build_combo(root: Control) -> void:
+	_danger = ColorRect.new()
+	_danger.color = Color(0.9, 0.1, 0.1, 0.0)
+	_danger.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_danger.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_danger)
+	_combo = _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	_combo.anchor_left = 0.0
+	_combo.anchor_right = 1.0
+	_combo.anchor_top = 0.62
+	_combo.anchor_bottom = 0.62
+	_combo.offset_bottom = 60.0
+	_combo.add_theme_color_override("font_color", COIN)
+	_combo.modulate.a = 0.0
+	_combo.pivot_offset = Vector2(360.0, 30.0)
+	root.add_child(_combo)
+	_combo_bar = ColorRect.new()
+	_combo_bar.color = COIN
+	_combo_bar.anchor_left = 0.4
+	_combo_bar.anchor_right = 0.6
+	_combo_bar.anchor_top = 0.62
+	_combo_bar.anchor_bottom = 0.62
+	_combo_bar.offset_top = 62.0
+	_combo_bar.offset_bottom = 68.0
+	_combo_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_combo_bar.modulate.a = 0.0
+	root.add_child(_combo_bar)
 
 
 func _build_over(root: Control) -> void:
@@ -329,7 +342,6 @@ func _hide_cards() -> void:
 	_title_card.visible = false
 	_shop_card.visible = false
 	_daily_card.visible = false
-	_perk_card.visible = false
 	_over_card.visible = false
 	_pause_card.visible = false
 
@@ -399,20 +411,6 @@ func show_shop(meta: Meta, coins: int) -> void:
 			buy.disabled = not meta.can_buy(id, coins)
 
 
-func show_perks(ids: Array) -> void:
-	_hide_cards()
-	_perk_card.visible = true
-	_pause_button.visible = false
-	for i in range(_perk_buttons.size()):
-		var b := _perk_buttons[i]
-		if i < ids.size():
-			b.visible = true
-			b.text = "%s\n%s" % [Perks.title(ids[i]), Perks.description(ids[i])]
-			b.set_meta("id", ids[i])
-		else:
-			b.visible = false
-
-
 func show_running() -> void:
 	_hide_cards()
 	_pause_button.visible = true
@@ -438,6 +436,32 @@ func show_game_over(score: int, best: int, is_best: bool, level: int, distance: 
 	_pulse_prompt()
 	if is_best:
 		flash(0.5)
+
+
+## Kill streak readout: count, multiplier, and a bar that drains with the
+## window. Hidden below a short chain so a single kill does not shout.
+func set_combo(count: int, mult: float, remaining: float) -> void:
+	if count < 3:
+		_combo.modulate.a = 0.0
+		_combo_bar.modulate.a = 0.0
+		return
+	var text := "%d COMBO" % count if mult <= 1.0 else "%d COMBO   x%.1f" % [count, mult]
+	if _combo.text != text:
+		_combo.scale = Vector2(1.2, 1.2)
+		if _combo_tween != null:
+			_combo_tween.kill()
+		_combo_tween = create_tween()
+		_combo_tween.tween_property(_combo, "scale", Vector2.ONE, 0.15)
+	_combo.text = text
+	_combo.modulate.a = 1.0
+	_combo_bar.modulate.a = 0.9
+	_combo_bar.anchor_right = 0.4 + 0.2 * remaining
+
+
+## Red edge pulse when the squad is nearly gone. 0 = calm, 1 = last man.
+func set_danger(level: float) -> void:
+	var t := Time.get_ticks_msec() * 0.001
+	_danger.color.a = level * (0.12 + 0.08 * sin(t * 9.0))
 
 
 func show_paused(paused: bool) -> void:
@@ -493,12 +517,6 @@ func _bump_count() -> void:
 	_count.scale = Vector2(1.25, 1.25)
 	_count_tween = create_tween()
 	_count_tween.tween_property(_count, "scale", Vector2.ONE, 0.18)
-
-
-func _on_perk_button(i: int) -> void:
-	var b := _perk_buttons[i]
-	if b.has_meta("id"):
-		perk_chosen.emit(b.get_meta("id"))
 
 
 func _on_sound_pressed() -> void:

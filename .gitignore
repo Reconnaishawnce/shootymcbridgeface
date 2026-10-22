@@ -1,0 +1,13 @@
+# Godot
+.godot/
+*.tmp
+# Build output
+build/
+*.apk
+*.aab
+# Local keystores other than the committed dev one
+*.keystore
+!android/dev.keystore
+# OS
+.DS_Store
+Thumbs.db

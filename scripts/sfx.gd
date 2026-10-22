@@ -60,7 +60,10 @@ func _ready() -> void:
 		mp.volume_db = -80.0
 		mp.bus = "Master"
 		add_child(mp)
-		mp.play()
+		# Silent runs (the headless bot) never start the loops at all, so
+		# nothing is left playing at exit.
+		if enabled:
+			mp.play()
 		_music[style] = mp
 		_music_target[style] = 0.0
 

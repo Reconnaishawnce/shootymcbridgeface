@@ -27,11 +27,21 @@ the same key (see below).
 
 ## Play
 
-- **Drag** left or right to steer the squad, **up and down** to spread or
-  tighten the formation. Wide sweeps the lane and catches crowds; tight
-  focuses fire on one gate panel or the boss core. The button at the
-  bottom right cycles tight, normal and wide. On desktop: arrows or WASD,
-  F to cycle, B to throw a bomb.
+- The screen has two zones. **Low, near the squad: drag** left or right to
+  steer, up and down to spread or tighten the formation, and **flick** hard
+  sideways to dash (from level 2). **The road above: hold** a finger on it
+  and every gun converges on that spot with a red laser. Lift to go back
+  to spraying ahead. The button at the bottom right cycles tight, normal
+  and wide. On desktop: arrows or WASD, Q/E to dash, click and hold the
+  road to focus, F to cycle, B to throw a bomb.
+- The game teaches itself one line at a time. Level 1 is steer and pick.
+  Level 2 adds the dash and the spitter. Level 3 adds flashing panels (hit
+  them during the flash for triple steps) and latchers, zombies that grab
+  your front rank and keep eating until you focus fire on them. From
+  level 4 gates are often red on both sides.
+- Firepower stops growing past forty soldiers. Beyond that, soldiers are
+  health: a big squad is something to protect, not a win button.
+- Dashing through a bite, a spit or the boss's chew pays a DODGED bonus.
 - **Power-ups** come from purple gate panels (soldiers now, or a tool for
   later) and from crates on the road. Named or a mystery `?`. Bomb: tap
   the button to lob it, clears the road ahead and hurts heavies and the

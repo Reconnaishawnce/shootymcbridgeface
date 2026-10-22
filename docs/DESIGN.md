@@ -60,6 +60,29 @@ other way, and your aim as a resource you have to spend wisely.
   guns; piercing lets a bullet survive a kill; gate whisperer cuts step
   cost; recruiter adds a soldier at every gate; thick skin, long sight,
   core sight and greed do what they say. Bullets pass through perk gates.
+- The run teaches itself. Level 1 has no hidden panels, no dilemmas and
+  no latchers: steer, pick, shoot. Each level after adds one tool or one
+  threat with a one-line hint: dash (2), hot panels and latchers (3),
+  both-red gates (4). Hard, but never two new things at once.
+- Focus fire. Holding a finger on the road makes every bullet converge on
+  that point, drawn as a red laser. It is how you kill a brute before it
+  arrives, shoot a latcher off your own front rank, farm one panel while
+  the squad is wide, or hold the boss core. The cost is the rest of the
+  lane going unwatched.
+- Dash. A hard sideways flick in the steer zone moves the squad 2.2 m in
+  0.14 s with 0.4 s of invulnerability and a 1.1 s cooldown. A bite, a
+  landing spit or a boss chew during those frames is a DODGED bonus. It
+  turns the spitter's landing ring and the runner packs into timing.
+- Hot panels. From level 3 every panel flashes white for 0.45 s of every
+  2.2 s, each side out of phase. Hits during the flash count triple
+  toward stepping the value. Rhythm, not just position.
+- Latchers. From level 3, sturdier purple zombies that grab the front rank
+  instead of biting once: they ride along eating a soldier every 0.7 s
+  until shot off. They sit just ahead of the front row, so back-row fire
+  and focus fire both reach them.
+- Firepower caps at forty soldiers' worth. Past that, more soldiers are
+  more to lose, so waves and bosses stay dangerous to a big squad and the
+  count reads as health.
 - Formation is a control, not a fact. Drag up or down (or a button) to
   stretch the blob from tight (0.45x) to wide (1.8x, clamped so it fits
   the lane). Wide covers the lane so bullets catch runners from both
@@ -149,10 +172,10 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 7 result (bot, no upgrades) |
+| Metric | Run 8 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 6 | 74, 358, 60, 86, 56, 20; wiped at the level 6 boss, 3.4 min |
-| Endless: after 3 minutes | level 8, peak 304, 148 alive |
+| Levels: squad at each boss, 1 to 4 | 79, 122, 168, 28; wiped on level 5, 2.6 min |
+| Endless: after 3 minutes | level 7, peak 705 |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side

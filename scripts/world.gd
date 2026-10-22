@@ -19,6 +19,8 @@ signal powerup_granted(id: String, from_crate: bool)
 signal shield_blocked
 signal bomb_exploded(at: Vector3, kills: int)
 signal fork_ahead(routes: Dictionary)
+signal dodged
+signal latched(zombie: Zombie)
 signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
@@ -214,6 +216,24 @@ func nearest_zombie(max_range: float) -> Zombie:
 	return best
 
 
+## The best focus-fire target: a latcher on the squad, else the nearest
+## brute, tank or thief within [param max_range], else null.
+func focus_target(max_range: float) -> Zombie:
+	var best: Zombie = null
+	for z in zombies:
+		if z.latched:
+			return z
+		if not (z.brute or z.is_tank() or z.is_thief() or z.is_latcher()):
+			continue
+		if z.position.z < -max_range:
+			continue
+		if fork_side != 0 and signf(z.position.x) != float(fork_side) and absf(z.position.x) > 0.3:
+			continue
+		if best == null or z.position.z > best.position.z:
+			best = z
+	return best
+
+
 ## The next gate the squad has not passed yet, or null.
 func nearest_upcoming_gate() -> Gate:
 	var best: Gate = null
@@ -259,13 +279,14 @@ func try_hit(b: Bullet) -> bool:
 			continue
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
-			if g.register_hit(i, b.damage, _step_cost()):
+			var dmg := b.damage * (Progression.HOT_MULT if g.is_hot(i, now) else 1.0)
+			if g.register_hit(i, dmg, _step_cost()):
 				gate_stepped.emit(g, i)
 			return true
 	for rg in route_gates:
 		if rg.passed or rg.position.z < z_lo or rg.position.z > z_hi or not rg.covers_x(b.position.x):
 			continue
-		rg.register_hit(b.damage, _step_cost())
+		rg.register_hit(b.damage * (Progression.HOT_MULT if rg.is_hot(now) else 1.0), _step_cost())
 		return true
 	return false
 
@@ -305,6 +326,8 @@ func _spawn() -> void:
 				var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
 				var rg := RouteGate.new()
 				rg.setup(route.panels[k], side)
+				rg.hot_enabled = Progression.hot_panels(level)
+				rg.hot_phase = gen.rng.randf_range(0.0, Progression.HOT_PERIOD)
 				rg.position.z = z
 				add_child(rg)
 				route_gates.append(rg)
@@ -319,6 +342,8 @@ func _spawn() -> void:
 			var g := Gate.new()
 			g.setup(pair[0], pair[1])
 			g.index = _gate_index(_next_gate)
+			g.hot_enabled = Progression.hot_panels(level)
+			g.hot_phase = gen.rng.randf_range(0.0, Progression.HOT_PERIOD)
 			g.position = Vector3(0.0, 0.0, z)
 			add_child(g)
 			gates.append(g)
@@ -371,6 +396,8 @@ func _spawn_wave(n: int, count: int) -> void:
 		_spawn_zombie(spec.brute_hp, spec.speed, Zombie.Kind.BRUTE, base_z - gen.rng.randf_range(4.0, 9.0), wave)
 	for i in range(spec.tanks):
 		_spawn_zombie(spec.tank_hp, spec.speed, Zombie.Kind.TANK, base_z + 3.0, wave)
+	for i in range(spec.latchers):
+		_spawn_zombie(spec.latcher_hp, spec.speed, Zombie.Kind.LATCHER, base_z - gen.rng.randf_range(2.0, 6.0), wave)
 	# Thieves start on the squad's side of the gate ahead and sprint for it.
 	# The gate this wave follows is at wave_distance - WAVE_OFFSET; the next
 	# gate is GATE_SPACING further. Put thieves 14 m short of that next gate.
@@ -458,6 +485,7 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0)
 	for g in gates.duplicate():
 		g.position.z += world_speed * delta
+		g.update_hot(now)
 		if not g.passed:
 			if g.position.z >= reveal_z:
 				g.reveal_all()
@@ -516,6 +544,7 @@ func _move_fork(delta: float, p_squad: Squad) -> void:
 			fork_chosen.emit(_fork_routes["left" if fork_side < 0 else "right"], fork_side)
 	for rg in route_gates.duplicate():
 		rg.position.z += world_speed * delta
+		rg.update_hot(now)
 		if not rg.passed:
 			if rg.position.z >= REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0):
 				rg.reveal()
@@ -564,6 +593,9 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		if z.is_thief():
 			_move_thief(delta, z)
 			continue
+		if z.latched:
+			_tick_latched(delta, z, p_squad)
+			continue
 		var pace := _pace()
 		z.position.z += (world_speed + z.speed * pace) * delta
 		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-LANE_HALF + 0.4, z.lane_min), minf(LANE_HALF - 0.4, z.lane_max))
@@ -571,6 +603,20 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		var in_reach: bool = absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius
 		var same_route: bool = p_squad.position.x >= z.lane_min - 0.6 and p_squad.position.x <= z.lane_max + 0.6
 		if z.position.z >= BITE_Z and in_reach and same_route:
+			if p_squad.is_invulnerable():
+				# Dashed through it: it stumbles past and is gone.
+				zombies.erase(z)
+				_note_wave_leak(z)
+				z.consume()
+				dodged.emit()
+				continue
+			if z.is_latcher() and not p_squad.is_shielded():
+				# Grabs the front rank and rides along, eating, until shot off.
+				z.latched = true
+				z.latch_offset_x = clampf(z.position.x - p_squad.position.x, -1.2, 1.2)
+				z.latch_timer = Difficulty.LATCH_INTERVAL
+				latched.emit(z)
+				continue
 			zombies.erase(z)
 			_note_wave_leak(z)
 			z.consume()
@@ -593,6 +639,24 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			zombies.erase(z)
 			_note_wave_leak(z)
 			z.queue_free()
+
+
+## A latched zombie clings to the squad's front rank and eats on a timer.
+## It is a target on your own doorstep: focus fire takes it off.
+func _tick_latched(delta: float, z: Zombie, p_squad: Squad) -> void:
+	var front_z := -(Formation.half_width(mini(p_squad.count, Squad.MAX_VISUAL), p_squad.spread) * 0.9 + 0.9)
+	z.position.x = lerpf(z.position.x, p_squad.position.x + z.latch_offset_x, 1.0 - exp(-12.0 * delta))
+	z.position.z = lerpf(z.position.z, front_z, 1.0 - exp(-12.0 * delta))
+	z.latch_timer -= delta
+	if z.latch_timer <= 0.0:
+		z.latch_timer = Difficulty.LATCH_INTERVAL
+		if p_squad.is_shielded() or p_squad.is_invulnerable():
+			return
+		p_squad.add(-Difficulty.LATCH_BITE)
+		squad_bitten.emit(Difficulty.LATCH_BITE, false)
+		if p_squad.count <= 0:
+			zombies.erase(z)
+			z.consume()
 
 
 ## Thieves sprint away from the squad toward the gate ahead of them and
@@ -670,6 +734,9 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	_chew_timer -= delta
 	if _chew_timer <= 0.0:
 		_chew_timer = Difficulty.BOSS_BITE_INTERVAL
+		if p_squad.is_invulnerable():
+			dodged.emit()
+			return
 		if p_squad.is_shielded():
 			shield_blocked.emit()
 			return
@@ -684,7 +751,10 @@ func _move_spits(p_squad: Squad) -> void:
 			continue
 		_spits.erase(sp)
 		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() + 1.0
-		if hit and p_squad.is_shielded():
+		if hit and p_squad.is_invulnerable():
+			dodged.emit()
+			hit = false
+		elif hit and p_squad.is_shielded():
 			shield_blocked.emit()
 			hit = false
 		elif hit:

@@ -73,6 +73,9 @@ var _formation_button: Button
 var _bomb_button: Button
 var _powers: Label
 var _fork_box: Control
+var _hint: Label
+var _hint_tween: Tween
+var _dash: Label
 var _fork_left: Label
 var _fork_right: Label
 
@@ -114,8 +117,8 @@ func _init() -> void:
 	_boss_box = Control.new()
 	_boss_box.anchor_left = 0.08
 	_boss_box.anchor_right = 0.92
-	_boss_box.offset_top = 140.0
-	_boss_box.offset_bottom = 172.0
+	_boss_box.offset_top = 154.0
+	_boss_box.offset_bottom = 186.0
 	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boss_box.visible = false
 	root.add_child(_boss_box)
@@ -190,12 +193,32 @@ func _init() -> void:
 	_place(root, _powers, 0.15, 0.85, 124.0)
 	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
 
+	# Teaching line: one new thing per level, big, then gone.
+	_hint = _label(34, HORIZONTAL_ALIGNMENT_CENTER)
+	_hint.anchor_left = 0.0
+	_hint.anchor_right = 1.0
+	_hint.anchor_top = 0.44
+	_hint.anchor_bottom = 0.44
+	_hint.offset_bottom = 120.0
+	_hint.modulate.a = 0.0
+	_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
+	root.add_child(_hint)
+	_dash = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_dash.anchor_left = 0.3
+	_dash.anchor_right = 0.7
+	_dash.anchor_top = 1.0
+	_dash.anchor_bottom = 1.0
+	_dash.offset_top = -60.0
+	_dash.offset_bottom = -30.0
+	_dash.modulate.a = 0.0
+	root.add_child(_dash)
+
 	# The fork preview: what each route offers, before you have to choose.
 	_fork_box = Control.new()
 	_fork_box.anchor_left = 0.04
 	_fork_box.anchor_right = 0.96
-	_fork_box.offset_top = 180.0
-	_fork_box.offset_bottom = 262.0
+	_fork_box.offset_top = 194.0
+	_fork_box.offset_bottom = 276.0
 	_fork_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fork_box.visible = false
 	root.add_child(_fork_box)
@@ -424,6 +447,26 @@ func set_bombs(n: int) -> void:
 	_bomb_button.text = "BOMB x%d" % n
 
 
+## A teaching line that holds for a while, then fades.
+func show_hint(text: String, seconds: float = 3.2) -> void:
+	if text == "":
+		return
+	_hint.text = text
+	_hint.modulate.a = 0.0
+	if _hint_tween != null:
+		_hint_tween.kill()
+	_hint_tween = create_tween()
+	_hint_tween.tween_property(_hint, "modulate:a", 1.0, 0.3)
+	_hint_tween.tween_interval(seconds)
+	_hint_tween.tween_property(_hint, "modulate:a", 0.0, 0.5)
+
+
+## Dash readiness under the squad: "DASH" when ready, cooling bar when not.
+func set_dash(enabled: bool, ready: bool) -> void:
+	_dash.modulate.a = 0.75 if enabled else 0.0
+	_dash.text = "DASH READY" if ready else "..."
+
+
 ## Show both routes of the coming fork. [param routes] is the fork dict.
 func show_fork(routes: Dictionary) -> void:
 	_fork_box.visible = true
@@ -453,6 +496,8 @@ func _hide_cards() -> void:
 	_bomb_button.visible = false
 	_powers.text = ""
 	_fork_box.visible = false
+	_hint.modulate.a = 0.0
+	_dash.modulate.a = 0.0
 	_title_card.visible = false
 	_shop_card.visible = false
 	_daily_card.visible = false

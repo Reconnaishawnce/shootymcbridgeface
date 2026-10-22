@@ -119,14 +119,25 @@ collectables, growth felt flat, no music.
   the first frame. Synthesis now runs on a worker thread and costs a
   third as much; the loops fade in when ready.
 
-## Run 8: polish and feedback
+## Run 8: skill, pressure, and a run that teaches itself (done)
 
-- Real models for soldiers and zombies if available, same classes.
-- Play-as-the-horde mode prototype.
-- Pass-and-play.
-- Performance pass on low-end phones, battery check, 30 fps option.
-- Third phone feedback pass: fork balance, spread drag feel, bomb button
-  placement, music level.
+From the third play session: too easy, nothing to get good at.
+
+- Focus fire: hold the road, every gun converges there, red laser.
+- Dash: flick in the steer zone, short invulnerability, DODGED bonus.
+- Hot panels: flashing panels count triple during the flash.
+- Latchers: zombies that grab the front rank and eat until shot off.
+- Firepower capped at forty soldiers; the count is health past that.
+- Progressive unlocks with one-line hints: level 1 is plain, dash at 2,
+  hot panels and latchers at 3, both-red gates at 4.
+
+## Run 9: difficulty modifiers and grades
+
+- Hard and Nightmare modifiers with score and coin multipliers.
+- Level grades (S to D) on the clear banner.
+- Trade gates, bet gates, scout sacrifice.
+- Flankers over the curbs; the horde behind you.
+- Fourth phone feedback pass.
 
 ## Always
 

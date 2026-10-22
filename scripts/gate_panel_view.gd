@@ -16,6 +16,8 @@ var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
 var _label: Label3D
 var _pop := 0.0
+var _hot := false
+var _base_color := GOOD
 
 
 func _init() -> void:
@@ -43,19 +45,33 @@ func _init() -> void:
 func refresh(panel: GateMath.GatePanel) -> void:
 	_label.text = GateMath.label(panel)
 	_label.font_size = 150 if _label.text.length() <= 4 else 84
+	var color := BAD
 	if not panel.revealed:
-		_mat.albedo_color = HIDDEN
+		color = HIDDEN
 	elif GateMath.is_power(panel):
-		_mat.albedo_color = POWER
+		color = POWER
 	elif GateMath.is_good(panel):
-		_mat.albedo_color = GOOD
-	else:
-		_mat.albedo_color = BAD
+		color = GOOD
+	_base_color = color
+	if not _hot:
+		_mat.albedo_color = color
 
 
 ## Little bounce when a shot steps the value up.
 func pop() -> void:
 	_pop = 1.0
+
+
+## Hot flash: the slab goes near-white while hits count extra.
+func set_hot(hot: bool) -> void:
+	if hot == _hot:
+		return
+	_hot = hot
+	if hot:
+		_base_color = _mat.albedo_color
+		_mat.albedo_color = Color(1.0, 1.0, 0.9, 0.95)
+	else:
+		_mat.albedo_color = _base_color
 
 
 func highlight() -> void:

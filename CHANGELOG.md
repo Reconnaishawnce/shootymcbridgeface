@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.8 (run 8)
+
+Skill, pressure, and a run that teaches itself.
+
+- Two touch zones. Low near the squad: drag to steer and spread, flick to
+  dash. The road above: hold to focus fire, with a red laser, every gun
+  converging on the spot.
+- Dash from level 2: 2.2 m in 0.14 s, 0.4 s invulnerable, 1.1 s cooldown.
+  Dashing through a bite, a spit or the boss's chew pays DODGED +40.
+- Hot panels from level 3: panels flash white and hits during the flash
+  count triple toward stepping the value.
+- Latchers from level 3: sturdy purple zombies that grab the front rank
+  and eat a soldier every 0.7 s until shot off.
+- Firepower capped at forty soldiers' worth; a big squad is health.
+- Level 1 has no hidden panels or dilemmas. Each level start shows one
+  teaching line. Keyboard: Q/E dash, click-hold to focus.
+- Balance, bot with no upgrades: squad at the boss on levels 1 to 4 was
+  79, 122, 168, 28; died at the level 5 fork after 2.6 minutes with the
+  firepower cap biting from level 3 on; best combo 61, 9 perfect gates.
+  Endless: level 7 at three minutes, peak 705. Levels 1 to 3 are the
+  confidence builders; 4 is where it bites.
+
 ## 0.7.1 (gray screen)
 
 - Fixed the gray screen after the splash, for real this time. The quit

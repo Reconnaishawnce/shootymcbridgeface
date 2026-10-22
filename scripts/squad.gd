@@ -46,6 +46,14 @@ var velocity_x := 0.0
 ## Steering bounds. A fork narrows them to one side of the divider.
 var lane_min := -LANE_HALF
 var lane_max := LANE_HALF
+## Focus fire: when set, every bullet converges on this road point.
+var focus_on := false
+var focus_point := Vector3.ZERO
+## Dash state. Invulnerable until [member invulnerable_until] (run seconds).
+var dash_ready_at := 0.0
+var invulnerable_until := 0.0
+var _dash_tween: Tween
+var _laser: MeshInstance3D
 
 var _soldiers: Array[Soldier] = []
 var _fire_accum := 0.0
@@ -76,6 +84,15 @@ func _init() -> void:
 	_shield.position.y = 0.8
 	_shield.visible = false
 	add_child(_shield)
+	var laser_mat := StandardMaterial3D.new()
+	laser_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	laser_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	laser_mat.albedo_color = Color(1.0, 0.3, 0.2, 0.55)
+	_laser = Mats.box(Vector3(0.06, 0.06, 1.0), Color.WHITE, true)
+	_laser.material_override = laser_mat
+	_laser.visible = false
+	_laser.top_level = true
+	add_child(_laser)
 
 
 func reset(start_count: int = 1) -> void:
@@ -173,6 +190,39 @@ func is_shielded() -> bool:
 	return powerups != null and powerups.shielded(now)
 
 
+func is_invulnerable() -> bool:
+	return now < invulnerable_until
+
+
+## Aim every gun at a point on the road, or stop.
+func set_focus(point: Vector3) -> void:
+	focus_on = true
+	focus_point = Vector3(clampf(point.x, -LANE_HALF - 0.5, LANE_HALF + 0.5), 0.0, clampf(point.z, -70.0, -2.0))
+
+
+func clear_focus() -> void:
+	focus_on = false
+
+
+func can_dash() -> bool:
+	return active and now >= dash_ready_at
+
+
+## A quick sideways burst with a moment of invulnerability.
+func dash(direction: float) -> bool:
+	if not can_dash():
+		return false
+	dash_ready_at = now + Progression.DASH_COOLDOWN
+	invulnerable_until = now + Progression.DASH_IFRAMES
+	var b := _bounds()
+	target_x = clampf(target_x + signf(direction) * Progression.DASH_DISTANCE, b.x, b.y)
+	if _dash_tween != null:
+		_dash_tween.kill()
+	_dash_tween = create_tween()
+	_dash_tween.tween_property(self, "position:x", target_x, Progression.DASH_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	return true
+
+
 ## New level: back to the starting squad where you stand.
 func redeploy(start_count: int) -> void:
 	_fire_accum = 0.0
@@ -231,14 +281,20 @@ func _damage_mult() -> float:
 	return m
 
 
-## Damage per second of the whole squad. Linear in count by design.
+## Soldiers that count toward firepower. Past the cap, more soldiers are
+## more to lose, not more damage.
+func firing_count() -> int:
+	return mini(count, Progression.DPS_CAP_SOLDIERS)
+
+
+## Damage per second of the whole squad. Linear in count up to the cap.
 func dps() -> float:
-	return float(count) * DPS_PER_SOLDIER * _fire_mult() * _damage_mult()
+	return float(firing_count()) * DPS_PER_SOLDIER * _fire_mult() * _damage_mult()
 
 
 ## Total shots per second. Capped so a huge squad stays cheap to render.
 func shots_per_second() -> float:
-	return minf(float(count) * DPS_PER_SOLDIER * _fire_mult(), MAX_SHOTS_PER_SECOND)
+	return minf(float(firing_count()) * DPS_PER_SOLDIER * _fire_mult(), MAX_SHOTS_PER_SECOND)
 
 
 ## Damage per shot rises once the rate cap is hit, so DPS stays linear.
@@ -315,7 +371,15 @@ func _make_flag(color: Color) -> Node3D:
 func _process(delta: float) -> void:
 	var b := _bounds()
 	target_x = clampf(target_x, b.x, b.y)
-	position.x = lerpf(position.x, target_x, 1.0 - exp(-STEER_LERP * delta))
+	if _dash_tween == null or not _dash_tween.is_running():
+		position.x = lerpf(position.x, target_x, 1.0 - exp(-STEER_LERP * delta))
+	_laser.visible = focus_on and active and count > 0
+	if _laser.visible:
+		var from := global_position + Vector3(0.0, 0.9, -0.6)
+		var to := focus_point + Vector3(0.0, 0.3, 0.0)
+		_laser.global_position = (from + to) * 0.5
+		_laser.scale = Vector3(1.0, 1.0, from.distance_to(to))
+		_laser.look_at(to, Vector3.UP)
 	if delta > 0.0:
 		velocity_x = lerpf(velocity_x, (position.x - _prev_x) / delta, 0.3)
 	_prev_x = position.x
@@ -358,6 +422,11 @@ func _fire(delta: float) -> void:
 func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> void:
 	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0))
 	b.damage = damage
+	if focus_on:
+		# Converge on the focus point: sideways speed that gets there as the
+		# bullet covers the distance.
+		var dz := maxf(0.5, origin.z - focus_point.z)
+		vx += (focus_point.x - origin.x) / (dz / Bullet.SPEED)
 	b.vx = vx
 	b.world = world
 	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0

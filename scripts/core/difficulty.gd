@@ -25,10 +25,10 @@ const RUNNER_SECONDS := 1.1
 const STEP_COST_DPS_FRACTION := 0.7
 const MAX_RUNNERS := 10
 
-const HIDDEN_CHANCE := [0.15, 0.25, 0.35, 0.5]
+const HIDDEN_CHANCE := [0.0, 0.25, 0.35, 0.5]
 ## Chance that both panels hurt, so the question becomes which one you can
 ## shoot back into the black.
-const DILEMMA_CHANCE := [0.08, 0.12, 0.18, 0.25]
+const DILEMMA_CHANCE := [0.0, 0.12, 0.22, 0.3]
 ## Chance the bad side of a gate is a halving (x0.5) instead of a subtraction.
 const HALVE_CHANCE := [0.0, 0.0, 0.4, 0.5]
 ## Chance the good side is a multiplier. Low: multipliers compound.
@@ -62,6 +62,10 @@ const BRUTE_HP_PER_SOLDIER := 2.0
 const TANK_HP_PER_SOLDIER := 6.0
 const TANK_BITE_FRACTION := 0.15
 const MAX_THIEVES := 3
+const MAX_LATCHERS := 4
+## Soldiers a latched zombie eats per LATCH_INTERVAL.
+const LATCH_BITE := 1
+const LATCH_INTERVAL := 0.7
 ## Thieves sprint away from the squad toward the next gate at this absolute
 ## speed; the world scrolls the other way, so they close on the gate at
 ## roughly this minus the world speed.
@@ -166,6 +170,11 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 	var tanks := 0
 	if level >= 3 and index >= 2 and index % 3 == 2:
 		tanks = 1
+	# Latchers grab the front of the squad and keep eating until shot off.
+	# From level 3, a couple per wave, more with level.
+	var latchers := 0
+	if Progression.latchers(level) and index >= 1:
+		latchers = 1 + int(lv / 2.0)
 	# Many bodies, little health: mowing a crowd is the fun part. The
 	# opener of every level is gentler because the squad has just reset.
 	var hp := 0.8 + ix * 0.1 + lv * 0.3
@@ -189,6 +198,8 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 		"brutes": mini(brutes, MAX_BRUTES),
 		"thieves": mini(thieves, MAX_THIEVES),
 		"tanks": tanks,
+		"latchers": mini(latchers, MAX_LATCHERS),
+		"latcher_hp": hp * 2.5,
 		# Runners: fast, thin, and they find you. The near-miss engine.
 		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS),
 	}
@@ -365,7 +376,7 @@ func make_fork(level: int) -> Dictionary:
 		else:
 			panel = GateMath.add(rng.randi_range(6, 10) + 2 * lv)
 		rich.panels.append(panel)
-	if rng.randf() < RICH_HIDDEN_CHANCE:
+	if level >= Progression.HIDDEN_LEVEL and rng.randf() < RICH_HIDDEN_CHANCE:
 		var which := rng.randi_range(0, FORK_GATES - 1)
 		if rng.randf() < RICH_TRAP_CHANCE:
 			rich.panels[which] = GateMath.add(rng.randi_range(-6, -3) - lv, true)

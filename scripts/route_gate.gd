@@ -9,6 +9,8 @@ var panel: GateMath.GatePanel
 var side := -1
 var passed := false
 var steps_up := 0
+var hot_enabled := false
+var hot_phase := 0.0
 var _view: GatePanelView
 
 
@@ -28,6 +30,14 @@ func setup(p_panel: GateMath.GatePanel, p_side: int) -> void:
 
 func covers_x(x: float) -> bool:
 	return absf(x - position.x) <= GatePanelView.WIDTH * 0.5
+
+
+func is_hot(t: float) -> bool:
+	return hot_enabled and Progression.is_hot(t, hot_phase)
+
+
+func update_hot(t: float) -> void:
+	_view.set_hot(not passed and is_hot(t))
 
 
 func register_hit(damage: float, step_cost: float) -> bool:

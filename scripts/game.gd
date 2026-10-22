@@ -70,6 +70,11 @@ var _drag_scale := 0.015
 var _fov_tween: Tween
 var _quitting := false
 var _slowmo_until := 0.0
+## Touch bookkeeping: index -> "focus" or "steer", decided by where the
+## finger landed. The road (upper part of the screen) is for focus fire;
+## the strip near the squad is for steering and flick-dashing.
+var _touches: Dictionary = {}
+const FOCUS_ZONE := 0.62
 ## The screenshot walkthrough sets the spread by hand; the bot leaves it.
 var _bot_spread := true
 
@@ -161,6 +166,8 @@ func _build_scene() -> void:
 	world.fork_ahead.connect(_on_fork_ahead)
 	world.fork_chosen.connect(_on_fork_chosen)
 	world.fork_merged.connect(_on_fork_merged)
+	world.dodged.connect(_on_dodged)
+	world.latched.connect(_on_latched)
 	world.powerups = powerups
 
 	squad = Squad.new()
@@ -297,6 +304,9 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
+	hud.show_hint(Progression.hint_for(1), 4.0)
+	_touches.clear()
+	squad.clear_focus()
 	sfx.play("spawn")
 	sfx.set_music("tense" if mode == "endless" else "calm")
 
@@ -425,6 +435,7 @@ func _tick_run(delta: float) -> void:
 		danger = 0.5
 	hud.set_danger(danger)
 	hud.set_formation(squad.formation_name())
+	hud.set_dash(Progression.dash_enabled(world.level), squad.can_dash())
 	var powers := []
 	for id in Powerups.ORDER:
 		if id != "bomb" and powerups.active(id, _run_time):
@@ -443,12 +454,31 @@ func _tick_run(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch and event.pressed:
-		_try_retry()
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			_try_retry()
+			if state == State.RUNNING:
+				var zone := "focus" if event.position.y < get_viewport().get_visible_rect().size.y * FOCUS_ZONE else "steer"
+				_touches[event.index] = zone
+				if zone == "focus":
+					squad.set_focus(_road_point(event.position))
+		else:
+			if _touches.get(event.index, "") == "focus":
+				squad.clear_focus()
+			_touches.erase(event.index)
 	elif event is InputEventScreenDrag and state == State.RUNNING:
-		squad.nudge(event.relative.x * _drag_scale)
-		# Drag up to spread the line, down to tighten it.
-		squad.adjust_spread(-event.relative.y * _drag_scale * 0.35)
+		var zone: String = _touches.get(event.index, "steer")
+		if zone == "focus":
+			squad.set_focus(_road_point(event.position))
+		else:
+			# A hard flick is a dash; anything gentler steers.
+			if Progression.dash_enabled(world.level) and absf(event.velocity.x) >= Progression.DASH_FLICK_SPEED and squad.can_dash():
+				if squad.dash(event.velocity.x):
+					_on_dash()
+			else:
+				squad.nudge(event.relative.x * _drag_scale)
+				# Drag up to spread the line, down to tighten it.
+				squad.adjust_spread(-event.relative.y * _drag_scale * 0.35)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
 			if state == State.TITLE:
@@ -464,6 +494,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			cycle_formation()
 		elif event.keycode == KEY_B:
 			throw_bomb()
+		elif event.keycode == KEY_Q or event.keycode == KEY_E:
+			if state == State.RUNNING and Progression.dash_enabled(world.level) and squad.dash(-1.0 if event.keycode == KEY_Q else 1.0):
+				_on_dash()
+
+
+## Where a screen point lands on the road (y = 0), for focus fire.
+func _road_point(screen: Vector2) -> Vector3:
+	var origin := camera.project_ray_origin(screen)
+	var dir := camera.project_ray_normal(screen)
+	if absf(dir.y) < 0.001:
+		return Vector3(0.0, 0.0, -20.0)
+	var t := -origin.y / dir.y
+	var p := origin + dir * t
+	return Vector3(p.x, 0.0, p.z)
+
+
+func _on_dash() -> void:
+	sfx.play("throw", -6.0, 1.6)
+	Burst.spawn(world, squad.position + Vector3(0.0, 0.6, 0.0), Soldier.BODY, 10, 0.1, 3.0, 0.3)
 
 
 func _try_retry() -> void:
@@ -612,6 +661,7 @@ func _on_level_started(level: int) -> void:
 	if level <= 1:
 		return
 	hud.show_banner("LEVEL %d" % level, 1.0)
+	hud.show_hint(Progression.hint_for(level), 3.6)
 	_level_peak = 1
 	if not world.endless:
 		squad.redeploy(Difficulty.carry_over(squad.count, run_meta.start_squad()))
@@ -673,6 +723,20 @@ func _on_fork_chosen(route: Dictionary, _side: int) -> void:
 
 func _on_fork_merged() -> void:
 	hud.show_banner("MERGE", 0.6)
+
+
+func _on_dodged() -> void:
+	bonus += Progression.DODGE_BONUS
+	hud.show_float("DODGED  +%d" % Progression.DODGE_BONUS, true)
+	sfx.play("block", -6.0, 1.3)
+	_punch(2.0)
+
+
+func _on_latched(zombie: Zombie) -> void:
+	sfx.play("bite", -8.0, 1.4)
+	hud.show_float("LATCHED!", false)
+	Burst.spawn(world, zombie.position + Vector3(0.0, 0.9, 0.0), Zombie.LATCHER_SKIN, 6, 0.1, 3.0, 0.3)
+	_shake = minf(1.0, _shake + 0.3)
 
 
 func _on_wave_cleared(level: int) -> void:
@@ -760,6 +824,13 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
+	var focus := world.focus_target(24.0)
+	if focus != null:
+		squad.set_focus(focus.position)
+	elif world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
+		squad.set_focus(Vector3(world.boss.position.x + world.boss.core_x, 0.0, world.boss.position.z))
+	else:
+		squad.clear_focus()
 	if world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
 		if _bot_spread:
 			squad.set_spread(0.6)

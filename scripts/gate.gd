@@ -11,6 +11,9 @@ var passed := false
 var index := 0
 ## Steps the player shot each panel up, for the PERFECT bonus.
 var steps_up := [0, 0]
+## Hot panels flash on a timer; the two sides are out of phase.
+var hot_enabled := false
+var hot_phase := 0.0
 var _views: Array[GatePanelView] = []
 
 
@@ -36,6 +39,15 @@ func panel_index_at_x(x: float) -> int:
 	if absf(x - GatePanelView.CENTER_X) <= half:
 		return 1
 	return -1
+
+
+func is_hot(index: int, t: float) -> bool:
+	return hot_enabled and Progression.is_hot(t, hot_phase + float(index) * Progression.HOT_PERIOD * 0.5)
+
+
+func update_hot(t: float) -> void:
+	for i in range(2):
+		_views[i].set_hot(not passed and is_hot(i, t))
 
 
 ## Returns true when the hit stepped the panel's value up.

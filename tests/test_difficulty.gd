@@ -204,3 +204,23 @@ func test_fork() -> void:
 		for c in crates:
 			check(not Difficulty.is_fork_gate(c.index), "no crate inside the fork")
 	check(rich_left > 10 and rich_left < 50, "rich side varies (%d of 60 left)" % rich_left)
+
+
+func test_level_one_is_simple() -> void:
+	for seed in range(40):
+		var gen := Difficulty.new(seed)
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			var pair := gen.make_gate_pair(1, i)
+			var any_good := false
+			for p in pair:
+				check(p.revealed, "level 1 never hides a panel (seed %d gate %d)" % [seed, i])
+				if GateMath.is_good(p):
+					any_good = true
+			check(any_good, "level 1 always offers a gain (seed %d gate %d)" % [seed, i])
+		var f := gen.make_fork(1)
+		for side in ["left", "right"]:
+			for p in f[side].panels:
+				check(p.revealed, "level 1 fork is fully visible")
+	check_eq(Difficulty.wave_for(2, 3).latchers, 0, "no latchers before level 3")
+	check(Difficulty.wave_for(3, 3).latchers >= 1, "latchers from level 3")
+	check(Difficulty.wave_for(3, 3).latcher_hp > Difficulty.wave_for(3, 3).hp, "latchers are sturdier than walkers")

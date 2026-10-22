@@ -39,6 +39,20 @@ const MAX_WAVE := 32
 const POWER_GATE_CHANCE := 0.18
 ## Of those, how many are a mystery rather than a named power-up.
 const MYSTERY_CHANCE := 0.4
+## The fork: at this gate index the road splits into two routes for
+## FORK_GATES gates, then merges. Rich pays more and throws more at you.
+const FORK_INDEX := 3
+const FORK_GATES := 2
+## Metres past the last route gate where the divider ends.
+const FORK_MERGE_AFTER := 16.0
+## The fork line sits this far before the first route gate, so the squad
+## has committed to a side before any route panel can be walked through.
+const FORK_LEAD := 8.0
+const RICH_WAVE_MULT := 1.6
+const SAFE_WAVE_MULT := 0.6
+## Chance one rich panel is hidden, and the chance that hidden panel is a trap.
+const RICH_HIDDEN_CHANCE := 0.3
+const RICH_TRAP_CHANCE := 0.5
 ## Road crates per level, placed in the gap after a random gate.
 const CRATES_PER_LEVEL := 2
 const CRATE_OFFSET := 14.0
@@ -286,12 +300,12 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 			if rng.randf() < (0.8 if big else HALVE_CHANCE[t]):
 				bad = GateMath.mul(0.5)
 
-	# The first gate of any level is a clean, visible, additive gain: the
-	# squad has just reset to one soldier and needs a foothold.
+	# The first gate of any level is a clean, visible, additive gain against
+	# a mild other side: the squad has just reset and needs a foothold, and
+	# a wrong step there should sting, not wipe.
 	if index == 0:
 		good = GateMath.add(rng.randi_range(3, 5))
-		if bad.kind == GateMath.Kind.MUL:
-			bad = GateMath.add(rng.randi_range(-2, 1))
+		bad = GateMath.add(rng.randi_range(-2, 1))
 	elif rng.randf() < (0.4 if big else DILEMMA_CHANCE[t]):
 		# Both options hurt. Which one can you shoot back into the black?
 		good = GateMath.add(rng.randi_range(-3, -1))
@@ -316,6 +330,59 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 	return [bad, good]
 
 
+static func is_fork_gate(index: int) -> bool:
+	return index >= FORK_INDEX and index < FORK_INDEX + FORK_GATES
+
+
+static func fork_distance() -> float:
+	return gate_distance(FORK_INDEX) - FORK_LEAD
+
+
+static func fork_length() -> float:
+	return gate_distance(FORK_INDEX + FORK_GATES - 1) + FORK_MERGE_AFTER - fork_distance()
+
+
+## Two routes for the fork on [param level]: {"left": route, "right": route}.
+## A route is {name, threat (1..3), wave_mult, extra_brutes, panels}.
+## One side is RICH, the other SAFE; which is which is random.
+func make_fork(level: int) -> Dictionary:
+	var lv := level - 1
+	var t := tier_for_level(level)
+	var rich := {
+		"name": "RICH",
+		"threat": 3 if t >= 2 else 2,
+		"wave_mult": RICH_WAVE_MULT,
+		"extra_brutes": 1 + int(lv / 3.0),
+		"panels": [],
+	}
+	for i in range(FORK_GATES):
+		var roll := rng.randf()
+		var panel: GateMath.GatePanel
+		if roll < 0.1:
+			panel = GateMath.mul(3.0)
+		elif roll < 0.4:
+			panel = GateMath.mul(2.0)
+		else:
+			panel = GateMath.add(rng.randi_range(6, 10) + 2 * lv)
+		rich.panels.append(panel)
+	if rng.randf() < RICH_HIDDEN_CHANCE:
+		var which := rng.randi_range(0, FORK_GATES - 1)
+		if rng.randf() < RICH_TRAP_CHANCE:
+			rich.panels[which] = GateMath.add(rng.randi_range(-6, -3) - lv, true)
+		else:
+			rich.panels[which].revealed = false
+	var safe := {
+		"name": "SAFE",
+		"threat": 1,
+		"wave_mult": SAFE_WAVE_MULT,
+		"extra_brutes": 0,
+		"panels": [GateMath.add(rng.randi_range(3, 5) + lv / 2), GateMath.add(rng.randi_range(3, 5) + lv / 2)],
+	}
+	if rng.randf() < 0.5:
+		return {"left": rich, "right": safe}
+	return {"left": safe, "right": rich}
+
+
 ## Gate indices (0-based) that get a crate in the gap after them, and what
 ## is in each. Returns [{index, id}].
 func crates_for_level(level: int) -> Array:
@@ -323,7 +390,7 @@ func crates_for_level(level: int) -> Array:
 	var used := {}
 	for i in range(CRATES_PER_LEVEL):
 		var index := rng.randi_range(0, GATES_PER_LEVEL - 2)
-		while used.has(index):
+		while used.has(index) or is_fork_gate(index):
 			index = (index + 1) % (GATES_PER_LEVEL - 1)
 		used[index] = true
 		var id: String = Powerups.MYSTERY if rng.randf() < 0.5 else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]

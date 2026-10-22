@@ -72,6 +72,9 @@ var _music_button: Button
 var _formation_button: Button
 var _bomb_button: Button
 var _powers: Label
+var _fork_box: Control
+var _fork_left: Label
+var _fork_right: Label
 
 var _float_anchor: Control
 var _float: Label
@@ -186,6 +189,40 @@ func _init() -> void:
 	_powers = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _powers, 0.15, 0.85, 124.0)
 	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
+
+	# The fork preview: what each route offers, before you have to choose.
+	_fork_box = Control.new()
+	_fork_box.anchor_left = 0.04
+	_fork_box.anchor_right = 0.96
+	_fork_box.offset_top = 180.0
+	_fork_box.offset_bottom = 262.0
+	_fork_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fork_box.visible = false
+	root.add_child(_fork_box)
+	var fork_bg := ColorRect.new()
+	fork_bg.color = Color(0.05, 0.05, 0.08, 0.7)
+	fork_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fork_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fork_box.add_child(fork_bg)
+	var fork_head := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	fork_head.text = "FORK AHEAD"
+	fork_head.anchor_right = 1.0
+	fork_head.offset_top = 2.0
+	fork_head.offset_bottom = 26.0
+	_fork_box.add_child(fork_head)
+	_fork_left = _label(26, HORIZONTAL_ALIGNMENT_LEFT)
+	_fork_left.anchor_right = 0.5
+	_fork_left.offset_left = 14.0
+	_fork_left.offset_top = 28.0
+	_fork_left.offset_bottom = 80.0
+	_fork_box.add_child(_fork_left)
+	_fork_right = _label(26, HORIZONTAL_ALIGNMENT_RIGHT)
+	_fork_right.anchor_left = 0.5
+	_fork_right.anchor_right = 1.0
+	_fork_right.offset_right = -14.0
+	_fork_right.offset_top = 28.0
+	_fork_right.offset_bottom = 80.0
+	_fork_box.add_child(_fork_right)
 
 	_build_title(root)
 	_build_shop(root)
@@ -387,6 +424,25 @@ func set_bombs(n: int) -> void:
 	_bomb_button.text = "BOMB x%d" % n
 
 
+## Show both routes of the coming fork. [param routes] is the fork dict.
+func show_fork(routes: Dictionary) -> void:
+	_fork_box.visible = true
+	for side in ["left", "right"]:
+		var r: Dictionary = routes[side]
+		var labels := []
+		for p in r.panels:
+			labels.append(GateMath.label(p))
+		var text := "%s  %s
+%s" % [r.name, "!".repeat(int(r.threat)), " · ".join(labels)]
+		var l := _fork_left if side == "left" else _fork_right
+		l.text = ("◀ " + text) if side == "left" else (text + " ▶")
+		l.add_theme_color_override("font_color", Fork.RICH if r.name == "RICH" else Fork.SAFE)
+
+
+func hide_fork() -> void:
+	_fork_box.visible = false
+
+
 ## Active timed power-ups, e.g. "SLOW-MO 4s   SHIELD 2s".
 func set_powers(text: String) -> void:
 	_powers.text = text
@@ -396,6 +452,7 @@ func _hide_cards() -> void:
 	_formation_button.visible = false
 	_bomb_button.visible = false
 	_powers.text = ""
+	_fork_box.visible = false
 	_title_card.visible = false
 	_shop_card.visible = false
 	_daily_card.visible = false

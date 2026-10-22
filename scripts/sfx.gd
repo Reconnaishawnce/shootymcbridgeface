@@ -14,7 +14,7 @@ const HIT_INTERVAL := 0.05
 static var enabled := true
 static var music_on := true
 
-const MUSIC_RATE := 11025
+const MUSIC_RATE := 8000
 const MUSIC_DB := -15.0
 const MUSIC_STYLES := ["calm", "tense", "boss"]
 
@@ -26,6 +26,8 @@ var _hit_cooldown := 0.0
 var _music: Dictionary = {}
 var _music_target: Dictionary = {}
 var _music_style := ""
+var _music_thread: Thread
+var _music_ready := false
 
 
 func _ready() -> void:
@@ -56,16 +58,38 @@ func _ready() -> void:
 		_players.append(p)
 	for style in MUSIC_STYLES:
 		var mp := AudioStreamPlayer.new()
-		mp.stream = make_music(style)
 		mp.volume_db = -80.0
 		mp.bus = "Master"
 		add_child(mp)
-		# Silent runs (the headless bot) never start the loops at all, so
-		# nothing is left playing at exit.
-		if enabled:
-			mp.play()
 		_music[style] = mp
 		_music_target[style] = 0.0
+	# The music loops are a few hundred thousand samples of GDScript maths.
+	# Done on the main thread that blocked the first frame for seconds on a
+	# phone (a gray screen after the splash), so it runs on a worker and
+	# the loops start whenever they are ready. Silent runs skip it.
+	if enabled:
+		_music_thread = Thread.new()
+		_music_thread.start(_build_music_loops)
+
+
+## Worker: synthesise every loop. Pure maths, touches no nodes.
+func _build_music_loops() -> Dictionary:
+	var out := {}
+	for style in MUSIC_STYLES:
+		out[style] = make_music(style)
+	return out
+
+
+func _finish_music_if_ready() -> void:
+	if _music_ready or _music_thread == null or _music_thread.is_alive():
+		return
+	var loops: Dictionary = _music_thread.wait_to_finish()
+	_music_thread = null
+	_music_ready = true
+	for style in loops:
+		var mp: AudioStreamPlayer = _music[style]
+		mp.stream = loops[style]
+		mp.play()
 
 
 func _exit_tree() -> void:
@@ -75,6 +99,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	_shot_cooldown -= delta
 	_hit_cooldown -= delta
+	_finish_music_if_ready()
 	# Crossfade the music layers toward their targets.
 	for style in _music:
 		var mp: AudioStreamPlayer = _music[style]
@@ -107,6 +132,9 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 ## Stop every voice and drop the streams. Called before quitting so no
 ## playback object is left alive at exit.
 func stop_all() -> void:
+	if _music_thread != null:
+		_music_thread.wait_to_finish()
+		_music_thread = null
 	for p in _players:
 		p.stop()
 		p.stream = null
@@ -298,39 +326,53 @@ static func make_music(style: String) -> AudioStreamWAV:
 			pad_amp = 0.08
 	var beat := 60.0 / bpm
 	var beats := 8
-	var n := int(beat * float(beats) * float(MUSIC_RATE))
+	var rate := float(MUSIC_RATE)
+	# Own generator: this runs on a worker thread, and the global one is
+	# shared with the main thread.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = style.hash()
+	var n := int(beat * float(beats) * rate)
 	var out := PackedFloat32Array()
 	out.resize(n)
-	var bass_phase := 0.0
-	var pad_phases := []
+	# Pad and bass are continuous oscillators; kicks and hats are short
+	# one-shots mixed in afterwards, so the per-sample loop stays cheap.
+	var pad_step := PackedFloat32Array()
 	for f in pad:
-		pad_phases.append(0.0)
+		pad_step.append(TAU * float(f) / rate)
+	var pad_phase := PackedFloat32Array()
+	pad_phase.resize(pad.size())
+	var bass_phase := 0.0
+	var beat_samples := int(beat * rate)
 	for i in range(n):
-		var t := float(i) / float(MUSIC_RATE)
-		var b := t / beat
-		var in_beat := fmod(b, 1.0)
-		var bar_beat := fmod(b, 4.0)
-		var v := 0.0
-		# Bass: one note, pulsing every beat, octave jump on beat 3 for boss.
-		var bass_f := 55.0 if not (style == "boss" and int(bar_beat) == 2) else 110.0
-		bass_phase += TAU * bass_f / float(MUSIC_RATE)
-		v += sin(bass_phase) * bass_amp * exp(-3.0 * in_beat)
-		# Kick: a quick pitch drop on the chosen beats.
+		var in_beat := float(i % beat_samples) / rate
+		var bar_beat := (i / beat_samples) % 4
+		var bass_f := 110.0 if (style == "boss" and bar_beat == 2) else 55.0
+		bass_phase += TAU * bass_f / rate
+		var v := sin(bass_phase) * bass_amp * exp(-3.0 * in_beat)
+		var trem := 0.7 + 0.3 * sin(float(i) / rate * 0.8)
+		for j in range(pad_phase.size()):
+			pad_phase[j] += pad_step[j]
+			v += sin(pad_phase[j]) * pad_amp * trem
+		out[i] = v
+	# One-shots: a kick is a quick pitch drop, a hat a tick of noise.
+	var kick_len := int(0.25 * rate)
+	var hat_len := int(0.05 * rate)
+	for bar in range(beats / 4):
 		for k in kicks:
-			var since := bar_beat - float(k)
-			if since >= 0.0 and since < 0.25:
-				v += sin(TAU * (120.0 - 300.0 * since) * since) * 0.5 * exp(-18.0 * since)
-		# Hats: short noise ticks.
+			var start := int((float(bar * 4) + float(k)) * beat * rate)
+			for j in range(kick_len):
+				var since := float(j) / rate
+				var idx := start + j
+				if idx < n:
+					out[idx] += sin(TAU * (120.0 - 300.0 * since) * since) * 0.5 * exp(-18.0 * since)
 		for h in hats:
-			var since_h := bar_beat - float(h)
-			if since_h >= 0.0 and since_h < 0.05:
-				v += randf_range(-1.0, 1.0) * 0.12 * exp(-80.0 * since_h)
-		# Pad: slow tremolo chord.
-		var trem := 0.7 + 0.3 * sin(t * 0.8)
-		for j in range(pad.size()):
-			pad_phases[j] += TAU * float(pad[j]) / float(MUSIC_RATE)
-			v += sin(pad_phases[j]) * pad_amp * trem
-		out[i] = clampf(v, -1.0, 1.0)
+			var start_h := int((float(bar * 4) + float(h)) * beat * rate)
+			for j in range(hat_len):
+				var idx := start_h + j
+				if idx < n:
+					out[idx] += rng.randf_range(-1.0, 1.0) * 0.12 * exp(-80.0 * float(j) / rate)
+	for i in range(n):
+		out[i] = clampf(out[i], -1.0, 1.0)
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = MUSIC_RATE

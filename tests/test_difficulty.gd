@@ -91,6 +91,7 @@ func test_first_gate_of_every_level_is_a_clear_positive_choice() -> void:
 			for p in pair:
 				check(p.revealed, "opener never hidden (seed %d level %d)" % [s, level])
 				check_eq(p.kind, GateMath.Kind.ADD, "opener is additive (seed %d level %d)" % [s, level])
+				check(p.value >= -2.0, "opener never bites hard (seed %d level %d)" % [s, level])
 				if GateMath.is_good(p):
 					any_good = true
 			check(any_good, "opener offers a gain (seed %d level %d)" % [s, level])
@@ -174,3 +175,32 @@ func test_power_gates_and_crates() -> void:
 		check(Powerups.is_valid(c.id), "crate content valid")
 		check(Difficulty.crate_distance(c.index) > Difficulty.gate_distance(c.index), "crate after its gate")
 		check(Difficulty.crate_distance(c.index) < Difficulty.wave_distance(c.index), "crate before the wave")
+
+
+func test_fork() -> void:
+	check(Difficulty.is_fork_gate(Difficulty.FORK_INDEX), "fork starts at its index")
+	check(Difficulty.is_fork_gate(Difficulty.FORK_INDEX + 1), "second route gate")
+	check(not Difficulty.is_fork_gate(Difficulty.FORK_INDEX + 2), "fork is two gates")
+	check(not Perks.is_pick_gate(Difficulty.FORK_INDEX) and not Perks.is_pick_gate(Difficulty.FORK_INDEX + 1), "fork never overlaps a perk gate")
+	check(Difficulty.fork_distance() + Difficulty.fork_length() < Difficulty.gate_distance(Difficulty.FORK_INDEX + Difficulty.FORK_GATES), "merge before the next gate")
+	check(Difficulty.fork_distance() < Difficulty.gate_distance(Difficulty.FORK_INDEX), "fork line before the first route gate")
+	check(Difficulty.fork_distance() > Difficulty.gate_distance(Difficulty.FORK_INDEX - 1), "fork line after the previous gate")
+	var rich_left := 0
+	for seed in range(60):
+		var gen := Difficulty.new(seed)
+		var f := gen.make_fork(2)
+		var names := [f.left.name, f.right.name]
+		check(names.has("RICH") and names.has("SAFE"), "one of each")
+		if f.left.name == "RICH":
+			rich_left += 1
+		for side in ["left", "right"]:
+			var r: Dictionary = f[side]
+			check_eq(r.panels.size(), Difficulty.FORK_GATES, "a panel per route gate")
+			check(r.threat >= 1 and r.threat <= 3, "threat in range")
+			if r.name == "SAFE":
+				for p in r.panels:
+					check(p.revealed and GateMath.is_good(p), "safe panels are visible gains")
+		var crates := gen.crates_for_level(2)
+		for c in crates:
+			check(not Difficulty.is_fork_gate(c.index), "no crate inside the fork")
+	check(rich_left > 10 and rich_left < 50, "rich side varies (%d of 60 left)" % rich_left)

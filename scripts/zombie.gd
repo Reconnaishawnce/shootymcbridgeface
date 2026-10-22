@@ -41,6 +41,9 @@ var radius := 0.55
 var alive := true
 ## Which wave this zombie belongs to, for wave-clear bonuses. -1 for none.
 var wave_id := -1
+## Sideways bounds while inside a fork route; the divider keeps them there.
+var lane_min := -3.0
+var lane_max := 3.0
 
 var _body: Node3D
 var _bar: MeshInstance3D

@@ -50,6 +50,12 @@ the same key (see below).
   `+2` is a real play. Bullets spent on a panel do not reach the zombies
   behind it. That trade-off is the whole game.
 - Brutes take a slice of your squad when they reach you, not a nibble.
+- **The fork**: once per level the road splits for two gates. One route is
+  RICH (bigger numbers, a bigger crowd, sometimes a hidden panel that may
+  be a trap), the other SAFE (modest, visible gains, a light crowd). A strip
+  at the top previews both routes' numbers and danger before you commit.
+  Be on the side you want when the divider arrives; the lane narrows to
+  that side until the routes merge.
 - **Levels**: eight gates and a boss. Kill the boss before it reaches you;
   once it arrives it chews through the squad. Its glowing core sways side
   to side and takes triple damage, so track it. A quarter of your survivors

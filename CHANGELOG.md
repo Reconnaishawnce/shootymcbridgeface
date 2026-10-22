@@ -3,6 +3,31 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.7 (run 7)
+
+The fork, and the startup fix.
+
+- Fixed: 0.6 sat on a gray screen after the splash on the phone. The
+  three music loops were synthesised in GDScript on the main thread before
+  the first frame could render. Synthesis now runs on a worker thread, at
+  a lower rate with precomputed one-shots, and the loops fade in when
+  they are ready. Startup is as light as 0.5.
+- The fork: at the fourth gate of every level the road splits into a RICH
+  route and a SAFE route for two gates, with a divider, its own panels and
+  crowd on each side, route names at the mouth, a preview strip at the
+  top showing both routes' numbers and danger, and a merge. Rich may hide
+  a panel, and a hidden rich panel may be a trap.
+- Also fixed on the way: the last gate of a level used to arrive during
+  the boss fight at crawl speed and slip into the next level; the boss
+  now engages only once every gate is behind you. Every level's opener
+  gate has a mild other side at every level, not just level 1. The
+  whole formation stays on its side of a fork divider.
+- Balance, bot with no upgrades: squad at the boss on levels 1 to 6 was
+  74, 358, 60, 86, 56, 20 (the 358 is a rich route with multipliers
+  paying off); died at the level 6 boss after 3.4 minutes; best combo
+  77, 13 perfect gates. Endless: level 8 at three minutes, peak 304, 148
+  alive.
+
 ## 0.6 (run 6)
 
 The badass pass, from the second play session.

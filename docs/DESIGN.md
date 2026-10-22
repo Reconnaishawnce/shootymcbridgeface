@@ -86,6 +86,17 @@ other way, and your aim as a resource you have to spend wisely.
   the landing spot. Globs fly at 16 m/s, splash the squad's reach plus a
   metre, and come every 2.2 s, or every 1.3 s once the boss is below
   half health.
+- The fork. At the fourth gate of every level the road splits for two
+  gates with a divider down the middle. One route is RICH: two panels
+  drawn from +6..+10 (+2 per level), x2 or x3, with a 30% chance one is
+  hidden and half of those hidden panels a trap of -3..-6; the wave inside
+  the fork is 1.6x with an extra brute or two. The other is SAFE: two
+  visible +2..+4 panels and a 0.6x wave. Which side is which is random. A
+  strip at the top shows both routes' panels and a danger rating from the
+  moment the fork spawns, so the choice is planned, not guessed. The
+  squad commits by being on a side when the divider arrives and is held
+  to that half of the road until the merge 16 m after the second route
+  gate. Bullets from either side can still shoot up either route's panel.
 - Dopamine on a timer. Kills within 1.4 s chain into a combo; every five
   raises a score multiplier up to 4x, with a readout and a draining bar.
   A wave fully killed before any of it reaches you pays a wave-clear
@@ -138,10 +149,10 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 6 result (bot, no upgrades) |
+| Metric | Run 7 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 6 | 55, 37, 36, 133, 59, 4; wiped at the level 6 boss, 3.7 min |
-| Endless | level 7, peak 272, wiped at 2.6 min |
+| Levels: squad at each boss, 1 to 6 | 74, 358, 60, 86, 56, 20; wiped at the level 6 boss, 3.4 min |
+| Endless: after 3 minutes | level 8, peak 304, 148 alive |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side
@@ -164,7 +175,7 @@ Grouped by what they add. Starred items are the first to build.
 
 ### Make runs varied
 - ★ Mid-run perk picks every third gate (built).
-- Branching lanes with a tiny minimap.
+- ★ Branching lanes with a preview strip (built in run 7).
 - ★ Zombie types that interact with gates: thieves and tanks (built).
 - ★ Boss with a shootable weak point that multiplies damage (built).
 

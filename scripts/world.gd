@@ -18,6 +18,9 @@ signal gate_perfect(gate: Gate, index: int)
 signal powerup_granted(id: String, from_crate: bool)
 signal shield_blocked
 signal bomb_exploded(at: Vector3, kills: int)
+signal fork_ahead(routes: Dictionary)
+signal fork_chosen(route: Dictionary, side: int)
+signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 
@@ -44,6 +47,11 @@ const POST := Color(0.35, 0.3, 0.26)
 
 var gates: Array[Gate] = []
 var perk_gates: Array[PerkGate] = []
+var route_gates: Array[RouteGate] = []
+var fork: Fork = null
+## -1 left, 1 right, 0 not committed.
+var fork_side := 0
+var _fork_routes: Dictionary = {}
 var zombies: Array[Zombie] = []
 var boss: Boss = null
 var bullets: Node3D
@@ -112,6 +120,10 @@ func start_level(n: int) -> void:
 	_chew_timer = 0.0
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
+	_fork_routes = gen.make_fork(level) if gen != null else {}
+	fork_side = 0
+	if squad != null:
+		squad.set_lane(-Squad.LANE_HALF, Squad.LANE_HALF)
 	# Stragglers from the last level would eat a one-soldier squad.
 	for z in zombies:
 		z.consume()
@@ -126,6 +138,13 @@ func _clear_actors() -> void:
 	for pg in perk_gates:
 		pg.queue_free()
 	perk_gates.clear()
+	for rg in route_gates:
+		rg.queue_free()
+	route_gates.clear()
+	if fork != null and is_instance_valid(fork):
+		fork.queue_free()
+	fork = null
+	fork_side = 0
 	_wave_alive.clear()
 	_wave_voided.clear()
 	for z in zombies:
@@ -166,6 +185,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_scroll_dressing(delta)
 	_move_gates(delta, p_squad)
 	_move_perk_gates(delta, p_squad)
+	_move_fork(delta, p_squad)
 	_move_zombies(delta, p_squad)
 	_move_boss(delta)
 	_move_spits(p_squad)
@@ -180,10 +200,14 @@ func _pace() -> float:
 
 
 ## The closest live zombie within [param max_range] metres, or null.
+## Inside a fork, only zombies on the squad's own route count: the ones
+## behind the divider cannot be reached or reach you.
 func nearest_zombie(max_range: float) -> Zombie:
 	var best: Zombie = null
 	for z in zombies:
 		if z.position.z < -max_range:
+			continue
+		if fork_side != 0 and signf(z.position.x) != float(fork_side) and absf(z.position.x) > 0.3:
 			continue
 		if best == null or z.position.z > best.position.z:
 			best = z
@@ -235,13 +259,22 @@ func try_hit(b: Bullet) -> bool:
 			continue
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
-			var cost := Difficulty.effective_step_cost(level, squad.dps() if squad != null else 0.0)
-			if perks != null:
-				cost *= perks.step_cost_mult()
-			if g.register_hit(i, b.damage, cost):
+			if g.register_hit(i, b.damage, _step_cost()):
 				gate_stepped.emit(g, i)
 			return true
+	for rg in route_gates:
+		if rg.passed or rg.position.z < z_lo or rg.position.z > z_hi or not rg.covers_x(b.position.x):
+			continue
+		rg.register_hit(b.damage, _step_cost())
+		return true
 	return false
+
+
+func _step_cost() -> float:
+	var cost := Difficulty.effective_step_cost(level, squad.dps() if squad != null else 0.0)
+	if perks != null:
+		cost *= perks.step_cost_mult()
+	return cost
 
 
 ## In endless mode gate counters never reset, so the level and the index
@@ -260,7 +293,22 @@ func _spawn() -> void:
 	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
 		var z := -(Difficulty.gate_distance(_next_gate) - level_distance)
 		var offer: Array = perks.offer(gen.rng) if (perks != null and Perks.is_pick_gate(_gate_index(_next_gate))) else []
-		if offer.size() >= 2:
+		if Difficulty.is_fork_gate(_gate_index(_next_gate)) and not _fork_routes.is_empty():
+			var k := _gate_index(_next_gate) - Difficulty.FORK_INDEX
+			if k == 0:
+				fork = Fork.new()
+				fork.setup(_fork_routes, Difficulty.fork_length())
+				fork.position = Vector3(0.0, 0.0, z + Difficulty.FORK_LEAD)
+				add_child(fork)
+				fork_ahead.emit(_fork_routes)
+			for side in [-1, 1]:
+				var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
+				var rg := RouteGate.new()
+				rg.setup(route.panels[k], side)
+				rg.position.z = z
+				add_child(rg)
+				route_gates.append(rg)
+		elif offer.size() >= 2:
 			var pg := PerkGate.new()
 			pg.setup(offer)
 			pg.position = Vector3(0.0, 0.0, z)
@@ -300,6 +348,21 @@ func _spawn() -> void:
 func _spawn_wave(n: int, count: int) -> void:
 	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
 	var base_z := -(Difficulty.wave_distance(n) - level_distance)
+	# A wave that sits inside the fork is split per route: each side gets
+	# its own crowd, scaled by how rich that route is.
+	var index := _gate_index(n)
+	if Difficulty.is_fork_gate(index) and Difficulty.wave_distance(index) < Difficulty.fork_distance() + Difficulty.fork_length() and not _fork_routes.is_empty():
+		for side in [-1, 1]:
+			var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
+			_wave_seq += 1
+			var wave := _wave_seq
+			var lo := 0.6 if side > 0 else -LANE_HALF + 0.5
+			var hi := LANE_HALF - 0.5 if side > 0 else -0.6
+			for i in range(int(ceil(spec.count * float(route.wave_mult)))):
+				_spawn_zombie_in(spec.hp, spec.speed, Zombie.Kind.NORMAL, base_z - gen.rng.randf_range(0.0, 7.0), wave, lo, hi)
+			for i in range(int(spec.brutes * float(route.wave_mult)) + int(route.extra_brutes)):
+				_spawn_zombie_in(spec.brute_hp, spec.speed, Zombie.Kind.BRUTE, base_z - gen.rng.randf_range(4.0, 9.0), wave, lo, hi)
+		return
 	_wave_seq += 1
 	var wave := _wave_seq
 	for i in range(spec.count):
@@ -321,23 +384,38 @@ func _spawn_runners(n: int, count: int) -> void:
 	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
 	var base_z := Difficulty.runner_release_z(level)
 	var side := -1.0 if gen.rng.randf() < 0.5 else 1.0
+	var lo := -LANE_HALF + 0.5
+	var hi := LANE_HALF - 0.5
+	if fork_side != 0:
+		# Inside a fork the pack comes down your own route.
+		side = float(fork_side)
+		lo = 0.6 if fork_side > 0 else -LANE_HALF + 0.5
+		hi = LANE_HALF - 0.5 if fork_side > 0 else -0.6
 	for i in range(spec.runners):
 		var zb := Zombie.new()
 		zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
 		zb.lane_offset = gen.rng.randf_range(-0.8, 0.8)
-		zb.position = Vector3(side * gen.rng.randf_range(1.0, LANE_HALF - 0.5), 0.0, base_z - gen.rng.randf_range(0.0, 3.0))
+		zb.lane_min = lo
+		zb.lane_max = hi
+		zb.position = Vector3(clampf(side * gen.rng.randf_range(1.0, LANE_HALF - 0.5), lo, hi), 0.0, base_z - gen.rng.randf_range(0.0, 3.0))
 		add_child(zb)
 		zombies.append(zb)
 
 
 func _spawn_zombie(hp: float, speed: float, kind: int, z: float, wave: int = -1) -> void:
+	_spawn_zombie_in(hp, speed, kind, z, wave, -LANE_HALF + 0.8, LANE_HALF - 0.8)
+
+
+func _spawn_zombie_in(hp: float, speed: float, kind: int, z: float, wave: int, lo: float, hi: float) -> void:
 	var zb := Zombie.new()
 	zb.setup(hp, speed, kind)
 	zb.wave_id = wave
 	if wave >= 0:
 		_wave_alive[wave] = int(_wave_alive.get(wave, 0)) + 1
 	zb.lane_offset = gen.rng.randf_range(-1.1, 1.1)
-	zb.position = Vector3(gen.rng.randf_range(-LANE_HALF + 0.8, LANE_HALF - 0.8), 0.0, z)
+	zb.lane_min = lo
+	zb.lane_max = hi
+	zb.position = Vector3(gen.rng.randf_range(lo, hi), 0.0, z)
 	add_child(zb)
 	zombies.append(zb)
 
@@ -425,6 +503,51 @@ func _move_perk_gates(delta: float, p_squad: Squad) -> void:
 			pg.queue_free()
 
 
+func _move_fork(delta: float, p_squad: Squad) -> void:
+	if fork != null:
+		fork.position.z += world_speed * delta
+		if not fork.chosen and fork.position.z >= 0.0:
+			fork_side = -1 if p_squad.position.x < 0.0 else 1
+			fork.commit()
+			if fork_side < 0:
+				p_squad.set_lane(-Squad.LANE_HALF, -0.55)
+			else:
+				p_squad.set_lane(0.55, Squad.LANE_HALF)
+			fork_chosen.emit(_fork_routes["left" if fork_side < 0 else "right"], fork_side)
+	for rg in route_gates.duplicate():
+		rg.position.z += world_speed * delta
+		if not rg.passed:
+			if rg.position.z >= REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0):
+				rg.reveal()
+			if rg.position.z >= 0.0:
+				if rg.side == fork_side:
+					var panel: GateMath.GatePanel = rg.choose()
+					var before := p_squad.count
+					var after := GateMath.apply(before, panel)
+					if after > 0 and perks != null:
+						after += perks.recruit_per_gate()
+					p_squad.set_count(after)
+					_gates_passed += 1
+					gate_passed.emit(panel, before, after)
+					_spawn_runners(_next_runners, p_squad.count)
+					_next_runners += 1
+					if after > 0 and rg.steps_up >= Difficulty.PERFECT_STEPS:
+						gate_perfect.emit(null, rg.side)
+				else:
+					rg.skip()
+		if rg.position.z > DESPAWN_Z:
+			route_gates.erase(rg)
+			rg.queue_free()
+	if fork == null:
+		return
+	if fork.chosen and fork.position.z >= fork.length:
+		fork_side = 0
+		p_squad.set_lane(-Squad.LANE_HALF, Squad.LANE_HALF)
+		fork_merged.emit()
+		fork.queue_free()
+		fork = null
+
+
 ## The next perk gate the squad has not passed yet, or null.
 func nearest_upcoming_perk_gate() -> PerkGate:
 	var best: PerkGate = null
@@ -443,9 +566,11 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			continue
 		var pace := _pace()
 		z.position.z += (world_speed + z.speed * pace) * delta
-		var aim_x := clampf(p_squad.position.x + z.lane_offset, -LANE_HALF + 0.4, LANE_HALF - 0.4)
+		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-LANE_HALF + 0.4, z.lane_min), minf(LANE_HALF - 0.4, z.lane_max))
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
-		if z.position.z >= BITE_Z and absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius:
+		var in_reach: bool = absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius
+		var same_route: bool = p_squad.position.x >= z.lane_min - 0.6 and p_squad.position.x <= z.lane_max + 0.6
+		if z.position.z >= BITE_Z and in_reach and same_route:
 			zombies.erase(z)
 			_note_wave_leak(z)
 			z.consume()
@@ -496,7 +621,9 @@ func _move_boss(delta: float) -> void:
 	match phase:
 		Phase.GATES:
 			boss.position.z += (world_speed + 1.0) * delta
-			if boss.position.z >= BOSS_ENGAGE_Z:
+			# The fight starts once the last gate is behind you, so the road
+			# never crawls with a number gate still ahead.
+			if boss.position.z >= BOSS_ENGAGE_Z and _all_gates_passed():
 				phase = Phase.BOSS
 		Phase.BOSS:
 			var walk := BOSS_WALK_SPEED * _pace()
@@ -505,6 +632,19 @@ func _move_boss(delta: float) -> void:
 				boss.position.x = boss.sway_x
 			else:
 				boss.position.z = minf(boss.position.z + walk * delta, BOSS_CHEW_Z)
+
+
+func _all_gates_passed() -> bool:
+	for g in gates:
+		if not g.passed:
+			return false
+	for pg in perk_gates:
+		if not pg.passed:
+			return false
+	for rg in route_gates:
+		if not rg.passed:
+			return false
+	return true
 
 
 func _tick_boss(delta: float, p_squad: Squad) -> void:

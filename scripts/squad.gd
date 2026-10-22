@@ -43,6 +43,9 @@ var spread := 1.0
 var now := 0.0
 ## Estimated sideways speed, for the spitter's lead.
 var velocity_x := 0.0
+## Steering bounds. A fork narrows them to one side of the divider.
+var lane_min := -LANE_HALF
+var lane_max := LANE_HALF
 
 var _soldiers: Array[Soldier] = []
 var _fire_accum := 0.0
@@ -78,6 +81,7 @@ func _init() -> void:
 func reset(start_count: int = 1) -> void:
 	target_x = 0.0
 	position.x = 0.0
+	set_lane(-LANE_HALF, LANE_HALF)
 	_prev_x = 0.0
 	velocity_x = 0.0
 	spread = 1.0
@@ -88,9 +92,35 @@ func reset(start_count: int = 1) -> void:
 	set_count(start_count)
 
 
+## Restrict steering to a strip of the road (a fork route), or free it.
+func set_lane(lo: float, hi: float) -> void:
+	lane_min = lo
+	lane_max = hi
+	target_x = clampf(target_x, lane_min, lane_max)
+	set_spread(spread)
+
+
+func lane_half() -> float:
+	return (lane_max - lane_min) * 0.5
+
+
+## Where the squad's centre may go: the lane, minus the formation's own
+## half-width, so no soldier ends up inside a fork divider or a curb.
+func _bounds() -> Vector2:
+	var hw := Formation.half_width(mini(count, MAX_VISUAL), spread)
+	# Only an inner edge (a fork divider) pushes the formation in; the road
+	# edges are soft and a few soldiers on the curb look fine.
+	var lo := lane_min + (hw if lane_min > -LANE_HALF + 0.01 else 0.0)
+	var hi := lane_max - (hw if lane_max < LANE_HALF - 0.01 else 0.0)
+	if lo > hi:
+		var mid := (lane_min + lane_max) * 0.5
+		return Vector2(mid, mid)
+	return Vector2(lo, hi)
+
+
 ## Stretch or squeeze the formation. Clamped so it always fits the lane.
 func set_spread(v: float) -> void:
-	var limit := Formation.max_spread_for(mini(count, MAX_VISUAL), LANE_HALF - 0.2)
+	var limit := Formation.max_spread_for(mini(count, MAX_VISUAL), lane_half() - 0.1)
 	spread = clampf(v, Formation.SPREAD_MIN, limit)
 	_layout()
 
@@ -168,7 +198,8 @@ func reach() -> float:
 
 
 func nudge(dx: float) -> void:
-	target_x = clampf(target_x + dx, -LANE_HALF, LANE_HALF)
+	var b := _bounds()
+	target_x = clampf(target_x + dx, b.x, b.y)
 
 
 func is_shotgun() -> bool:
@@ -227,7 +258,7 @@ func _sync_visuals() -> void:
 		var s: Soldier = _soldiers.pop_back()
 		s.queue_free()
 	# A bigger squad may need a narrower spread to stay in the lane.
-	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, LANE_HALF - 0.2))
+	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, lane_half() - 0.1))
 	_layout()
 	_sync_army()
 
@@ -282,6 +313,8 @@ func _make_flag(color: Color) -> Node3D:
 
 
 func _process(delta: float) -> void:
+	var b := _bounds()
+	target_x = clampf(target_x, b.x, b.y)
 	position.x = lerpf(position.x, target_x, 1.0 - exp(-STEER_LERP * delta))
 	if delta > 0.0:
 		velocity_x = lerpf(velocity_x, (position.x - _prev_x) / delta, 0.3)

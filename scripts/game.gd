@@ -158,6 +158,9 @@ func _build_scene() -> void:
 	world.powerup_granted.connect(_on_powerup_granted)
 	world.shield_blocked.connect(_on_shield_blocked)
 	world.bomb_exploded.connect(_on_bomb_exploded)
+	world.fork_ahead.connect(_on_fork_ahead)
+	world.fork_chosen.connect(_on_fork_chosen)
+	world.fork_merged.connect(_on_fork_merged)
 	world.powerups = powerups
 
 	squad = Squad.new()
@@ -509,7 +512,7 @@ func _punch(amount: float) -> void:
 func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void:
 	gates_passed += 1
 	if smoke:
-		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
+		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "dist": int(world.level_distance), "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
 	var text := GateMath.label(panel)
 	if after > before:
 		text += "   %d > %d" % [before, after]
@@ -654,6 +657,24 @@ func _on_bomb_exploded(at: Vector3, kills: int) -> void:
 		hud.show_float("BOOM  %d" % kills, true)
 
 
+func _on_fork_ahead(routes: Dictionary) -> void:
+	hud.show_fork(routes)
+	sfx.play("click", -2.0, 0.8)
+
+
+func _on_fork_chosen(route: Dictionary, _side: int) -> void:
+	if smoke:
+		print("SMOKE_FORK ", JSON.stringify({"level": world.level, "route": route.name, "squad": squad.count, "frame": _frames}))
+	hud.hide_fork()
+	hud.show_banner("%s ROUTE" % route.name, 0.9)
+	sfx.play("powerup" if route.name == "RICH" else "spawn", -4.0)
+	_punch(2.0)
+
+
+func _on_fork_merged() -> void:
+	hud.show_banner("MERGE", 0.6)
+
+
 func _on_wave_cleared(level: int) -> void:
 	waves_cleared += 1
 	var b := Difficulty.wave_clear_bonus(level)
@@ -662,7 +683,7 @@ func _on_wave_cleared(level: int) -> void:
 	sfx.play("spawn", -4.0, 1.2)
 
 
-func _on_gate_perfect(_gate: Gate, _index: int) -> void:
+func _on_gate_perfect(_gate, _index: int) -> void:
 	perfect_gates += 1
 	bonus += Difficulty.PERFECT_BONUS
 	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
@@ -752,9 +773,22 @@ func _bot_steer() -> void:
 		if z.is_thief():
 			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
 			return
+	# At a fork, go rich when the squad can afford the crowd, else safe.
+	if world.fork != null and not world.fork.chosen:
+		var left: Dictionary = world.fork.routes.left
+		var want_rich := squad.count >= 12
+		var go_left: bool = (str(left.name) == "RICH") == want_rich
+		squad.target_x = -GatePanelView.CENTER_X if go_left else GatePanelView.CENTER_X
+		if world.fork.position.z > -24.0:
+			return
 	var z := world.nearest_zombie(22.0)
 	var g := world.nearest_upcoming_gate()
 	var pg := world.nearest_upcoming_perk_gate()
+	# A gate about to arrive outranks a zombie: pick the side first.
+	if g != null and g.position.z > -12.0:
+		var i := GateMath.better_index(g.panels[0], g.panels[1], squad.count)
+		squad.target_x = -GatePanelView.CENTER_X if i == 0 else GatePanelView.CENTER_X
+		return
 	if pg != null and (g == null or pg.position.z > g.position.z):
 		if z != null and z.position.z > pg.position.z:
 			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
@@ -794,6 +828,16 @@ func _shots_walkthrough() -> void:
 	squad.set_spread(1.0)
 	await _capture("5c_army.png", 40)
 	_bot_spread = true
+	for i in range(3000):
+		if world.fork != null and world.fork.position.z > -30.0 and not world.fork.chosen:
+			break
+		await get_tree().process_frame
+	await _capture("5d_fork.png", 2)
+	for i in range(600):
+		if world.fork != null and world.fork.chosen:
+			break
+		await get_tree().process_frame
+	await _capture("5e_route.png", 30)
 	for i in range(3000):
 		if world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0:
 			break

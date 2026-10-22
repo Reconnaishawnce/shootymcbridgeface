@@ -109,16 +109,24 @@ collectables, growth felt flat, no music.
 - Procedural music in three layers that crossfade with the state.
 - Music toggle, formation and bomb buttons, power-up timers in the HUD.
 
-## Run 7: branching lanes and polish
+## Run 7: the fork, and the gray screen (done)
 
-- Branching lanes: a fork gate splits the road for a stretch, each side
-  with its own gates and waves, a minimap strip previewing both, merge at
-  the end.
+- Branching lanes: once per level the road forks into RICH and SAFE
+  routes for two gates, each with its own panels and crowd, a divider,
+  a preview strip at the top, and a merge.
+- Startup fix: 0.6 showed a gray screen on the phone after the splash
+  because the three music loops were synthesised on the main thread before
+  the first frame. Synthesis now runs on a worker thread and costs a
+  third as much; the loops fade in when ready.
+
+## Run 8: polish and feedback
+
 - Real models for soldiers and zombies if available, same classes.
 - Play-as-the-horde mode prototype.
 - Pass-and-play.
 - Performance pass on low-end phones, battery check, 30 fps option.
-- Third phone feedback pass.
+- Third phone feedback pass: fork balance, spread drag feel, bomb button
+  placement, music level.
 
 ## Always
 

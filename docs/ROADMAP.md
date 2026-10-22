@@ -93,7 +93,23 @@ perk cards broke the flow enough to make the player want to quit.
   subtractions, a few more multipliers. Gate farming 40% faster.
 - Every level's opener wave is gentle, so a reset squad gets a foothold.
 
-## Run 6: branching lanes and polish
+## Run 6: badass pass (done)
+
+From the second play session: no control over the squad's shape, the
+spitter was harmless, big squads looked the same as small ones, no
+collectables, growth felt flat, no music.
+
+- Formation control: drag up and down or tap the button; tight to wide.
+- Spitter rebuilt: leads the squad, fast globs, a red landing ring to
+  dodge, faster once hurt.
+- Power-ups: purple gate panels (named or mystery) and road crates. Bomb,
+  slow-mo, shield, frenzy. Bomb button with a count.
+- Army visuals: flags and a ground glow at 25, 75, 150, 300; visible
+  squad up to 60; rally ring, hop and chord on every real gain.
+- Procedural music in three layers that crossfade with the state.
+- Music toggle, formation and bomb buttons, power-up timers in the HUD.
+
+## Run 7: branching lanes and polish
 
 - Branching lanes: a fork gate splits the road for a stretch, each side
   with its own gates and waves, a minimap strip previewing both, merge at
@@ -102,7 +118,7 @@ perk cards broke the flow enough to make the player want to quit.
 - Play-as-the-horde mode prototype.
 - Pass-and-play.
 - Performance pass on low-end phones, battery check, 30 fps option.
-- Second phone feedback pass.
+- Third phone feedback pass.
 
 ## Always
 

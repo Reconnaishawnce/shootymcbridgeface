@@ -60,6 +60,32 @@ other way, and your aim as a resource you have to spend wisely.
   guns; piercing lets a bullet survive a kill; gate whisperer cuts step
   cost; recruiter adds a soldier at every gate; thick skin, long sight,
   core sight and greed do what they say. Bullets pass through perk gates.
+- Formation is a control, not a fact. Drag up or down (or a button) to
+  stretch the blob from tight (0.45x) to wide (1.8x, clamped so it fits
+  the lane). Wide covers the lane so bullets catch runners from both
+  sides and the squad's reach catches more bites; tight concentrates
+  fire on one panel or the boss core and lets zombies slip past. The
+  decision changes with every gate and wave.
+- Power-ups. A gate can offer a named or mystery power-up against a
+  visible gain (18% of gates after the opener; thieves turn a known one
+  into a mystery). Two crates per level sit in the gap after random gates.
+  Bomb (carry three): arcs 13 m ahead, kills everything within 5 m, deals
+  three seconds of squad fire to brutes and tanks and more to the boss.
+  Slow-mo: the road and everything on it runs at 45% for six seconds while
+  your guns do not. Shield: six seconds where bites and spit bounce.
+  Frenzy: double fire rate for six seconds. Timers stack from the end.
+- The army looks like one. Every three-plus soldier gain cheers: a ring
+  expands under the squad, the soldiers hop, a chord plays, the camera
+  leans. At 25, 75, 150 and 300 the squad raises one, three, five flags
+  in blue, gold, red, purple and a ground glow of the same colour.
+- Music. Three synthesised loops in the same key (calm 100 BPM, tense
+  118, boss 140) play at once and crossfade by state: calm for the early
+  road, tense from level 3 or whenever the squad is in danger, boss for
+  the boss. Nothing is loaded from disk.
+- The spitter aims at where the squad will be, with a red ring marking
+  the landing spot. Globs fly at 16 m/s, splash the squad's reach plus a
+  metre, and come every 2.2 s, or every 1.3 s once the boss is below
+  half health.
 - Dopamine on a timer. Kills within 1.4 s chain into a combo; every five
   raises a score multiplier up to 4x, with a readout and a draining bar.
   A wave fully killed before any of it reaches you pays a wave-clear
@@ -112,10 +138,10 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 5 result (bot, no upgrades) |
+| Metric | Run 6 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 6 | 69, 100, 57, 242, 25, 29; wiped at the level 6 boss, 4 min |
-| Endless: after 3 minutes | level 8, peak 590, 40 left, best combo 126 |
+| Levels: squad at each boss, 1 to 6 | 55, 37, 36, 133, 59, 4; wiped at the level 6 boss, 3.7 min |
+| Endless | level 7, peak 272, wiped at 2.6 min |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side
@@ -134,7 +160,7 @@ Grouped by what they add. Starred items are the first to build.
 - Kill combos, wave-clear and PERFECT bonuses (built in run 5).
 - Dual-resource gates: one side grows the squad, the other grows fire rate.
 - Trade-off gates: `-3 soldiers, +50% damage`.
-- Formation choice: wide line, column, wedge, each with a cost.
+- ★ Formation control: tight to wide, continuous (built in run 6).
 
 ### Make runs varied
 - ★ Mid-run perk picks every third gate (built).

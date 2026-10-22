@@ -48,6 +48,14 @@ static func save_sound_on(on: bool) -> void:
 	_write(SETTINGS, "sound_on", on)
 
 
+static func load_music_on() -> bool:
+	return bool(_read(SETTINGS, "music_on", true))
+
+
+static func save_music_on(on: bool) -> void:
+	_write(SETTINGS, "music_on", on)
+
+
 static func load_squad_type() -> String:
 	return str(_read(SETTINGS, "squad_type", "rifle"))
 

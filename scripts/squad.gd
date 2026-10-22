@@ -8,7 +8,13 @@ signal count_changed(new_count: int)
 signal wiped_out
 
 const LANE_HALF := 2.6
-const MAX_VISUAL := 36
+const MAX_VISUAL := 60
+## Formation presets the button cycles through: tight, normal, wide.
+const PRESETS := [0.55, 1.0, 1.7]
+## Soldier counts at which flags appear, and the colour tier of each.
+const FLAG_TIERS := [25, 75, 150, 300]
+const TIER_COLORS := [Color(0.3, 0.6, 1.0), Color(1.0, 0.8, 0.2), Color(1.0, 0.3, 0.25), Color(0.75, 0.4, 1.0)]
+const FLAG_SLOTS := [Vector3(0.0, 0.0, 0.35), Vector3(-1.1, 0.0, 0.9), Vector3(1.1, 0.0, 0.9), Vector3(-0.7, 0.0, -0.9), Vector3(0.7, 0.0, -0.9)]
 ## Soldiers in the front rings get the detailed build.
 const DETAILED := 19
 const STEER_LERP := 16.0
@@ -29,22 +35,112 @@ var active := false
 var world: World
 var perks: Perks
 var meta: Meta
+var powerups: Powerups
 var squad_type := "rifle"
+## Sideways stretch of the formation, player-controlled.
+var spread := 1.0
+## Run seconds, kept current by the game for timed power-ups.
+var now := 0.0
+## Estimated sideways speed, for the spitter's lead.
+var velocity_x := 0.0
 
 var _soldiers: Array[Soldier] = []
 var _fire_accum := 0.0
 var _fire_index := 0
 var _revive_timer := 0.0
+var _flags: Array[Node3D] = []
+var _ring: MeshInstance3D
+var _ring_mat: StandardMaterial3D
+var _shield: MeshInstance3D
+var _prev_x := 0.0
+
+
+func _init() -> void:
+	_ring_mat = StandardMaterial3D.new()
+	_ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ring_mat.albedo_color = Color(TIER_COLORS[0], 0.0)
+	_ring = Mats.torus(0.8, 1.0, Color.WHITE, true)
+	_ring.material_override = _ring_mat
+	_ring.position.y = 0.04
+	add_child(_ring)
+	var shield_mat := StandardMaterial3D.new()
+	shield_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shield_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	shield_mat.albedo_color = Color(0.4, 0.8, 1.0, 0.22)
+	_shield = Mats.sphere(1.0, Color.WHITE)
+	_shield.material_override = shield_mat
+	_shield.position.y = 0.8
+	_shield.visible = false
+	add_child(_shield)
 
 
 func reset(start_count: int = 1) -> void:
 	target_x = 0.0
 	position.x = 0.0
+	_prev_x = 0.0
+	velocity_x = 0.0
+	spread = 1.0
 	_fire_accum = 0.0
 	for s in _soldiers:
 		s.queue_free()
 	_soldiers.clear()
 	set_count(start_count)
+
+
+## Stretch or squeeze the formation. Clamped so it always fits the lane.
+func set_spread(v: float) -> void:
+	var limit := Formation.max_spread_for(mini(count, MAX_VISUAL), LANE_HALF - 0.2)
+	spread = clampf(v, Formation.SPREAD_MIN, limit)
+	_layout()
+
+
+func adjust_spread(d: float) -> void:
+	set_spread(spread + d)
+
+
+## Jump to the next preset: tight, normal, wide.
+func cycle_formation() -> void:
+	var best := 0
+	var best_d := 100.0
+	for i in range(PRESETS.size()):
+		var d := absf(float(PRESETS[i]) - spread)
+		if d < best_d:
+			best_d = d
+			best = i
+	set_spread(PRESETS[(best + 1) % PRESETS.size()])
+
+
+func formation_name() -> String:
+	if spread < 0.8:
+		return "TIGHT"
+	if spread > 1.3:
+		return "WIDE"
+	return "NORMAL"
+
+
+## A cheer: an expanding ring under the squad, for a big gain.
+func rally() -> void:
+	var ring := Mats.torus(0.6, 0.8, Color(1.0, 0.9, 0.4), true)
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.9, 0.4, 0.9)
+	ring.material_override = mat
+	ring.position.y = 0.06
+	add_child(ring)
+	var tw := create_tween()
+	tw.tween_property(ring, "scale", Vector3(5.0, 1.0, 5.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.5)
+	tw.tween_callback(ring.queue_free)
+	for sol in _soldiers:
+		var jump := create_tween()
+		jump.tween_property(sol, "scale", Vector3(1.15, 1.25, 1.15), 0.08).set_delay(randf() * 0.12)
+		jump.tween_property(sol, "scale", Vector3.ONE, 0.15)
+
+
+func is_shielded() -> bool:
+	return powerups != null and powerups.shielded(now)
 
 
 ## New level: back to the starting squad where you stand.
@@ -68,7 +164,7 @@ func add(n: int) -> void:
 ## Half-width of the squad's footprint, for deciding whether a zombie that
 ## reaches z = 0 actually touches anyone or just shambles past.
 func reach() -> float:
-	return Formation.half_width(mini(count, MAX_VISUAL)) + 0.5
+	return Formation.half_width(mini(count, MAX_VISUAL), spread) + 0.5
 
 
 func nudge(dx: float) -> void:
@@ -89,7 +185,10 @@ func bite_mult() -> float:
 
 
 func _fire_mult() -> float:
-	return perks.fire_rate_mult() if perks != null else 1.0
+	var m := perks.fire_rate_mult() if perks != null else 1.0
+	if powerups != null:
+		m *= powerups.fire_rate_mult(now)
+	return m
 
 
 func _damage_mult() -> float:
@@ -127,13 +226,73 @@ func _sync_visuals() -> void:
 	while _soldiers.size() > want:
 		var s: Soldier = _soldiers.pop_back()
 		s.queue_free()
-	var pos := Formation.positions(want)
+	# A bigger squad may need a narrower spread to stay in the lane.
+	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, LANE_HALF - 0.2))
+	_layout()
+	_sync_army()
+
+
+func _layout() -> void:
+	var want := _soldiers.size()
+	var pos := Formation.positions(want, spread)
 	for i in range(want):
 		_soldiers[i].target_offset = Vector3(pos[i].x, 0.0, pos[i].y)
+	var hw := Formation.half_width(want, spread) + 0.7
+	_ring.scale = Vector3(hw, 1.0, hw * 0.8)
+	for i in range(_flags.size()):
+		var slot: Vector3 = FLAG_SLOTS[i]
+		_flags[i].position = Vector3(slot.x * spread, 0.0, slot.z / sqrt(spread))
+
+
+## Flags and the ground glow: the squad should look like an army when it
+## is one. Tier by count; more flags, hotter colour.
+func _sync_army() -> void:
+	var tier := -1
+	for i in range(FLAG_TIERS.size()):
+		if count >= int(FLAG_TIERS[i]):
+			tier = i
+	var want_flags := 0 if tier < 0 else mini(1 + tier * 2, FLAG_SLOTS.size())
+	var color: Color = TIER_COLORS[maxi(tier, 0)]
+	while _flags.size() < want_flags:
+		_flags.append(_make_flag(color))
+	while _flags.size() > want_flags:
+		var f: Node3D = _flags.pop_back()
+		f.queue_free()
+	for f in _flags:
+		var cloth: MeshInstance3D = f.get_meta("cloth")
+		cloth.material_override = Mats.flat(color)
+	_ring_mat.albedo_color = Color(color, 0.0 if tier < 0 else 0.25 + 0.15 * tier)
+	_layout()
+
+
+func _make_flag(color: Color) -> Node3D:
+	var f := Node3D.new()
+	var pole := Mats.box(Vector3(0.06, 2.4, 0.06), Color(0.2, 0.18, 0.15))
+	pole.position.y = 1.2
+	f.add_child(pole)
+	var cloth := Mats.box(Vector3(0.75, 0.45, 0.04), color)
+	cloth.position = Vector3(0.4, 2.1, 0.0)
+	f.add_child(cloth)
+	f.set_meta("cloth", cloth)
+	add_child(f)
+	f.scale = Vector3.ONE * 0.2
+	var tw := create_tween()
+	tw.tween_property(f, "scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return f
 
 
 func _process(delta: float) -> void:
 	position.x = lerpf(position.x, target_x, 1.0 - exp(-STEER_LERP * delta))
+	if delta > 0.0:
+		velocity_x = lerpf(velocity_x, (position.x - _prev_x) / delta, 0.3)
+	_prev_x = position.x
+	var t := Time.get_ticks_msec() * 0.001
+	for i in range(_flags.size()):
+		_flags[i].rotation.y = sin(t * 3.0 + float(i)) * 0.25
+	_shield.visible = is_shielded()
+	if _shield.visible:
+		var r := reach() + 0.4
+		_shield.scale = Vector3(r, 1.3, r) * (1.0 + 0.04 * sin(t * 8.0))
 	if not active or count == 0 or world == null:
 		return
 	_fire(delta)

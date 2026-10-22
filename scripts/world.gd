@@ -15,6 +15,9 @@ signal level_started(level: int)
 signal perk_chosen(id: String)
 signal wave_cleared(level: int)
 signal gate_perfect(gate: Gate, index: int)
+signal powerup_granted(id: String, from_crate: bool)
+signal shield_blocked
+signal bomb_exploded(at: Vector3, kills: int)
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 
@@ -49,6 +52,9 @@ var gen: Difficulty
 var squad: Squad
 var perks: Perks
 var meta: Meta
+var powerups: Powerups
+## Run seconds, passed in by the game each frame.
+var now := 0.0
 ## Endless: no bosses, no squad reset, gates forever. Levels tick every
 ## GATES_PER_LEVEL gates for difficulty and the HUD.
 var endless := false
@@ -71,6 +77,9 @@ var _boss_spawned := false
 var _chew_timer := 0.0
 var _clear_timer := 0.0
 var _spits: Array[Spit] = []
+var _crates: Array[Crate] = []
+var _crate_plan: Array = []
+var _bombs: Array[Bomb] = []
 ## Bosses get tougher as perks stack; the game keeps this current.
 var perk_count := 0
 var _dashes: Array[Node3D] = []
@@ -102,6 +111,7 @@ func start_level(n: int) -> void:
 	_boss_spawned = false
 	_chew_timer = 0.0
 	boss = null
+	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	# Stragglers from the last level would eat a one-soldier squad.
 	for z in zombies:
 		z.consume()
@@ -127,6 +137,12 @@ func _clear_actors() -> void:
 	for sp in _spits:
 		sp.queue_free()
 	_spits.clear()
+	for c in _crates:
+		c.queue_free()
+	_crates.clear()
+	for b in _bombs:
+		b.queue_free()
+	_bombs.clear()
 	for b in bullets.get_children():
 		b.queue_free()
 
@@ -134,6 +150,8 @@ func _clear_actors() -> void:
 ## Advance the world by one frame. Returns the scroll speed used.
 func advance(delta: float, p_squad: Squad) -> float:
 	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level)
+	if powerups != null:
+		target *= powerups.world_speed_mult(now)
 	world_speed = lerpf(world_speed, target, 1.0 - exp(-2.5 * delta))
 	level_distance += world_speed * delta
 	match phase:
@@ -151,7 +169,14 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_zombies(delta, p_squad)
 	_move_boss(delta)
 	_move_spits(p_squad)
+	_move_crates(delta, p_squad)
+	_move_bombs(p_squad)
 	return world_speed
+
+
+## How much slower everything that walks is going right now.
+func _pace() -> float:
+	return powerups.world_speed_mult(now) if powerups != null else 1.0
 
 
 ## The closest live zombie within [param max_range] metres, or null.
@@ -253,6 +278,15 @@ func _spawn() -> void:
 	while _next_wave < limit and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
 		_spawn_wave(_next_wave, count)
 		_next_wave += 1
+	for plan in _crate_plan.duplicate():
+		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
+		if Difficulty.crate_distance(n) - level_distance <= SPAWN_AHEAD:
+			var c := Crate.new()
+			c.setup(plan.id)
+			c.position = Vector3(gen.rng.randf_range(-LANE_HALF + 1.0, LANE_HALF - 1.0), 0.0, -(Difficulty.crate_distance(n) - level_distance))
+			add_child(c)
+			_crates.append(c)
+			_crate_plan.erase(plan)
 	if not endless and not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
 		_boss_spawned = true
 		boss = Boss.new()
@@ -354,6 +388,8 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 				var panel: GateMath.GatePanel = g.choose(index)
 				var before := p_squad.count
 				var after := GateMath.apply(before, panel)
+				if GateMath.is_power(panel):
+					powerup_granted.emit(Powerups.resolve(panel.power, gen.rng), false)
 				if after > 0:
 					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
 						after += meta.gate_bonus()
@@ -405,13 +441,17 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		if z.is_thief():
 			_move_thief(delta, z)
 			continue
-		z.position.z += (world_speed + z.speed) * delta
+		var pace := _pace()
+		z.position.z += (world_speed + z.speed * pace) * delta
 		var aim_x := clampf(p_squad.position.x + z.lane_offset, -LANE_HALF + 0.4, LANE_HALF - 0.4)
-		z.position.x = move_toward(z.position.x, aim_x, z.homing * delta)
+		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
 		if z.position.z >= BITE_Z and absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius:
 			zombies.erase(z)
 			_note_wave_leak(z)
 			z.consume()
+			if p_squad.is_shielded():
+				shield_blocked.emit()
+				continue
 			var bite: int = z.bite
 			if z.is_tank():
 				bite = maxi(1, int(Difficulty.tank_bite(p_squad.count) * p_squad.bite_mult()))
@@ -434,7 +474,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 ## knock its better panel down when they arrive. Kill them first.
 func _move_thief(delta: float, z: Zombie) -> void:
 	var g := _gate_ahead_of(z.position.z)
-	z.position.z += (world_speed - Difficulty.THIEF_SPEED) * delta
+	z.position.z += (world_speed - Difficulty.THIEF_SPEED * _pace()) * delta
 	if g == null:
 		if z.position.z < -SPAWN_AHEAD - 10.0:
 			zombies.erase(z)
@@ -459,11 +499,12 @@ func _move_boss(delta: float) -> void:
 			if boss.position.z >= BOSS_ENGAGE_Z:
 				phase = Phase.BOSS
 		Phase.BOSS:
+			var walk := BOSS_WALK_SPEED * _pace()
 			if boss.is_spitter():
-				boss.position.z = minf(boss.position.z + BOSS_WALK_SPEED * delta, Boss.SPITTER_HOLD_Z)
+				boss.position.z = minf(boss.position.z + walk * delta, Boss.SPITTER_HOLD_Z)
 				boss.position.x = boss.sway_x
 			else:
-				boss.position.z = minf(boss.position.z + BOSS_WALK_SPEED * delta, BOSS_CHEW_Z)
+				boss.position.z = minf(boss.position.z + walk * delta, BOSS_CHEW_Z)
 
 
 func _tick_boss(delta: float, p_squad: Squad) -> void:
@@ -472,12 +513,16 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	if boss.is_spitter():
 		if boss.position.z < Boss.SPITTER_HOLD_Z - 0.5:
 			return
-		boss.spit_timer -= delta
+		boss.spit_timer -= delta * _pace()
 		if boss.spit_timer <= 0.0:
-			boss.spit_timer = Boss.SPIT_INTERVAL
+			# Faster once hurt. Aim where the squad will be, not where it is.
+			boss.spit_timer = Boss.SPIT_INTERVAL if boss.hp > boss.max_hp * 0.5 else Boss.SPIT_INTERVAL * 0.6
+			var from := boss.position + Vector3(0.0, 3.3, 0.8)
+			var flight := -from.z / Spit.SPEED
+			var to_x := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -LANE_HALF + 0.3, LANE_HALF - 0.3)
 			var sp := Spit.new()
 			add_child(sp)
-			sp.launch(boss.position + Vector3(0.0, 3.3, 0.8), p_squad.position.x)
+			sp.launch(from, to_x, self)
 			_spits.append(sp)
 		return
 	if boss.position.z < BOSS_CHEW_Z:
@@ -485,6 +530,9 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	_chew_timer -= delta
 	if _chew_timer <= 0.0:
 		_chew_timer = Difficulty.BOSS_BITE_INTERVAL
+		if p_squad.is_shielded():
+			shield_blocked.emit()
+			return
 		var bite := Difficulty.boss_bite(p_squad.count)
 		p_squad.add(-bite)
 		squad_bitten.emit(bite, true)
@@ -495,13 +543,65 @@ func _move_spits(p_squad: Squad) -> void:
 		if not sp.landed():
 			continue
 		_spits.erase(sp)
-		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() + 0.5
-		if hit:
+		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() + 1.0
+		if hit and p_squad.is_shielded():
+			shield_blocked.emit()
+			hit = false
+		elif hit:
 			var bite := Difficulty.spit_bite(p_squad.count)
 			p_squad.add(-bite)
 			squad_bitten.emit(bite, true)
 		spit_landed.emit(hit)
 		sp.queue_free()
+
+
+func _move_crates(delta: float, p_squad: Squad) -> void:
+	for c in _crates.duplicate():
+		c.position.z += world_speed * delta
+		if c.position.z >= -0.6 and absf(c.position.x - p_squad.position.x) <= p_squad.reach() + 0.7:
+			_crates.erase(c)
+			powerup_granted.emit(Powerups.resolve(c.id, gen.rng), true)
+			c.queue_free()
+		elif c.position.z > DESPAWN_Z:
+			_crates.erase(c)
+			c.queue_free()
+
+
+## Lob a bomb from the squad. It detonates where it lands.
+func throw_bomb(from_x: float) -> void:
+	var b := Bomb.new()
+	add_child(b)
+	b.launch(Vector3(from_x, 1.0, -0.5))
+	_bombs.append(b)
+
+
+func _move_bombs(p_squad: Squad) -> void:
+	for b in _bombs.duplicate():
+		if not b.landed():
+			continue
+		_bombs.erase(b)
+		var at: Vector3 = b.target
+		var kills := 0
+		var heavy := (p_squad.dps() if p_squad != null else 10.0) * 3.0
+		for z in zombies.duplicate():
+			if z.position.distance_to(at) > Bomb.RADIUS:
+				continue
+			var dead := true
+			if z.brute or z.is_tank():
+				dead = z.take_damage(heavy)
+			if dead:
+				zombies.erase(z)
+				zombie_killed.emit(z)
+				_note_wave_death(z)
+				z.die()
+				kills += 1
+		if boss != null and boss.alive and boss.position.distance_to(at) <= Bomb.RADIUS + 1.5:
+			var dead := boss.take_damage(heavy * 1.5, false)
+			boss_hit.emit(boss, false)
+			if dead:
+				_on_boss_dead()
+		bomb_exploded.emit(at, kills)
+		b.queue_free()
 
 
 func _on_boss_dead() -> void:

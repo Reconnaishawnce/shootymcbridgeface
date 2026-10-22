@@ -17,6 +17,9 @@ signal menu_pressed
 signal pause_pressed
 signal resume_pressed
 signal sound_toggled(on: bool)
+signal music_toggled(on: bool)
+signal formation_pressed
+signal bomb_pressed
 signal quit_pressed
 
 const OUTLINE := Color(0.05, 0.05, 0.08)
@@ -65,6 +68,10 @@ var _over_prompt: Label
 
 var _pause_card: Control
 var _sound_button: Button
+var _music_button: Button
+var _formation_button: Button
+var _bomb_button: Button
+var _powers: Label
 
 var _float_anchor: Control
 var _float: Label
@@ -153,6 +160,32 @@ func _init() -> void:
 	_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_flash)
+
+	_formation_button = _button("NORMAL", 26)
+	_formation_button.anchor_left = 1.0
+	_formation_button.anchor_right = 1.0
+	_formation_button.anchor_top = 1.0
+	_formation_button.anchor_bottom = 1.0
+	_formation_button.offset_left = -220.0
+	_formation_button.offset_right = -20.0
+	_formation_button.offset_top = -92.0
+	_formation_button.offset_bottom = -24.0
+	_formation_button.pressed.connect(func() -> void: formation_pressed.emit())
+	root.add_child(_formation_button)
+	_bomb_button = _button("BOMB x1", 26)
+	_bomb_button.anchor_top = 1.0
+	_bomb_button.anchor_bottom = 1.0
+	_bomb_button.offset_left = 20.0
+	_bomb_button.offset_right = 220.0
+	_bomb_button.offset_top = -92.0
+	_bomb_button.offset_bottom = -24.0
+	_bomb_button.add_theme_color_override("font_color", COIN)
+	_bomb_button.pressed.connect(func() -> void: bomb_pressed.emit())
+	_bomb_button.visible = false
+	root.add_child(_bomb_button)
+	_powers = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+	_place(root, _powers, 0.15, 0.85, 124.0)
+	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
 
 	_build_title(root)
 	_build_shop(root)
@@ -319,6 +352,9 @@ func _build_pause(root: Control) -> void:
 	_sound_button = _button("SOUND: ON", 34)
 	_sound_button.pressed.connect(_on_sound_pressed)
 	box.add_child(_sound_button)
+	_music_button = _button("MUSIC: ON", 34)
+	_music_button.pressed.connect(_on_music_pressed)
+	box.add_child(_music_button)
 	var quit := _button("QUIT TO TITLE", 34)
 	quit.pressed.connect(func() -> void: quit_pressed.emit())
 	box.add_child(quit)
@@ -338,7 +374,28 @@ func set_sound(on: bool) -> void:
 	_sound_button.text = "SOUND: ON" if on else "SOUND: OFF"
 
 
+func set_music(on: bool) -> void:
+	_music_button.text = "MUSIC: ON" if on else "MUSIC: OFF"
+
+
+func set_formation(name: String) -> void:
+	_formation_button.text = name
+
+
+func set_bombs(n: int) -> void:
+	_bomb_button.visible = n > 0 and _pause_button.visible
+	_bomb_button.text = "BOMB x%d" % n
+
+
+## Active timed power-ups, e.g. "SLOW-MO 4s   SHIELD 2s".
+func set_powers(text: String) -> void:
+	_powers.text = text
+
+
 func _hide_cards() -> void:
+	_formation_button.visible = false
+	_bomb_button.visible = false
+	_powers.text = ""
 	_title_card.visible = false
 	_shop_card.visible = false
 	_daily_card.visible = false
@@ -414,6 +471,7 @@ func show_shop(meta: Meta, coins: int) -> void:
 func show_running() -> void:
 	_hide_cards()
 	_pause_button.visible = true
+	_formation_button.visible = true
 	if _prompt_tween != null:
 		_prompt_tween.kill()
 
@@ -523,6 +581,12 @@ func _on_sound_pressed() -> void:
 	var on := not _sound_button.text.ends_with("ON")
 	set_sound(on)
 	sound_toggled.emit(on)
+
+
+func _on_music_pressed() -> void:
+	var on := not _music_button.text.ends_with("ON")
+	set_music(on)
+	music_toggled.emit(on)
 
 
 func _pulse_prompt() -> void:

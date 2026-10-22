@@ -7,7 +7,7 @@ extends RefCounted
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.
 
-enum Kind { ADD, MUL }
+enum Kind { ADD, MUL, POWER }
 
 ## Multiplier panels cannot be shot past this.
 const MUL_CAP := 5.0
@@ -17,15 +17,19 @@ const MUL_STEP := 0.5
 const MUL_COST_FACTOR := 3.0
 ## What a thief takes off an additive panel.
 const STEAL_AMOUNT := 2.0
+## How many soldiers a power-up is worth when weighing a gate.
+const POWER_WORTH := 4
 
 
 class GatePanel:
 	var kind: int
-	## ADD: signed integer count. MUL: multiplier >= 1.0.
+	## ADD: signed integer count. MUL: multiplier >= 1.0. POWER: unused.
 	var value: float
 	## Hidden panels show "?" until revealed by proximity or by a bullet.
 	var revealed: bool
 	var shot_progress: float = 0.0
+	## POWER panels carry a power-up id, or Powerups.MYSTERY.
+	var power: String = ""
 
 	func _init(p_kind: int, p_value: float, p_hidden: bool = false) -> void:
 		kind = p_kind
@@ -39,6 +43,13 @@ static func add(value: int, hidden: bool = false) -> GatePanel:
 
 static func mul(value: float, hidden: bool = false) -> GatePanel:
 	return GatePanel.new(Kind.MUL, value, hidden)
+
+
+## A panel that grants a power-up instead of changing the count.
+static func power(id: String) -> GatePanel:
+	var p := GatePanel.new(Kind.POWER, 0.0, false)
+	p.power = id
+	return p
 
 
 ## The squad count after walking through [param panel].
@@ -58,7 +69,13 @@ static func is_good(panel: GatePanel) -> bool:
 			return panel.value > 0.0
 		Kind.MUL:
 			return panel.value > 1.0
+		Kind.POWER:
+			return true
 	return false
+
+
+static func is_power(panel: GatePanel) -> bool:
+	return panel.kind == Kind.POWER
 
 
 ## What the panel prints on its face.
@@ -75,6 +92,8 @@ static func label(panel: GatePanel) -> String:
 			if is_equal_approx(panel.value, round(panel.value)):
 				return "x%d" % int(round(panel.value))
 			return "x%.1f" % panel.value
+		Kind.POWER:
+			return Powerups.title(panel.power)
 	return "?"
 
 
@@ -84,7 +103,7 @@ static func label(panel: GatePanel) -> String:
 ## gate yields about one step per second of committed fire at any squad size.
 static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> int:
 	panel.revealed = true
-	if step_cost <= 0.0:
+	if step_cost <= 0.0 or panel.kind == Kind.POWER:
 		return 0
 	var cost := step_cost
 	if panel.kind == Kind.MUL:
@@ -107,6 +126,9 @@ static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> i
 static func steal(panel: GatePanel) -> void:
 	panel.revealed = true
 	match panel.kind:
+		Kind.POWER:
+			# A thief turns a known power-up into a mystery.
+			panel.power = Powerups.MYSTERY
 		Kind.ADD:
 			panel.value -= STEAL_AMOUNT
 		Kind.MUL:
@@ -115,6 +137,9 @@ static func steal(panel: GatePanel) -> void:
 
 ## Index (0 or 1) of the panel that leaves the squad larger. Ties go left.
 static func better_index(left: GatePanel, right: GatePanel, count: int) -> int:
-	if apply(count, left) >= apply(count, right):
+	# A power-up counts as a handful of soldiers for the comparison.
+	var l := apply(count, left) + (POWER_WORTH if is_power(left) else 0)
+	var r := apply(count, right) + (POWER_WORTH if is_power(right) else 0)
+	if l >= r:
 		return 0
 	return 1

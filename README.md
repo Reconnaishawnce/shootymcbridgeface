@@ -27,7 +27,20 @@ the same key (see below).
 
 ## Play
 
-- **Drag** left or right to steer the squad. On desktop use arrow keys or A/D.
+- **Drag** left or right to steer the squad, **up and down** to spread or
+  tighten the formation. Wide sweeps the lane and catches crowds; tight
+  focuses fire on one gate panel or the boss core. The button at the
+  bottom right cycles tight, normal and wide. On desktop: arrows or WASD,
+  F to cycle, B to throw a bomb.
+- **Power-ups** come from purple gate panels (soldiers now, or a tool for
+  later) and from crates on the road. Named or a mystery `?`. Bomb: tap
+  the button to lob it, clears the road ahead and hurts heavies and the
+  boss, carry up to three. Slow-mo: the road crawls for six seconds.
+  Shield: nothing bites for six seconds. Frenzy: double fire rate.
+- A big gain makes the squad cheer with a ring and a chord. Past 25,
+  75, 150 and 300 soldiers the squad raises flags and glows.
+- A quiet procedural score sits under the run and builds from calm to
+  tense to the boss. Music and sound toggle separately in the pause menu.
 - **Tap** to retry after a wipe. The **II** button pauses; so does the
   Android back button or leaving the app.
 - Blue panels help, red panels hurt, grey panels are hidden until you get
@@ -61,7 +74,8 @@ the same key (see below).
   copy button too.
 - **Bosses** alternate: odd levels get the walker that chews you once it
   arrives, even levels get the spitter that holds back and lobs globs at
-  where you were standing.
+  where you are heading. A red ring marks where each glob lands: step out
+  of it.
 - **Thieves** sprint away from you toward the next gate and knock its
   better panel down if they get there. **Tanks** are slow bullet sponges
   that shield the gate behind them.

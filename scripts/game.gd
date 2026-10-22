@@ -47,6 +47,7 @@ var sfx: Sfx
 var meta := Meta.new()
 var perks := Perks.new()
 var combo := Combo.new()
+var powerups := Powerups.new()
 var waves_cleared := 0
 var perfect_gates := 0
 var _run_time := 0.0
@@ -69,6 +70,8 @@ var _drag_scale := 0.015
 var _fov_tween: Tween
 var _quitting := false
 var _slowmo_until := 0.0
+## The screenshot walkthrough sets the spread by hand; the bot leaves it.
+var _bot_spread := true
 
 
 func _ready() -> void:
@@ -95,9 +98,11 @@ func _ready() -> void:
 	# on its own thread and can report them as leaked at exit. Keep the
 	# auto-player silent so its exit is deterministic.
 	Sfx.enabled = SaveData.load_sound_on() and not smoke
+	Sfx.music_on = SaveData.load_music_on()
 	_build_scene()
 	_drag_scale = (Squad.LANE_HALF * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
 	hud.set_sound(Sfx.enabled)
+	hud.set_music(Sfx.music_on)
 	show_title()
 	if smoke:
 		start_run("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels"))
@@ -150,10 +155,15 @@ func _build_scene() -> void:
 	world.perk_chosen.connect(_on_perk_chosen)
 	world.wave_cleared.connect(_on_wave_cleared)
 	world.gate_perfect.connect(_on_gate_perfect)
+	world.powerup_granted.connect(_on_powerup_granted)
+	world.shield_blocked.connect(_on_shield_blocked)
+	world.bomb_exploded.connect(_on_bomb_exploded)
+	world.powerups = powerups
 
 	squad = Squad.new()
 	squad.world = world
 	squad.meta = meta
+	squad.powerups = powerups
 	world.squad = squad
 	add_child(squad)
 	squad.count_changed.connect(_on_count_changed)
@@ -174,12 +184,16 @@ func _build_scene() -> void:
 	hud.resume_pressed.connect(resume_game)
 	hud.quit_pressed.connect(quit_to_title)
 	hud.sound_toggled.connect(_on_sound_toggled)
+	hud.music_toggled.connect(_on_music_toggled)
+	hud.formation_pressed.connect(cycle_formation)
+	hud.bomb_pressed.connect(throw_bomb)
 
 
 # --- menus -----------------------------------------------------------------
 
 func show_title() -> void:
 	state = State.TITLE
+	sfx.set_music("calm")
 	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"))
 
 
@@ -260,6 +274,8 @@ func start_run(p_mode: String = "levels") -> void:
 	_shake = 0.0
 	perks = Perks.new()
 	combo.reset()
+	powerups.reset()
+	hud.set_bombs(0)
 	waves_cleared = 0
 	perfect_gates = 0
 	_run_time = 0.0
@@ -276,8 +292,10 @@ func start_run(p_mode: String = "levels") -> void:
 	world.reset(run_seed)
 	squad.active = true
 	hud.show_running()
+	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	sfx.play("spawn")
+	sfx.set_music("tense" if mode == "endless" else "calm")
 
 
 func end_run() -> void:
@@ -288,6 +306,7 @@ func end_run() -> void:
 	Engine.time_scale = 1.0
 	hud.set_combo(0, 1.0, 0.0)
 	hud.set_danger(0.0)
+	sfx.set_music("")
 	_since_game_over = 0.0
 	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad}
@@ -370,8 +389,26 @@ func _process(delta: float) -> void:
 		_smoke_tick()
 
 
+func cycle_formation() -> void:
+	if state != State.RUNNING:
+		return
+	squad.cycle_formation()
+	hud.set_formation(squad.formation_name())
+	sfx.play("click")
+
+
+func throw_bomb() -> void:
+	if state != State.RUNNING or not powerups.take_bomb():
+		return
+	hud.set_bombs(powerups.bombs)
+	world.throw_bomb(squad.position.x)
+	sfx.play("throw")
+
+
 func _tick_run(delta: float) -> void:
 	_run_time += delta
+	squad.now = _run_time
+	world.now = _run_time
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
 	score = int(total_distance) + bonus
@@ -384,6 +421,19 @@ func _tick_run(delta: float) -> void:
 	elif _level_peak >= 12 and squad.count < _level_peak / 4:
 		danger = 0.5
 	hud.set_danger(danger)
+	hud.set_formation(squad.formation_name())
+	var powers := []
+	for id in Powerups.ORDER:
+		if id != "bomb" and powerups.active(id, _run_time):
+			powers.append("%s %ds" % [Powerups.title(id), int(ceil(powerups.remaining(id, _run_time)))])
+	hud.set_powers("   ".join(powers))
+	# Music follows the room: boss, trouble, or the road.
+	if world.phase == World.Phase.BOSS:
+		sfx.set_music("boss")
+	elif danger > 0.0 or world.level >= 3 or mode == "endless":
+		sfx.set_music("tense")
+	else:
+		sfx.set_music("calm")
 	if _slowmo_until > 0.0 and Time.get_ticks_msec() * 0.001 >= _slowmo_until:
 		_slowmo_until = 0.0
 		Engine.time_scale = 1.0
@@ -394,6 +444,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_retry()
 	elif event is InputEventScreenDrag and state == State.RUNNING:
 		squad.nudge(event.relative.x * _drag_scale)
+		# Drag up to spread the line, down to tighten it.
+		squad.adjust_spread(-event.relative.y * _drag_scale * 0.35)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
 			if state == State.TITLE:
@@ -405,6 +457,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				resume_game()
 			else:
 				pause_game()
+		elif event.keycode == KEY_F:
+			cycle_formation()
+		elif event.keycode == KEY_B:
+			throw_bomb()
 
 
 func _try_retry() -> void:
@@ -422,6 +478,13 @@ func _keyboard_steer(delta: float) -> void:
 		dir += 1.0
 	if dir != 0.0:
 		squad.nudge(dir * KEY_STEER_SPEED * delta)
+	var sp := 0.0
+	if Input.is_physical_key_pressed(KEY_UP) or Input.is_physical_key_pressed(KEY_W):
+		sp += 1.0
+	if Input.is_physical_key_pressed(KEY_DOWN) or Input.is_physical_key_pressed(KEY_S):
+		sp -= 1.0
+	if sp != 0.0:
+		squad.adjust_spread(sp * 2.0 * delta)
 
 
 func _apply_shake(delta: float) -> void:
@@ -451,7 +514,14 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 	if after > before:
 		text += "   %d > %d" % [before, after]
 	hud.show_float(text, after >= before)
-	if after > before:
+	if GateMath.is_power(panel):
+		return
+	if after >= before + 3 or (before > 0 and after >= before * 1.3 and after > before):
+		# A real gain: the squad cheers, the ground rings, the camera leans.
+		squad.rally()
+		sfx.play("rally")
+		_punch(5.0)
+	elif after > before:
 		sfx.play("gate_good")
 		_punch(3.0)
 	else:
@@ -553,6 +623,37 @@ func _on_perk_chosen(id: String) -> void:
 	_punch(3.0)
 
 
+func _on_powerup_granted(id: String, from_crate: bool) -> void:
+	var changed := powerups.grant(id, _run_time)
+	hud.set_bombs(powerups.bombs)
+	if smoke:
+		print("SMOKE_POWER ", JSON.stringify({"id": id, "crate": from_crate, "frame": _frames}))
+	if id == "bomb":
+		hud.show_float("+BOMB" if changed else "BOMBS FULL", changed)
+	else:
+		hud.show_float("%s!" % Powerups.title(id), true)
+	sfx.play("crate" if from_crate else "powerup")
+	if id != "bomb":
+		sfx.play("powerup", -3.0, 0.9)
+	_punch(2.0)
+
+
+func _on_shield_blocked() -> void:
+	hud.show_float("BLOCKED", true)
+	sfx.play("block", -4.0)
+	Burst.spawn(world, squad.position + Vector3(0.0, 1.0, -1.0), Color(0.4, 0.8, 1.0), 8, 0.1, 3.5, 0.35)
+
+
+func _on_bomb_exploded(at: Vector3, kills: int) -> void:
+	sfx.play("explosion")
+	_shake = 1.0
+	_punch(5.0)
+	Burst.spawn(world, at + Vector3(0.0, 0.5, 0.0), Color(1.0, 0.6, 0.15), 40, 0.25, 9.0, 0.7)
+	Burst.spawn(world, at + Vector3(0.0, 0.3, 0.0), Color(0.2, 0.2, 0.2), 24, 0.2, 5.0, 0.9)
+	if kills > 0:
+		hud.show_float("BOOM  %d" % kills, true)
+
+
 func _on_wave_cleared(level: int) -> void:
 	waves_cleared += 1
 	var b := Difficulty.wave_clear_bonus(level)
@@ -586,6 +687,12 @@ func _on_sound_toggled(on: bool) -> void:
 		sfx.play("click")
 
 
+func _on_music_toggled(on: bool) -> void:
+	Sfx.music_on = on
+	SaveData.save_music_on(on)
+	sfx.play("click")
+
+
 # --- smoke and screenshots ------------------------------------------------
 
 func _smoke_tick() -> void:
@@ -606,6 +713,7 @@ func _smoke_tick() -> void:
 			"bosses": bosses_killed,
 			"perks": perks.stacks,
 			"best_combo": combo.best,
+			"bombs_left": powerups.bombs,
 			"waves_cleared": waves_cleared,
 			"perfect_gates": perfect_gates,
 			"kills": kills,
@@ -622,9 +730,23 @@ func _smoke_tick() -> void:
 ## Play like a person: track the boss core, shoot whatever is close,
 ## otherwise line up the better panel of the next gate.
 func _bot_steer() -> void:
+	# Spread for crowds, tighten for gates and the boss; bomb the heavies.
+	var near := world.nearest_zombie(18.0)
+	var heavy_near := false
+	for z in world.zombies:
+		if (z.brute or z.is_tank()) and z.position.z > -16.0:
+			heavy_near = true
+			break
+	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
+		throw_bomb()
 	if world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
+		if _bot_spread:
+			squad.set_spread(0.6)
 		squad.target_x = clampf(world.boss.position.x + world.boss.core_x, -Squad.LANE_HALF, Squad.LANE_HALF)
 		return
+	var g_near := world.nearest_upcoming_gate()
+	if _bot_spread:
+		squad.set_spread(1.6 if (near != null and (g_near == null or near.position.z > g_near.position.z)) else 0.7)
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
 		if z.is_thief():
@@ -663,7 +785,15 @@ func _shots_walkthrough() -> void:
 			break
 		await get_tree().process_frame
 	await _capture("4_perk_gate.png", 2)
-	await _capture("5_play_mid.png", 300)
+	_bot_spread = false
+	squad.set_spread(1.7)
+	await _capture("5_play_wide.png", 120)
+	squad.set_spread(0.5)
+	await _capture("5b_play_tight.png", 60)
+	squad.set_count(maxi(squad.count, 160))
+	squad.set_spread(1.0)
+	await _capture("5c_army.png", 40)
+	_bot_spread = true
 	for i in range(3000):
 		if world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0:
 			break

@@ -16,7 +16,9 @@ func test_tone_shape() -> void:
 func test_every_effect_builds() -> void:
 	for s in [Sfx.make_shot(), Sfx.make_hit(), Sfx.make_gate_step(), Sfx.make_gate_good(),
 			Sfx.make_gate_bad(), Sfx.make_bite(), Sfx.make_boss_hit(), Sfx.make_boss_roar(),
-			Sfx.make_level_clear(), Sfx.make_wipe(), Sfx.make_spawn(), Sfx.make_click()]:
+			Sfx.make_level_clear(), Sfx.make_wipe(), Sfx.make_spawn(), Sfx.make_click(),
+			Sfx.make_rally(), Sfx.make_powerup(), Sfx.make_throw(), Sfx.make_explosion(),
+			Sfx.make_block(), Sfx.make_crate()]:
 		check(s.data.size() > 100, "stream has data")
 		check_eq(s.mix_rate, Sfx.RATE, "mix rate")
 		check(s.get_length() < 2.0, "effects are short")
@@ -30,3 +32,11 @@ func test_mix_and_concat() -> void:
 	check_eq(m.size(), b.size(), "mix takes the longer length")
 	for v in m:
 		check(v >= -1.0 and v <= 1.0, "mix is clamped")
+
+
+func test_music_loops() -> void:
+	for style in Sfx.MUSIC_STYLES:
+		var m := Sfx.make_music(style)
+		check(m.get_length() > 2.0 and m.get_length() < 8.0, "%s loop is a few seconds" % style)
+		check_eq(m.loop_mode, AudioStreamWAV.LOOP_FORWARD, "%s loops" % style)
+		check_eq(m.loop_end, m.data.size() / 2, "%s loops its whole length" % style)

@@ -3,6 +3,33 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.6 (run 6)
+
+The badass pass, from the second play session.
+
+- Formation control: drag up and down to spread or tighten the squad, or
+  tap the bottom-right button to cycle tight, normal, wide. Clamped to
+  the lane. Wide catches crowds; tight focuses a panel or the boss core.
+- Spitter boss actually hurts: it leads your movement, globs fly fast,
+  a red ring marks the landing spot, and it fires faster below half
+  health. Splash is wider.
+- Power-ups: purple gate panels offer a named or mystery power-up against
+  a visible gain; two crates per level sit on the road. Bomb (lob with
+  the bottom-left button, carry three), slow-mo, shield, frenzy. Timers
+  shown under the stats. Thieves turn a known gate power-up into a
+  mystery.
+- The army looks like an army: visible squad up to 60, flags and a
+  ground glow at 25, 75, 150 and 300 soldiers in rising colours, and a
+  rally on every real gain: ring, hop, chord, camera lean.
+- Procedural music: calm, tense and boss layers synthesised at startup
+  and crossfaded by state. Music toggle in the pause menu.
+- Keyboard: W/S or up/down for spread, F to cycle, B for bomb.
+- Balance, bot with no upgrades: squad at the boss on levels 1 to 6 was
+  55, 37, 36, 133, 59, 4; the spitters on levels 2 and 4 now cost it 8
+  and 35 soldiers; died at the level 6 boss after 3.7 minutes; best
+  combo 72, 14 perfect gates, 30 waves cleared, every bomb thrown.
+  Endless: level 7, peak 272, wiped at 2.6 minutes.
+
 ## 0.5 (run 5)
 
 The fun pass, from the first real play session: too easy, flow broken by

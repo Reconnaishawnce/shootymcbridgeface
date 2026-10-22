@@ -35,6 +35,13 @@ const HALVE_CHANCE := [0.0, 0.0, 0.4, 0.5]
 const MUL2_CHANCE := 0.25
 const MUL3_CHANCE := 0.05
 const MAX_WAVE := 32
+## Chance a gate offers a power-up against a number (never the opener).
+const POWER_GATE_CHANCE := 0.18
+## Of those, how many are a mystery rather than a named power-up.
+const MYSTERY_CHANCE := 0.4
+## Road crates per level, placed in the gap after a random gate.
+const CRATES_PER_LEVEL := 2
+const CRATE_OFFSET := 14.0
 const MAX_BRUTES := 6
 const BRUTE_BITE_FRACTION := 0.08
 const BRUTE_HP_PER_SOLDIER := 2.0
@@ -296,6 +303,33 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 		else:
 			bad.revealed = false
 
+	# Sometimes the choice is soldiers now or a tool for later.
+	if index > 0 and rng.randf() < POWER_GATE_CHANCE:
+		var id: String = Powerups.MYSTERY if rng.randf() < MYSTERY_CHANCE else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]
+		bad = GateMath.power(id)
+		if good.kind == GateMath.Kind.ADD and good.value <= 0.0:
+			good = GateMath.add(rng.randi_range(2, 5))
+		good.revealed = true
+
 	if rng.randf() < 0.5:
 		return [good, bad]
 	return [bad, good]
+
+
+## Gate indices (0-based) that get a crate in the gap after them, and what
+## is in each. Returns [{index, id}].
+func crates_for_level(level: int) -> Array:
+	var out := []
+	var used := {}
+	for i in range(CRATES_PER_LEVEL):
+		var index := rng.randi_range(0, GATES_PER_LEVEL - 2)
+		while used.has(index):
+			index = (index + 1) % (GATES_PER_LEVEL - 1)
+		used[index] = true
+		var id: String = Powerups.MYSTERY if rng.randf() < 0.5 else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]
+		out.append({"index": index, "id": id})
+	return out
+
+
+static func crate_distance(index: int) -> float:
+	return gate_distance(index) + CRATE_OFFSET

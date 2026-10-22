@@ -10,6 +10,7 @@ const GOOD := Color(0.2, 0.52, 1.0, 0.82)
 const BAD := Color(0.92, 0.22, 0.22, 0.82)
 const HIDDEN := Color(0.5, 0.5, 0.56, 0.85)
 const CHOSEN := Color(1.0, 0.95, 0.5, 1.0)
+const POWER := Color(0.6, 0.35, 0.9, 0.85)
 
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
@@ -41,8 +42,11 @@ func _init() -> void:
 
 func refresh(panel: GateMath.GatePanel) -> void:
 	_label.text = GateMath.label(panel)
+	_label.font_size = 150 if _label.text.length() <= 4 else 84
 	if not panel.revealed:
 		_mat.albedo_color = HIDDEN
+	elif GateMath.is_power(panel):
+		_mat.albedo_color = POWER
 	elif GateMath.is_good(panel):
 		_mat.albedo_color = GOOD
 	else:

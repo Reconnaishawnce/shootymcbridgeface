@@ -144,3 +144,33 @@ func test_values_stay_in_sane_ranges() -> void:
 				if not p.revealed:
 					hidden_seen = true
 	check(hidden_seen, "hidden panels appear over a long run")
+
+
+func test_power_gates_and_crates() -> void:
+	var gen := Difficulty.new(21)
+	var powers := 0
+	var total := 0
+	for level in range(1, 30):
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			var pair := gen.make_gate_pair(level, i)
+			var has_power := false
+			for p in pair:
+				total += 1
+				if GateMath.is_power(p):
+					has_power = true
+					powers += 1
+					check(Powerups.is_valid(p.power), "valid power id")
+			if i == 0:
+				check(not has_power, "opener never offers a power-up")
+			if has_power:
+				for p in pair:
+					if not GateMath.is_power(p):
+						check(GateMath.is_good(p) and p.revealed, "a power gate's other side is a visible gain")
+	check(powers > 0 and float(powers) / float(total) < 0.15, "power panels are a minority (%d of %d)" % [powers, total])
+	var crates := gen.crates_for_level(1)
+	check_eq(crates.size(), Difficulty.CRATES_PER_LEVEL, "two crates")
+	check(crates[0].index != crates[1].index, "distinct gates")
+	for c in crates:
+		check(Powerups.is_valid(c.id), "crate content valid")
+		check(Difficulty.crate_distance(c.index) > Difficulty.gate_distance(c.index), "crate after its gate")
+		check(Difficulty.crate_distance(c.index) < Difficulty.wave_distance(c.index), "crate before the wave")

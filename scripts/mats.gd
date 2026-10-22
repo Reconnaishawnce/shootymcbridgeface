@@ -1,14 +1,25 @@
 class_name Mats
 extends RefCounted
 ## Shared flat-colour materials so hundreds of meshes do not each carry one.
+##
+## The cache lives as metadata on the Engine singleton rather than in a
+## static variable: a static container here kept this script alive at the
+## end of Godot's import pass and tripped CI with "resources still in use".
 
-static var _cache: Dictionary = {}
+const CACHE_KEY := "mats_cache"
+
+
+static func _cache() -> Dictionary:
+	if not Engine.has_meta(CACHE_KEY):
+		Engine.set_meta(CACHE_KEY, {})
+	return Engine.get_meta(CACHE_KEY)
 
 
 static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
+	var cache := _cache()
 	var key := "%s|%s" % [color.to_html(true), unshaded]
-	if _cache.has(key):
-		return _cache[key]
+	if cache.has(key):
+		return cache[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = 0.9
@@ -16,7 +27,7 @@ static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if color.a < 0.999:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_cache[key] = m
+	cache[key] = m
 	return m
 
 

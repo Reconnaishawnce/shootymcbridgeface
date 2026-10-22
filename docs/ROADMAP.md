@@ -134,3 +134,5 @@ collectables, growth felt flat, no music.
 - Any balance change is checked against the auto-player at 900, 3600 and
   7200 frames before it ships.
 - Never commit a change that makes CI red on `main`.
+- The editor binary is not the game. Every push is smoke-played as an
+  exported build too (`scripts/ci/check_export.sh`).

@@ -877,9 +877,14 @@ func _quit_with(code: int) -> void:
 	sfx.stop_all()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	# Free the whole scene first so the shared materials have no users
-	# left, then drop the cache itself.
-	get_tree().root.remove_child(self)
-	free()
-	Mats.clear()
-	Engine.get_main_loop().quit(code)
+	# Tear the scene down first so the shared materials have no users left,
+	# then drop the cache and quit on the following frame. queue_free, not
+	# free(): the release export template refuses to parse a bare free()
+	# on self, which left the whole game script unloaded on phones.
+	var tree := get_tree()
+	tree.root.remove_child(self)
+	queue_free()
+	tree.process_frame.connect(func() -> void:
+		Mats.clear()
+		tree.quit(code)
+	, CONNECT_ONE_SHOT)

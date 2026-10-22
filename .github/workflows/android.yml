@@ -44,7 +44,7 @@ jobs:
           path: |
             ~/godot-bin
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}-android-v1
+          key: godot-${{ env.GODOT_VERSION }}-android-linux-v2
 
       - name: Install Godot and Android export templates
         if: steps.godot-cache.outputs.cache-hit != 'true'
@@ -60,13 +60,18 @@ jobs:
           curl -sSL -o /tmp/templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
           dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           mkdir -p "$dest"
-          # Only the Android templates are needed; the full archive is ~1 GB.
-          unzip -q /tmp/templates.tpz 'templates/android_*' 'templates/version.txt' -d /tmp/tpl
+          # Android templates for the APK, the Linux release template for the
+          # exported-build smoke test; the full archive is ~1 GB.
+          unzip -q /tmp/templates.tpz 'templates/android_*' 'templates/linux_release.x86_64' 'templates/version.txt' -d /tmp/tpl
           mv /tmp/tpl/templates/* "$dest/"
 
       - name: Verify (import, unit tests, smoke-play)
         shell: bash
         run: scripts/ci/check.sh ~/godot-bin/godot
+
+      - name: Verify the exported build (Linux, same script export as the APK)
+        shell: bash
+        run: scripts/ci/check_export.sh ~/godot-bin/godot
 
       - name: Version
         id: ver

@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.7.1 (gray screen)
+
+- Fixed the gray screen after the splash, for real this time. The quit
+  path added in v0.6.9 called a bare `free()` on the game node, which the
+  editor binary parses but the release export template does not, so on
+  phones the game script failed to load and the main scene ran with no
+  script. Reproduced here by exporting a Linux build with the same script
+  export settings and smoke-playing it. The quit path now uses
+  `queue_free()` and clears the material cache on the following frame.
+- CI now exports a Linux build with the same compressed-binary-token
+  script export as the APK and smoke-plays it, so a script that only
+  breaks in exported builds fails the build instead of shipping.
+- The music-thread change from 0.7 stays; it was a real startup cost, just
+  not the cause.
+
 ## 0.7 (run 7)
 
 The fork, and the startup fix.

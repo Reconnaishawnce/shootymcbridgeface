@@ -28,7 +28,8 @@ the same key (see below).
 ## Play
 
 - **Drag** left or right to steer the squad. On desktop use arrow keys or A/D.
-- **Tap** to start, and to retry after a wipe.
+- **Tap** to start, and to retry after a wipe. The **II** button pauses;
+  so does the Android back button or leaving the app.
 - Blue panels help, red panels hurt, grey panels are hidden until you get
   close or put a bullet into them.
 - Your squad fires straight ahead automatically. Bullets that hit a gate
@@ -36,7 +37,12 @@ the same key (see below).
   `+2` is a real play. Bullets spent on a panel do not reach the zombies
   behind it. That trade-off is the whole game.
 - Brutes take a slice of your squad when they reach you, not a nibble.
-- Score is metres travelled plus ten per kill. Your best is saved locally.
+- A level is eight gates and a boss. Kill the boss before it reaches you;
+  once it arrives it chews through the squad. Its glowing core sways side
+  to side and takes triple damage, so track it.
+- Every level starts again from one soldier. The boss is the bar.
+- Score is metres travelled plus ten per kill plus a bonus per level
+  cleared. Best score and best level are saved locally.
 
 ## Develop
 

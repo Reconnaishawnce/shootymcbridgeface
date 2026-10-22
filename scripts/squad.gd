@@ -29,6 +29,12 @@ func reset() -> void:
 	set_count(1)
 
 
+## New level: back to one soldier where you stand.
+func redeploy() -> void:
+	_fire_accum = 0.0
+	set_count(1)
+
+
 func set_count(n: int) -> void:
 	count = maxi(0, n)
 	_sync_visuals()

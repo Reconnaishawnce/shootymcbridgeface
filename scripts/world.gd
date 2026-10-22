@@ -1,11 +1,19 @@
 class_name World
 extends Node3D
-## Owns everything that scrolls past the squad: gates, zombies, road dressing
-## and the bullets in flight. The squad stays at z = 0; the world moves +z.
+## Owns everything that scrolls past the squad: gates, zombies, the boss,
+## road dressing and the bullets in flight. The squad stays at z = 0; the
+## world moves +z. Runs the level state machine: gates, boss, clear.
 
 signal gate_passed(panel: GateMath.GatePanel, before: int, after: int)
+signal gate_stepped(gate: Gate, index: int)
 signal zombie_killed(zombie: Zombie)
-signal squad_bitten(bite: int)
+signal squad_bitten(bite: int, heavy: bool)
+signal boss_spawned(boss: Boss)
+signal boss_hit(boss: Boss, is_core: bool)
+signal boss_killed(level: int, squad_left: int)
+signal level_started(level: int)
+
+enum Phase { GATES, BOSS, CLEAR }
 
 const SPAWN_AHEAD := 72.0
 const DESPAWN_Z := 12.0
@@ -14,6 +22,12 @@ const REVEAL_Z := -20.0
 ## A zombie that crosses this line reaches the squad.
 const BITE_Z := -0.9
 const LANE_HALF := 3.0
+## The boss fight starts when the boss has walked this close.
+const BOSS_ENGAGE_Z := -30.0
+## The boss stops here and starts chewing.
+const BOSS_CHEW_Z := -2.4
+const BOSS_WALK_SPEED := 2.2
+const CLEAR_SECONDS := 2.2
 
 const ROAD := Color(0.2, 0.2, 0.22)
 const CURB := Color(0.55, 0.52, 0.45)
@@ -22,15 +36,22 @@ const POST := Color(0.35, 0.3, 0.26)
 
 var gates: Array[Gate] = []
 var zombies: Array[Zombie] = []
+var boss: Boss = null
 var bullets: Node3D
 var gen: Difficulty
 ## Set by the game so hit resolution can read the squad's damage output.
 var squad: Squad
 
-var _distance := 0.0
+var level := 1
+var level_distance := 0.0
+var phase: int = Phase.GATES
+var world_speed := 8.0
 
-var _next_gate_at := Difficulty.FIRST_GATE_AT
-var _next_wave_at := Difficulty.FIRST_GATE_AT + Difficulty.WAVE_OFFSET
+var _next_gate := 0
+var _next_wave := 0
+var _boss_spawned := false
+var _chew_timer := 0.0
+var _clear_timer := 0.0
 var _dashes: Array[Node3D] = []
 var _posts: Array[Node3D] = []
 
@@ -43,24 +64,60 @@ func _init() -> void:
 
 func reset(seed_value: int) -> void:
 	gen = Difficulty.new(seed_value)
-	_next_gate_at = Difficulty.FIRST_GATE_AT
-	_next_wave_at = Difficulty.FIRST_GATE_AT + Difficulty.WAVE_OFFSET
+	_clear_actors()
+	world_speed = Difficulty.world_speed(1)
+	start_level(1)
+
+
+func start_level(n: int) -> void:
+	level = n
+	level_distance = 0.0
+	phase = Phase.GATES
+	_next_gate = 0
+	_next_wave = 0
+	_boss_spawned = false
+	_chew_timer = 0.0
+	boss = null
+	# Stragglers from the last level would eat a one-soldier squad.
+	for z in zombies:
+		z.consume()
+	zombies.clear()
+	level_started.emit(level)
+
+
+func _clear_actors() -> void:
 	for g in gates:
 		g.queue_free()
 	gates.clear()
 	for z in zombies:
 		z.queue_free()
 	zombies.clear()
+	if boss != null and is_instance_valid(boss):
+		boss.queue_free()
+	boss = null
 	for b in bullets.get_children():
 		b.queue_free()
 
 
-func advance(delta: float, world_speed: float, distance: float, squad: Squad) -> void:
-	_distance = distance
-	_spawn(distance)
-	_scroll_dressing(delta, world_speed)
-	_move_gates(delta, world_speed, squad)
-	_move_zombies(delta, world_speed, squad)
+## Advance the world by one frame. Returns the scroll speed used.
+func advance(delta: float, p_squad: Squad) -> float:
+	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level)
+	world_speed = lerpf(world_speed, target, 1.0 - exp(-2.5 * delta))
+	level_distance += world_speed * delta
+	match phase:
+		Phase.GATES:
+			_spawn()
+		Phase.BOSS:
+			_tick_boss(delta, p_squad)
+		Phase.CLEAR:
+			_clear_timer -= delta
+			if _clear_timer <= 0.0:
+				start_level(level + 1)
+	_scroll_dressing(delta)
+	_move_gates(delta, p_squad)
+	_move_zombies(delta, p_squad)
+	_move_boss(delta)
+	return world_speed
 
 
 ## The closest live zombie within [param max_range] metres, or null.
@@ -101,34 +158,51 @@ func try_hit(b: Bullet) -> bool:
 			zombie_killed.emit(z)
 			z.die()
 		return true
+	if boss != null and boss.alive and boss.position.z >= z_lo - 0.6 and boss.position.z <= z_hi + 0.6:
+		if absf(boss.position.x - b.position.x) <= Boss.BODY_RADIUS:
+			var core := boss.is_core_hit(b.position.x)
+			var dead := boss.take_damage(b.damage, core)
+			boss_hit.emit(boss, core)
+			if dead:
+				_on_boss_dead()
+			return true
 	for g in gates:
 		if g.passed or g.position.z < z_lo or g.position.z > z_hi:
 			continue
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
-			var cost := Difficulty.effective_step_cost(_distance, squad.dps() if squad != null else 0.0)
-			g.register_hit(i, b.damage, cost)
+			var cost := Difficulty.effective_step_cost(level, squad.dps() if squad != null else 0.0)
+			if g.register_hit(i, b.damage, cost):
+				gate_stepped.emit(g, i)
 			return true
 	return false
 
 
-func _spawn(distance: float) -> void:
-	while _next_gate_at - distance <= SPAWN_AHEAD:
-		var pair := gen.make_gate_pair(_next_gate_at, squad.count if squad != null else 1)
+func _spawn() -> void:
+	var count := squad.count if squad != null else 1
+	while _next_gate < Difficulty.GATES_PER_LEVEL and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
+		var pair := gen.make_gate_pair(level, _next_gate, count)
 		var g := Gate.new()
 		g.setup(pair[0], pair[1])
-		g.position = Vector3(0.0, 0.0, -(_next_gate_at - distance))
+		g.position = Vector3(0.0, 0.0, -(Difficulty.gate_distance(_next_gate) - level_distance))
 		add_child(g)
 		gates.append(g)
-		_next_gate_at += Difficulty.GATE_SPACING
-	while _next_wave_at - distance <= SPAWN_AHEAD:
-		_spawn_wave(_next_wave_at, distance)
-		_next_wave_at += Difficulty.GATE_SPACING
+		_next_gate += 1
+	while _next_wave < Difficulty.GATES_PER_LEVEL and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
+		_spawn_wave(_next_wave, count)
+		_next_wave += 1
+	if not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
+		_boss_spawned = true
+		boss = Boss.new()
+		boss.setup(Difficulty.boss_hp(level))
+		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
+		add_child(boss)
+		boss_spawned.emit(boss)
 
 
-func _spawn_wave(at: float, distance: float) -> void:
-	var spec := Difficulty.wave_for(at, squad.count if squad != null else 1)
-	var base_z := -(at - distance)
+func _spawn_wave(index: int, count: int) -> void:
+	var spec := Difficulty.wave_for(level, index, count)
+	var base_z := -(Difficulty.wave_distance(index) - level_distance)
 	for i in range(spec.count):
 		_spawn_zombie(spec, base_z - gen.rng.randf_range(0.0, 7.0), false)
 	for i in range(spec.brutes):
@@ -144,38 +218,69 @@ func _spawn_zombie(spec: Dictionary, z: float, brute: bool) -> void:
 	zombies.append(zb)
 
 
-func _move_gates(delta: float, world_speed: float, squad: Squad) -> void:
+func _move_gates(delta: float, p_squad: Squad) -> void:
 	for g in gates.duplicate():
 		g.position.z += world_speed * delta
 		if not g.passed:
 			if g.position.z >= REVEAL_Z:
 				g.reveal_all()
 			if g.position.z >= 0.0:
-				var index := 0 if squad.position.x < 0.0 else 1
+				var index := 0 if p_squad.position.x < 0.0 else 1
 				var panel: GateMath.GatePanel = g.choose(index)
-				var before := squad.count
+				var before := p_squad.count
 				var after := GateMath.apply(before, panel)
-				squad.set_count(after)
+				p_squad.set_count(after)
 				gate_passed.emit(panel, before, after)
 		if g.position.z > DESPAWN_Z:
 			gates.erase(g)
 			g.queue_free()
 
 
-func _move_zombies(delta: float, world_speed: float, squad: Squad) -> void:
+func _move_zombies(delta: float, p_squad: Squad) -> void:
 	for z in zombies.duplicate():
 		z.position.z += (world_speed + z.speed) * delta
-		var aim_x := clampf(squad.position.x + z.lane_offset, -LANE_HALF + 0.4, LANE_HALF - 0.4)
+		var aim_x := clampf(p_squad.position.x + z.lane_offset, -LANE_HALF + 0.4, LANE_HALF - 0.4)
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * delta)
-		if z.position.z >= BITE_Z and absf(z.position.x - squad.position.x) <= squad.reach() + z.radius:
+		if z.position.z >= BITE_Z and absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius:
 			zombies.erase(z)
 			z.consume()
-			var bite: int = Difficulty.brute_bite(squad.count) if z.brute else z.bite
-			squad.add(-bite)
-			squad_bitten.emit(bite)
+			var bite: int = Difficulty.brute_bite(p_squad.count) if z.brute else z.bite
+			p_squad.add(-bite)
+			squad_bitten.emit(bite, z.brute)
 		elif z.position.z > DESPAWN_Z:
 			zombies.erase(z)
 			z.queue_free()
+
+
+func _move_boss(delta: float) -> void:
+	if boss == null or not boss.alive:
+		return
+	match phase:
+		Phase.GATES:
+			boss.position.z += (world_speed + 1.0) * delta
+			if boss.position.z >= BOSS_ENGAGE_Z:
+				phase = Phase.BOSS
+		Phase.BOSS:
+			boss.position.z = minf(boss.position.z + BOSS_WALK_SPEED * delta, BOSS_CHEW_Z)
+
+
+func _tick_boss(delta: float, p_squad: Squad) -> void:
+	if boss == null or not boss.alive or boss.position.z < BOSS_CHEW_Z:
+		return
+	_chew_timer -= delta
+	if _chew_timer <= 0.0:
+		_chew_timer = Difficulty.BOSS_BITE_INTERVAL
+		var bite := Difficulty.boss_bite(p_squad.count)
+		p_squad.add(-bite)
+		squad_bitten.emit(bite, true)
+
+
+func _on_boss_dead() -> void:
+	var squad_left := squad.count if squad != null else 0
+	boss.die()
+	phase = Phase.CLEAR
+	_clear_timer = CLEAR_SECONDS
+	boss_killed.emit(level, squad_left)
 
 
 func _build_dressing() -> void:
@@ -199,7 +304,7 @@ func _build_dressing() -> void:
 			_posts.append(p)
 
 
-func _scroll_dressing(delta: float, world_speed: float) -> void:
+func _scroll_dressing(delta: float) -> void:
 	for d in _dashes:
 		d.position.z += world_speed * delta
 		if d.position.z > 10.0:

@@ -34,11 +34,18 @@ func panel_index_at_x(x: float) -> int:
 	return -1
 
 
-func register_hit(index: int, damage: float, step_cost: float) -> void:
+## Returns true when the hit stepped the panel's value up.
+func register_hit(index: int, damage: float, step_cost: float) -> bool:
 	var steps := GateMath.register_hit(panels[index], damage, step_cost)
 	_views[index].refresh(panels[index])
 	if steps > 0:
 		_views[index].pop()
+	return steps > 0
+
+
+## World position of a panel's centre, for effects.
+func panel_position(index: int) -> Vector3:
+	return _views[index].global_position
 
 
 func reveal_all() -> void:

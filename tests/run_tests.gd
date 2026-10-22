@@ -8,6 +8,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_difficulty.gd",
 	"res://tests/test_formation.gd",
 	"res://tests/test_save_data.gd",
+	"res://tests/test_sfx.gd",
 ]
 
 

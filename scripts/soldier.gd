@@ -29,6 +29,13 @@ func _init() -> void:
 	add_child(_muzzle)
 
 
+func _ready() -> void:
+	# Pop in, so a +5 gate reads as five people arriving.
+	scale = Vector3.ONE * 0.2
+	var tw := create_tween()
+	tw.tween_property(self, "scale", Vector3.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 func muzzle_world_position() -> Vector3:
 	return _muzzle.global_position
 

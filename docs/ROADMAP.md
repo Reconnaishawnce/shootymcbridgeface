@@ -24,19 +24,28 @@ Definition of done for every run:
 - GitHub Actions: test, export signed APK, publish a release for Obtainium.
 - Launcher icon, README, design doc, this roadmap.
 
-## Run 2: levels, bosses, feel
+## Run 2: levels, bosses, feel (done)
 
-- Levels of about eight gates ending in a boss whose health sets the bar.
-  Squad resets at level start. Endless mode becomes an unlock.
-- Boss with a shootable weak point.
-- Juice: hit flashes, gate-pass pulse, soldier spawn pop, death confetti,
-  camera kick on brute bite, a tiny screen flash on a new best.
-- Sound: generated or CC0 one-shots for fire, hit, gate, bite, wipe.
-- Pause button and a settings toggle for sound.
-- Re-tune difficulty against the auto-player with levels in place.
+- Levels of eight gates ending in a boss. Squad resets to one soldier at
+  level start. Boss walks in, chews once it arrives, and has a swaying core
+  that takes triple damage.
+- Difficulty rebuilt around level and gate index; waves open gently on every
+  level and ramp inside it. Boss health is seven seconds of a modelled squad.
+- Juice: camera punch on gains, soldier spawn pop, cube bursts for kills,
+  losses, gate steps and the boss, count bump, level banners, new-best flash.
+- Sound: every effect synthesised in code at startup, no asset files. Sound
+  toggle persisted.
+- Pause button, auto-pause on losing focus or Android back, pause menu with
+  resume, sound and quit.
+- Smoke bot tracks the boss core and reports per-boss telemetry. Screenshot
+  walkthrough covers boss, level clear, level two, paused.
+- Deferred to run 3: endless mode as a selectable unlock (needs a mode
+  picker on the title card).
 
 ## Run 3: perks and meta
 
+- Mode picker on the title card: Levels (default) and Endless (unlocked by
+  clearing level 3), the latter using the run 1 endless regulators.
 - Mid-run perk picks every three gates: three cards, pick one.
 - Coins earned per run. Meta shop with about eight upgrades.
 - Peak squad, best level and total kills on the title card.

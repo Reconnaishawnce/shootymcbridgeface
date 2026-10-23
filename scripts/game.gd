@@ -18,6 +18,7 @@ enum State { TITLE, RUNNING, GAME_OVER }
 
 const SMOKE_FRAMES := 900
 const SMOKE_SEED := 12345
+var _smoke_seed := SMOKE_SEED
 ## Ignore taps for a moment after dying so a frantic tap does not restart.
 const RETRY_LOCKOUT := 0.6
 const KEY_STEER_SPEED := 7.0
@@ -87,6 +88,8 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
+		elif a.begins_with("--smoke-seed="):
+			_smoke_seed = int(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):
 			_shots_dir = a.get_slice("=", 1)
 	best = SaveData.load_best()
@@ -105,7 +108,7 @@ func _ready() -> void:
 	Sfx.enabled = SaveData.load_sound_on() and not smoke
 	Sfx.music_on = SaveData.load_music_on()
 	_build_scene()
-	_drag_scale = (Squad.LANE_HALF * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
+	_drag_scale = (squad.road_half * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
 	hud.set_sound(Sfx.enabled)
 	hud.set_music(Sfx.music_on)
 	show_title()
@@ -170,6 +173,7 @@ func _build_scene() -> void:
 	world.latched.connect(_on_latched)
 	world.strike_landed.connect(_on_strike_landed)
 	world.shaken_off.connect(_on_shaken_off)
+	world.lanes_changed.connect(_on_lanes_changed)
 	world.powerups = powerups
 
 	squad = Squad.new()
@@ -269,7 +273,7 @@ func toggle_squad() -> void:
 
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
-	run_seed = SMOKE_SEED if smoke else randi()
+	run_seed = _smoke_seed if smoke else randi()
 	# The daily: one seed for everyone, no upgrades, rifles.
 	run_meta = Meta.new() if mode == "daily" else meta
 	if mode == "daily":
@@ -728,6 +732,29 @@ func _on_fork_merged() -> void:
 	hud.show_banner("MERGE", 0.6)
 
 
+## The road widened: pull the camera back so the whole thing fits, and say so.
+func _on_lanes_changed(n: int) -> void:
+	_fit_camera(n, true)
+	if state == State.RUNNING:
+		hud.show_banner("%d LANES" % n, 1.4)
+		sfx.play("powerup", -4.0, 0.7)
+		_punch(-4.0)
+
+
+func _fit_camera(n: int, animate: bool) -> void:
+	var extra := float(n - 2)
+	var target_pos := Vector3(0.0, 11.0 + extra * 3.2, 9.0 + extra * 2.4)
+	var look := Vector3(0.0, 0.0, -7.0 - extra * 2.0)
+	_drag_scale = (world.road_half * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
+	if animate:
+		var tw := create_tween()
+		tw.tween_property(camera, "position", target_pos, 1.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		tw.parallel().tween_method(func(v: Vector3) -> void: camera.look_at(v, Vector3.UP), camera.position + camera.basis.z * -10.0, look, 1.4)
+	else:
+		camera.position = target_pos
+		camera.look_at(look, Vector3.UP)
+
+
 func _on_dodged() -> void:
 	bonus += Progression.DODGE_BONUS
 	hud.show_float("DODGED  +%d" % Progression.DODGE_BONUS, true)
@@ -854,7 +881,7 @@ func _bot_steer() -> void:
 	if world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
 		if _bot_spread:
 			squad.set_spread(0.6)
-		squad.target_x = clampf(world.boss.position.x + world.boss.core_x, -Squad.LANE_HALF, Squad.LANE_HALF)
+		squad.target_x = clampf(world.boss.position.x + world.boss.core_x, -squad.road_half, squad.road_half)
 		return
 	var g_near := world.nearest_upcoming_gate()
 	if _bot_spread:
@@ -862,35 +889,33 @@ func _bot_steer() -> void:
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
 		if z.is_thief():
-			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
+			squad.target_x = clampf(z.position.x, -squad.road_half, squad.road_half)
 			return
 	# At a fork, go rich when the squad can afford the crowd, else safe.
 	if world.fork != null and not world.fork.chosen:
 		var left: Dictionary = world.fork.routes.left
 		var want_rich := squad.count >= 12
 		var go_left: bool = (str(left.name) == "RICH") == want_rich
-		squad.target_x = -GatePanelView.CENTER_X if go_left else GatePanelView.CENTER_X
+		squad.target_x = (-1.0 if go_left else 1.0) * world.road_half * 0.5
 		if world.fork.position.z > -24.0:
 			return
 	var z := world.nearest_zombie(22.0)
 	var g := world.nearest_upcoming_gate()
 	var pg := world.nearest_upcoming_perk_gate()
-	# A gate about to arrive outranks a zombie: pick the side first.
+	# A gate about to arrive outranks a zombie: pick the panel first.
 	if g != null and g.position.z > -12.0:
-		var i := GateMath.better_index(g.panels[0], g.panels[1], squad.count)
-		squad.target_x = -GatePanelView.CENTER_X if i == 0 else GatePanelView.CENTER_X
+		squad.target_x = g.panel_center_x(GateMath.best_index(g.panels, squad.count))
 		return
 	if pg != null and (g == null or pg.position.z > g.position.z):
 		if z != null and z.position.z > pg.position.z:
-			squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
+			squad.target_x = clampf(z.position.x, -squad.road_half, squad.road_half)
 		else:
 			squad.target_x = 0.0
 		return
 	if z != null and (g == null or z.position.z > g.position.z):
-		squad.target_x = clampf(z.position.x, -Squad.LANE_HALF, Squad.LANE_HALF)
+		squad.target_x = clampf(z.position.x, -squad.road_half, squad.road_half)
 	elif g != null:
-		var i := GateMath.better_index(g.panels[0], g.panels[1], squad.count)
-		squad.target_x = -GatePanelView.CENTER_X if i == 0 else GatePanelView.CENTER_X
+		squad.target_x = g.panel_center_x(GateMath.best_index(g.panels, squad.count))
 
 
 func _shots_walkthrough() -> void:
@@ -924,6 +949,12 @@ func _shots_walkthrough() -> void:
 			break
 		await get_tree().process_frame
 	await _capture("5d_fork.png", 2)
+	for i in range(6000):
+		var wide: Gate = world.nearest_upcoming_gate()
+		if world.lanes >= 3 and wide != null and wide.panels.size() >= 3 and wide.position.z > -22.0:
+			break
+		await get_tree().process_frame
+	await _capture("5f_three_lanes.png", 2)
 	for i in range(600):
 		if world.fork != null and world.fork.chosen:
 			break

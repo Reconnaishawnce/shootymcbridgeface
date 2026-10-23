@@ -142,7 +142,16 @@ bosses were too easy.
 - Boss lightning with warning rings, runner adds, enrage below half,
   spitter volleys, walker charge.
 
-## Run 10: difficulty modifiers and grades
+## Run 10: sums and lanes (done)
+
+- Teal sum panels, applied left to right, tuned to sit close to the plain
+  gain beside them. Two terms from level 2, three from level 5.
+- The road widens from two lanes to five across the levels, with the
+  curbs, lane lines and camera animating out. One panel per lane; forks
+  and perk gates share the width.
+- Extra lanes add reading, not free soldiers: one rival, the rest traps.
+
+## Run 11: difficulty modifiers and grades
 
 - Hard and Nightmare modifiers with score and coin multipliers.
 - Level grades (S to D) on the clear banner.

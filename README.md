@@ -34,6 +34,13 @@ the same key (see below).
   to spraying ahead. The button at the bottom right cycles tight, normal
   and wide. On desktop: arrows or WASD, Q/E to dash, click and hold the
   road to focus, F to cycle, B to throw a bomb.
+- **Sums.** Teal panels like **+3 x2** are worked out left to right, so
+  they are not the same as **x2 +3**. A sum sits close in value to the
+  plain gain beside it for the squad you have right now. Think, then
+  steer. Two terms from level 2, three from level 5.
+- **Lanes.** The road starts at two lanes and widens to five as you go,
+  one panel per lane. More lanes means more to read: one of the extras is
+  worth weighing and the rest are traps.
 - **Clingers.** Any walker or runner that reaches you clings to the
   squad's flank and keeps eating until you hold focus fire on it, or dash
   to shake a couple off. Up to six can cling at once. Brutes and tanks

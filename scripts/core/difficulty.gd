@@ -424,6 +424,103 @@ func make_fork(level: int) -> Dictionary:
 	return {"left": safe, "right": rich}
 
 
+## Chance a gate (after the opener) carries a sum panel, by tier.
+const EXPR_CHANCE := [0.0, 0.35, 0.4, 0.45]
+## How close a sum's result sits to the plain panel it competes with, so
+## the comparison takes thought rather than a glance.
+const EXPR_BAND := 0.4
+
+
+## A short sum for [param level]: two terms, three from
+## EXPR_THREE_TERMS_LEVEL. A big squad (see BIG_SQUAD) gets no doubling
+## terms, the same brake make_gate_pair applies to plain multipliers.
+func make_expr(level: int, count: int = 1) -> GateMath.GatePanel:
+	var lv := level - 1
+	var terms := 3 if level >= Progression.EXPR_THREE_TERMS_LEVEL else 2
+	var big := count >= BIG_SQUAD
+	var ops := []
+	var last_kind := -1
+	for i in range(terms):
+		var kind := GateMath.Kind.ADD if (last_kind == GateMath.Kind.MUL or rng.randf() < 0.5) else GateMath.Kind.MUL
+		if kind == GateMath.Kind.ADD:
+			var v := rng.randi_range(2, 7) + lv
+			if rng.randf() < 0.4:
+				v = -rng.randi_range(2, 5) - lv / 2
+			ops.append([kind, float(v)])
+		else:
+			var roll := rng.randf()
+			var m := 2.0
+			if roll < 0.25 or big:
+				m = 0.5
+			elif roll < 0.35:
+				m = 3.0
+			ops.append([kind, m])
+		last_kind = kind
+	return GateMath.expr(ops)
+
+
+## A sum that lands within EXPR_BAND of [param rival] for a squad of
+## [param count], so neither side is obviously better. Falls back to the
+## last attempt if nothing lands in the band.
+func make_rival_expr(level: int, rival: GateMath.GatePanel, count: int) -> GateMath.GatePanel:
+	var target := GateMath.apply(maxi(count, 4), rival)
+	var e := make_expr(level, count)
+	for i in range(10):
+		var v := GateMath.apply(maxi(count, 4), e)
+		if v >= float(target) * (1.0 - EXPR_BAND) and v <= float(target) * (1.0 + EXPR_BAND) and v != target:
+			break
+		e = make_expr(level, count)
+	return e
+
+
+## All the panels of a gate, one per lane. The first two come from
+## make_gate_pair; a sum may replace one of them from EXPR_LEVEL; extra
+## lanes get a mix of small gains, traps, sums and power-ups. Shuffled.
+func make_gate(level: int, index: int, count: int, lanes: int) -> Array:
+	var t := tier_for_level(level)
+	var panels: Array = make_gate_pair(level, index, count)
+	if index > 0 and level >= Progression.EXPR_LEVEL and rng.randf() < EXPR_CHANCE[t]:
+		# The sum competes with the good side: both look like gains, one is
+		# better for the squad you actually have.
+		var good_i := 0 if GateMath.is_good(panels[0]) and not GateMath.is_power(panels[0]) else 1
+		var other := 1 - good_i
+		if GateMath.is_good(panels[good_i]):
+			panels[other] = make_rival_expr(level, panels[good_i], count)
+	# Extra lanes: one of them is a rival worth weighing (a sum close to the
+	# good side, or a modest gain), the rest are traps with the odd power-up.
+	# More lanes means more to read, not more to collect.
+	var lv := level - 1
+	var best_i := -1
+	for i in range(panels.size()):
+		if GateMath.is_good(panels[i]) and not GateMath.is_power(panels[i]) and not GateMath.is_expr(panels[i]):
+			best_i = i
+	for i in range(lanes - 2):
+		if index == 0:
+			panels.append(GateMath.add(rng.randi_range(1, 3)))
+		elif i == 0 and best_i >= 0 and level >= Progression.EXPR_LEVEL and rng.randf() < 0.6:
+			panels.append(make_rival_expr(level, panels[best_i], count))
+		elif i == 0 and rng.randf() < 0.6:
+			panels.append(GateMath.add(rng.randi_range(1, 3) + lv / 2))
+		elif rng.randf() < 0.15:
+			panels.append(GateMath.power(Powerups.MYSTERY if rng.randf() < MYSTERY_CHANCE else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]))
+		elif rng.randf() < 0.3 and level >= Progression.EXPR_LEVEL:
+			# A sum that reads tempting and isn't.
+			var trap := make_expr(level, count)
+			for k in range(6):
+				if not GateMath.is_good(trap):
+					break
+				trap = make_expr(level, count)
+			panels.append(trap)
+		else:
+			panels.append(GateMath.add(-rng.randi_range(3, 8) - lv))
+	for i in range(panels.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = panels[i]
+		panels[i] = panels[j]
+		panels[j] = tmp
+	return panels
+
+
 ## Gate indices (0-based) that get a crate in the gap after them, and what
 ## is in each. Returns [{index, id}].
 func crates_for_level(level: int) -> Array:

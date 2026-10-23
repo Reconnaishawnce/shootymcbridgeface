@@ -8,7 +8,10 @@ signal count_changed(new_count: int)
 signal wiped_out
 signal dashed
 
+## How far the squad's centre may steer from the middle on a two-lane
+## road. The world widens this with the road.
 const LANE_HALF := 2.6
+var road_half := LANE_HALF
 const MAX_VISUAL := 60
 ## Formation presets the button cycles through: tight, normal, wide.
 const PRESETS := [0.55, 1.0, 1.7]
@@ -99,7 +102,7 @@ func _init() -> void:
 func reset(start_count: int = 1) -> void:
 	target_x = 0.0
 	position.x = 0.0
-	set_lane(-LANE_HALF, LANE_HALF)
+	set_lane(-road_half, road_half)
 	_prev_x = 0.0
 	velocity_x = 0.0
 	spread = 1.0
@@ -108,6 +111,13 @@ func reset(start_count: int = 1) -> void:
 		s.queue_free()
 	_soldiers.clear()
 	set_count(start_count)
+
+
+## The road widened or narrowed: keep the squad inside it.
+func set_road_half(h: float) -> void:
+	road_half = h
+	if lane_min < -0.1 and lane_max > 0.1:
+		set_lane(-road_half, road_half)
 
 
 ## Restrict steering to a strip of the road (a fork route), or free it.
@@ -128,8 +138,8 @@ func _bounds() -> Vector2:
 	var hw := Formation.half_width(mini(count, MAX_VISUAL), spread)
 	# Only an inner edge (a fork divider) pushes the formation in; the road
 	# edges are soft and a few soldiers on the curb look fine.
-	var lo := lane_min + (hw if lane_min > -LANE_HALF + 0.01 else 0.0)
-	var hi := lane_max - (hw if lane_max < LANE_HALF - 0.01 else 0.0)
+	var lo := lane_min + (hw if lane_min > -road_half + 0.01 else 0.0)
+	var hi := lane_max - (hw if lane_max < road_half - 0.01 else 0.0)
 	if lo > hi:
 		var mid := (lane_min + lane_max) * 0.5
 		return Vector2(mid, mid)
@@ -200,7 +210,7 @@ func set_focus(point: Vector3) -> void:
 	focus_on = true
 	# z may come right up to the squad: that is how you hold fire on a
 	# zombie clinging to your own flank.
-	focus_point = Vector3(clampf(point.x, -LANE_HALF - 1.0, LANE_HALF + 1.0), 0.0, clampf(point.z, -70.0, 1.5))
+	focus_point = Vector3(clampf(point.x, -road_half - 1.0, road_half + 1.0), 0.0, clampf(point.z, -70.0, 1.5))
 
 
 func clear_focus() -> void:

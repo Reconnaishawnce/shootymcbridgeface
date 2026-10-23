@@ -10,17 +10,20 @@ const POST := Color(0.25, 0.25, 0.28)
 
 var ids: Array = []
 var passed := false
+var slot_w := SLOT_W
 var _mats: Array[StandardMaterial3D] = []
 var _labels: Array[Label3D] = []
 
 
-func setup(p_ids: Array) -> void:
+## Slots share the road: [param road_half] is half its width.
+func setup(p_ids: Array, road_half: float = 3.0) -> void:
 	ids = p_ids
+	slot_w = road_half * 2.0 / float(maxi(ids.size(), 1))
 	for i in range(ids.size()):
-		var x := (float(i) - float(ids.size() - 1) * 0.5) * SLOT_W
+		var x := (float(i) - float(ids.size() - 1) * 0.5) * slot_w
 		var mesh := MeshInstance3D.new()
 		var bm := BoxMesh.new()
-		bm.size = Vector3(SLOT_W - 0.12, HEIGHT, 0.25)
+		bm.size = Vector3(slot_w - 0.12, HEIGHT, 0.25)
 		mesh.mesh = bm
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = COLOR
@@ -35,7 +38,7 @@ func setup(p_ids: Array) -> void:
 		label.font_size = 40
 		label.outline_size = 12
 		label.pixel_size = 0.01
-		label.width = (SLOT_W - 0.3) / 0.01
+		label.width = (slot_w - 0.3) / 0.01
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		label.outline_modulate = Color(0.05, 0.05, 0.08)
 		label.position = Vector3(x, HEIGHT * 0.55, 0.2)
@@ -44,7 +47,7 @@ func setup(p_ids: Array) -> void:
 		_labels.append(label)
 	for i in range(ids.size() + 1):
 		var post := Mats.box(Vector3(0.16, HEIGHT + 0.3, 0.3), POST)
-		post.position = Vector3((float(i) - float(ids.size()) * 0.5) * SLOT_W, (HEIGHT + 0.3) * 0.5, 0.0)
+		post.position = Vector3((float(i) - float(ids.size()) * 0.5) * slot_w, (HEIGHT + 0.3) * 0.5, 0.0)
 		add_child(post)
 	var sign := Label3D.new()
 	sign.text = "PERK"
@@ -60,7 +63,7 @@ func setup(p_ids: Array) -> void:
 
 ## Index of the slot under [param x].
 func slot_at_x(x: float) -> int:
-	var i := int(floor(x / SLOT_W + float(ids.size()) * 0.5))
+	var i := int(floor(x / slot_w + float(ids.size()) * 0.5))
 	return clampi(i, 0, ids.size() - 1)
 
 

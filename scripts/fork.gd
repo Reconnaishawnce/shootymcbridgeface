@@ -13,9 +13,13 @@ var routes: Dictionary = {}
 var chosen := false
 
 
-func setup(p_routes: Dictionary, p_length: float) -> void:
+var road_half := 3.3
+
+
+func setup(p_routes: Dictionary, p_length: float, p_road_half: float = 3.3) -> void:
 	routes = p_routes
 	length = p_length
+	road_half = p_road_half
 	var wall := Mats.box(Vector3(0.36, 1.1, length), WALL)
 	wall.position = Vector3(0.0, 0.55, -length * 0.5)
 	add_child(wall)
@@ -36,7 +40,7 @@ func setup(p_routes: Dictionary, p_length: float) -> void:
 		label.pixel_size = 0.01
 		label.modulate = RICH if route.name == "RICH" else SAFE
 		label.outline_modulate = Color(0.05, 0.05, 0.08)
-		label.position = Vector3(float(side) * GatePanelView.CENTER_X, 2.4, 1.0)
+		label.position = Vector3(float(side) * road_half * 0.5, 2.4, 1.0)
 		label.no_depth_test = true
 		add_child(label)
 

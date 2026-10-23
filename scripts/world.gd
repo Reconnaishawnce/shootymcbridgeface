@@ -23,6 +23,7 @@ signal dodged
 signal latched(zombie: Zombie)
 signal strike_landed(at: Vector3, hit: bool)
 signal shaken_off(count: int)
+signal lanes_changed(lanes: int)
 signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
@@ -36,7 +37,11 @@ const DESPAWN_Z := 12.0
 const REVEAL_Z := -20.0
 ## A zombie that crosses this line reaches the squad.
 const BITE_Z := -0.9
-const LANE_HALF := 3.0
+## Half the road width; two lanes to start. The road widens with the level.
+var road_half := Progression.road_half(2)
+var lanes := 2
+## Steering margin inside the curbs.
+const EDGE := 0.4
 ## The boss fight starts when the boss has walked this close.
 const BOSS_ENGAGE_Z := -30.0
 ## The boss stops here and starts chewing.
@@ -100,6 +105,9 @@ var _bombs: Array[Bomb] = []
 var perk_count := 0
 var _dashes: Array[Node3D] = []
 var _posts: Array[Node3D] = []
+var _road: MeshInstance3D
+var _curbs: Array[MeshInstance3D] = []
+var _lane_tween: Tween
 
 
 func _init() -> void:
@@ -113,7 +121,45 @@ func reset(seed_value: int) -> void:
 	_clear_actors()
 	world_speed = Difficulty.world_speed(1)
 	_gates_passed = 0
+	set_lanes(2, false)
 	start_level(1)
+
+
+## Widen (or reset) the road. Animated: curbs slide out, the camera pulls
+## back (the game listens), and every gate spawned from now on has one
+## panel per lane.
+func set_lanes(n: int, animate: bool = true) -> void:
+	n = clampi(n, 2, Progression.MAX_LANES)
+	if n == lanes and not animate:
+		_apply_road_width(Progression.road_half(n))
+		return
+	if n == lanes:
+		return
+	lanes = n
+	var target := Progression.road_half(n)
+	if _lane_tween != null:
+		_lane_tween.kill()
+	if animate:
+		_lane_tween = create_tween()
+		_lane_tween.tween_method(_apply_road_width, road_half, target, 1.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_lane_tween.tween_callback(_place_dashes.bind(n))
+	else:
+		_apply_road_width(target)
+		_place_dashes(n)
+	lanes_changed.emit(n)
+
+
+func _apply_road_width(h: float) -> void:
+	road_half = h
+	if squad != null:
+		squad.set_road_half(h - EDGE)
+	if _road != null:
+		_road.scale.x = (h * 2.0 + 0.6) / 7.2
+	for i in range(_curbs.size()):
+		_curbs[i].position.x = (-1.0 if i == 0 else 1.0) * (h + 0.65)
+	for i in range(_posts.size()):
+		var side := -1.0 if i % 2 == 0 else 1.0
+		_posts[i].position.x = side * (h + 0.65)
 
 
 func start_level(n: int) -> void:
@@ -131,7 +177,7 @@ func start_level(n: int) -> void:
 	_fork_routes = gen.make_fork(level) if gen != null else {}
 	fork_side = 0
 	if squad != null:
-		squad.set_lane(-Squad.LANE_HALF, Squad.LANE_HALF)
+		squad.set_lane(-squad.road_half, squad.road_half)
 	# Stragglers from the last level would eat a one-soldier squad.
 	for z in zombies:
 		z.consume()
@@ -368,14 +414,14 @@ func _spawn() -> void:
 			var k := _gate_index(_next_gate) - Difficulty.FORK_INDEX
 			if k == 0:
 				fork = Fork.new()
-				fork.setup(_fork_routes, Difficulty.fork_length())
+				fork.setup(_fork_routes, Difficulty.fork_length(), road_half)
 				fork.position = Vector3(0.0, 0.0, z + Difficulty.FORK_LEAD)
 				add_child(fork)
 				fork_ahead.emit(_fork_routes)
 			for side in [-1, 1]:
 				var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
 				var rg := RouteGate.new()
-				rg.setup(route.panels[k], side)
+				rg.setup(route.panels[k], side, road_half)
 				rg.hot_enabled = Progression.hot_panels(level)
 				rg.hot_phase = gen.rng.randf_range(0.0, Progression.HOT_PERIOD)
 				rg.position.z = z
@@ -383,14 +429,16 @@ func _spawn() -> void:
 				route_gates.append(rg)
 		elif offer.size() >= 2:
 			var pg := PerkGate.new()
-			pg.setup(offer)
+			pg.setup(offer, road_half)
 			pg.position = Vector3(0.0, 0.0, z)
 			add_child(pg)
 			perk_gates.append(pg)
 		else:
-			var pair := gen.make_gate_pair(_gate_level(_next_gate), _gate_index(_next_gate), count)
+			var want_lanes := Progression.lanes_for(_gate_level(_next_gate), _gate_index(_next_gate))
+			if want_lanes != lanes:
+				set_lanes(want_lanes)
 			var g := Gate.new()
-			g.setup(pair[0], pair[1])
+			g.setup(gen.make_gate(_gate_level(_next_gate), _gate_index(_next_gate), count, lanes), Progression.LANE_W)
 			g.index = _gate_index(_next_gate)
 			g.hot_enabled = Progression.hot_panels(level)
 			g.hot_phase = gen.rng.randf_range(0.0, Progression.HOT_PERIOD)
@@ -406,7 +454,7 @@ func _spawn() -> void:
 		if Difficulty.crate_distance(n) - level_distance <= SPAWN_AHEAD:
 			var c := Crate.new()
 			c.setup(plan.id)
-			c.position = Vector3(gen.rng.randf_range(-LANE_HALF + 1.0, LANE_HALF - 1.0), 0.0, -(Difficulty.crate_distance(n) - level_distance))
+			c.position = Vector3(gen.rng.randf_range(-road_half + 1.0, road_half - 1.0), 0.0, -(Difficulty.crate_distance(n) - level_distance))
 			add_child(c)
 			_crates.append(c)
 			_crate_plan.erase(plan)
@@ -431,8 +479,8 @@ func _spawn_wave(n: int, count: int) -> void:
 			var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
 			_wave_seq += 1
 			var wave := _wave_seq
-			var lo := 0.6 if side > 0 else -LANE_HALF + 0.5
-			var hi := LANE_HALF - 0.5 if side > 0 else -0.6
+			var lo := 0.6 if side > 0 else -road_half + 0.5
+			var hi := road_half - 0.5 if side > 0 else -0.6
 			for i in range(int(ceil(spec.count * float(route.wave_mult)))):
 				_spawn_zombie_in(spec.hp, spec.speed, Zombie.Kind.NORMAL, base_z - gen.rng.randf_range(0.0, 7.0), wave, lo, hi)
 			for i in range(int(spec.brutes * float(route.wave_mult)) + int(route.extra_brutes)):
@@ -461,26 +509,29 @@ func _spawn_runners(n: int, count: int) -> void:
 	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
 	var base_z := Difficulty.runner_release_z(level)
 	var side := -1.0 if gen.rng.randf() < 0.5 else 1.0
-	var lo := -LANE_HALF + 0.5
-	var hi := LANE_HALF - 0.5
+	var lo := -road_half + 0.5
+	var hi := road_half - 0.5
 	if fork_side != 0:
 		# Inside a fork the pack comes down your own route.
 		side = float(fork_side)
-		lo = 0.6 if fork_side > 0 else -LANE_HALF + 0.5
-		hi = LANE_HALF - 0.5 if fork_side > 0 else -0.6
+		lo = 0.6 if fork_side > 0 else -road_half + 0.5
+		hi = road_half - 0.5 if fork_side > 0 else -0.6
 	for i in range(spec.runners):
 		var zb := Zombie.new()
 		zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
 		zb.lane_offset = gen.rng.randf_range(-0.8, 0.8)
 		zb.lane_min = lo
 		zb.lane_max = hi
-		zb.position = Vector3(clampf(side * gen.rng.randf_range(1.0, LANE_HALF - 0.5), lo, hi), 0.0, base_z - gen.rng.randf_range(0.0, 3.0))
+		zb.position = Vector3(clampf(side * gen.rng.randf_range(1.0, road_half - 0.5), lo, hi), 0.0, base_z - gen.rng.randf_range(0.0, 3.0))
 		add_child(zb)
 		zombies.append(zb)
 
 
 func _spawn_zombie(hp: float, speed: float, kind: int, z: float, wave: int = -1) -> void:
-	_spawn_zombie_in(hp, speed, kind, z, wave, -LANE_HALF + 0.8, LANE_HALF - 0.8)
+	# Waves spawn in a band that grows at half the road's rate: a wider road
+	# is more to read at the gates, not a wall of zombies at every angle.
+	var band := minf(road_half - 0.8, 2.5 + (road_half - Progression.road_half(2)) * 0.85)
+	_spawn_zombie_in(hp, speed, kind, z, wave, -band, band)
 
 
 func _spawn_zombie_in(hp: float, speed: float, kind: int, z: float, wave: int, lo: float, hi: float) -> void:
@@ -540,7 +591,9 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 			if g.position.z >= reveal_z:
 				g.reveal_all()
 			if g.position.z >= 0.0:
-				var index := 0 if p_squad.position.x < 0.0 else 1
+				var index: int = g.panel_index_at_x(p_squad.position.x)
+				if index < 0:
+					index = 0 if p_squad.position.x < 0.0 else g.panels.size() - 1
 				var panel: GateMath.GatePanel = g.choose(index)
 				var before := p_squad.count
 				var after := GateMath.apply(before, panel)
@@ -588,9 +641,9 @@ func _move_fork(delta: float, p_squad: Squad) -> void:
 			fork_side = -1 if p_squad.position.x < 0.0 else 1
 			fork.commit()
 			if fork_side < 0:
-				p_squad.set_lane(-Squad.LANE_HALF, -0.55)
+				p_squad.set_lane(-p_squad.road_half, -0.55)
 			else:
-				p_squad.set_lane(0.55, Squad.LANE_HALF)
+				p_squad.set_lane(0.55, p_squad.road_half)
 			fork_chosen.emit(_fork_routes["left" if fork_side < 0 else "right"], fork_side)
 	for rg in route_gates.duplicate():
 		rg.position.z += world_speed * delta
@@ -621,7 +674,7 @@ func _move_fork(delta: float, p_squad: Squad) -> void:
 		return
 	if fork.chosen and fork.position.z >= fork.length:
 		fork_side = 0
-		p_squad.set_lane(-Squad.LANE_HALF, Squad.LANE_HALF)
+		p_squad.set_lane(-p_squad.road_half, p_squad.road_half)
 		fork_merged.emit()
 		fork.queue_free()
 		fork = null
@@ -648,7 +701,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			continue
 		var pace := _pace()
 		z.position.z += (world_speed + z.speed * pace) * delta
-		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-LANE_HALF + 0.4, z.lane_min), minf(LANE_HALF - 0.4, z.lane_max))
+		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-road_half + 0.4, z.lane_min), minf(road_half - 0.4, z.lane_max))
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
 		var in_reach: bool = absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius
 		var same_route: bool = p_squad.position.x >= z.lane_min - 0.6 and p_squad.position.x <= z.lane_max + 0.6
@@ -725,8 +778,8 @@ func _move_thief(delta: float, z: Zombie) -> void:
 			zombies.erase(z)
 			z.queue_free()
 		return
-	var best := GateMath.better_index(g.panels[0], g.panels[1], squad.count if squad != null else 1)
-	var aim_x := -GatePanelView.CENTER_X if best == 0 else GatePanelView.CENTER_X
+	var best := GateMath.best_index(g.panels, squad.count if squad != null else 1)
+	var aim_x := g.panel_center_x(best)
 	z.position.x = move_toward(z.position.x, aim_x, z.homing * delta)
 	if z.position.z <= g.position.z + 0.6:
 		zombies.erase(z)
@@ -781,9 +834,9 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 		_strike_timer = Difficulty.STRIKE_INTERVAL_ENRAGED if enraged else Difficulty.STRIKE_INTERVAL
 		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0)
 		for i in range(n):
-			var offset := 0.0 if i == 0 else gen.rng.randf_range(-2.2, 2.2)
+			var offset := 0.0 if i == 0 else gen.rng.randf_range(-road_half * 0.7, road_half * 0.7)
 			var st := Strike.new()
-			st.setup(clampf(p_squad.position.x + p_squad.velocity_x * 0.5 + offset, -LANE_HALF, LANE_HALF))
+			st.setup(clampf(p_squad.position.x + p_squad.velocity_x * 0.5 + offset, -road_half, road_half))
 			add_child(st)
 			_strikes.append(st)
 	# Adds: the boss calls runners down the road.
@@ -795,7 +848,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			var zb := Zombie.new()
 			zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
 			zb.lane_offset = gen.rng.randf_range(-1.0, 1.0)
-			zb.position = Vector3(gen.rng.randf_range(-LANE_HALF + 0.6, LANE_HALF - 0.6), 0.0, boss.position.z + 1.0)
+			zb.position = Vector3(gen.rng.randf_range(-road_half + 0.6, road_half - 0.6), 0.0, boss.position.z + 1.0)
 			add_child(zb)
 			zombies.append(zb)
 	if boss.is_spitter():
@@ -808,10 +861,10 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			boss.spit_timer = Boss.SPIT_INTERVAL * 0.6 if enraged else Boss.SPIT_INTERVAL
 			var from := boss.position + Vector3(0.0, 3.3, 0.8)
 			var flight := -from.z / Spit.SPEED
-			var aim := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -LANE_HALF + 0.3, LANE_HALF - 0.3)
+			var aim := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -road_half + 0.3, road_half - 0.3)
 			var volley := Difficulty.SPIT_VOLLEY if enraged else 1
 			for i in range(volley):
-				var to_x := clampf(aim + (float(i) - float(volley - 1) * 0.5) * 1.6, -LANE_HALF + 0.3, LANE_HALF - 0.3)
+				var to_x := clampf(aim + (float(i) - float(volley - 1) * 0.5) * 1.6, -road_half + 0.3, road_half - 0.3)
 				var sp := Spit.new()
 				add_child(sp)
 				sp.launch(from, to_x, self)
@@ -939,24 +992,44 @@ func _on_boss_dead() -> void:
 
 
 func _build_dressing() -> void:
-	var road := Mats.box(Vector3(LANE_HALF * 2.0 + 0.6, 0.2, 260.0), ROAD)
-	road.position = Vector3(0.0, -0.1, -100.0)
-	add_child(road)
+	_road = Mats.box(Vector3(7.2, 0.2, 260.0), ROAD)
+	_road.position = Vector3(0.0, -0.1, -100.0)
+	add_child(_road)
 	for side in [-1.0, 1.0]:
 		var curb := Mats.box(Vector3(0.7, 0.45, 260.0), CURB)
-		curb.position = Vector3(side * (LANE_HALF + 0.65), 0.1, -100.0)
+		curb.position = Vector3(side * (road_half + 0.65), 0.1, -100.0)
 		add_child(curb)
-	for i in range(26):
-		var d := Mats.box(Vector3(0.18, 0.02, 2.4), DASH)
-		d.position = Vector3(0.0, 0.01, 6.0 - i * 6.0)
-		add_child(d)
-		_dashes.append(d)
+		_curbs.append(curb)
+	# Enough dashed lines for the widest road; unused ones hide under the road.
+	for line in range(Progression.MAX_LANES - 1):
+		for i in range(26):
+			var d := Mats.box(Vector3(0.18, 0.02, 2.4), DASH)
+			d.position = Vector3(0.0, -0.5, 6.0 - i * 6.0)
+			add_child(d)
+			_dashes.append(d)
+	_place_dashes(lanes)
 	for i in range(16):
 		for side in [-1.0, 1.0]:
 			var p := Mats.box(Vector3(0.3, 1.4, 0.3), POST)
-			p.position = Vector3(side * (LANE_HALF + 0.65), 0.9, 8.0 - i * 12.0)
+			p.position = Vector3(side * (road_half + 0.65), 0.9, 8.0 - i * 12.0)
 			add_child(p)
 			_posts.append(p)
+
+
+## Lane dividers sit on the boundaries between [param n] lanes; spare
+## lines drop below the road.
+func _place_dashes(n: int) -> void:
+	var lines := n - 1
+	for line in range(Progression.MAX_LANES - 1):
+		var x := 0.0
+		var y := -0.5
+		if line < lines:
+			x = (float(line) - float(lines - 1) * 0.5) * Progression.LANE_W
+			y = 0.01
+		for i in range(26):
+			var d := _dashes[line * 26 + i]
+			d.position.x = x
+			d.position.y = y
 
 
 func _scroll_dressing(delta: float) -> void:

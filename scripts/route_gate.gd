@@ -14,22 +14,27 @@ var hot_phase := 0.0
 var _view: GatePanelView
 
 
-func setup(p_panel: GateMath.GatePanel, p_side: int) -> void:
+var width := GatePanelView.WIDTH
+
+
+## [param road_half] is half the road; the route is one side of it.
+func setup(p_panel: GateMath.GatePanel, p_side: int, road_half: float = 3.3) -> void:
 	panel = p_panel
 	side = p_side
-	position.x = float(side) * GatePanelView.CENTER_X
-	_view = GatePanelView.new()
+	width = road_half - 0.35
+	position.x = float(side) * road_half * 0.5
+	_view = GatePanelView.new(width)
 	_view.position = Vector3(0.0, GatePanelView.HEIGHT * 0.5, 0.0)
 	add_child(_view)
 	_view.refresh(panel)
-	for x in [-GatePanelView.WIDTH * 0.5 - 0.1, GatePanelView.WIDTH * 0.5 + 0.1]:
+	for x in [-width * 0.5 - 0.1, width * 0.5 + 0.1]:
 		var post := Mats.box(Vector3(0.2, GatePanelView.HEIGHT + 0.3, 0.3), COLOR_POST)
 		post.position = Vector3(x, (GatePanelView.HEIGHT + 0.3) * 0.5, 0.0)
 		add_child(post)
 
 
 func covers_x(x: float) -> bool:
-	return absf(x - position.x) <= GatePanelView.WIDTH * 0.5
+	return absf(x - position.x) <= width * 0.5
 
 
 func is_hot(t: float) -> bool:

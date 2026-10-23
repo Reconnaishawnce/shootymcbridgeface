@@ -3,6 +3,30 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.10 (run 10)
+
+Sums you have to work out, and a road that widens to five lanes.
+
+- Teal sum panels from level 2: "+3 x2", "x2 +3", "÷2 -4". They apply
+  left to right, so "+3 x2" and "x2 +3" are different gates. A sum is
+  tuned to land within 40% of the plain gain it sits beside, for the
+  squad you have at that moment, so the better panel takes a second of
+  thought. Three-term sums from level 5. Shooting a sum steps its first
+  plus term; thieves knock it down the same way.
+- The road widens: two lanes on level 1, three from the middle of level 2,
+  four from the middle of level 4, five from the middle of level 7. Curbs
+  slide out, the lane lines redraw, the camera pulls back and a "3 LANES"
+  banner lands. Every gate has one panel per lane, forks and perk gates
+  share the wider road.
+- Extra lanes read, they do not pay: one extra panel is a rival worth
+  weighing, the rest are traps, tempting sums that lose, and the odd
+  power-up. Waves spawn across a band that grows slower than the road.
+- Sums give a big squad no doubling terms, the same brake plain
+  multipliers already had.
+- Auto-player takes `--smoke-seed=N` for balance runs across seeds.
+- Balance, bot with no upgrades, four seeds: wiped on levels 5, 6, 5 and 7
+  at 2.4 to 3.9 minutes. Endless: level 8 at three minutes.
+
 ## 0.9 (run 9)
 
 Clingers, spray, and bosses that fight back.

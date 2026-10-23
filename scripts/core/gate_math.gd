@@ -7,7 +7,7 @@ extends RefCounted
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.
 
-enum Kind { ADD, MUL, POWER }
+enum Kind { ADD, MUL, POWER, EXPR }
 
 ## Multiplier panels cannot be shot past this.
 const MUL_CAP := 5.0
@@ -30,6 +30,8 @@ class GatePanel:
 	var shot_progress: float = 0.0
 	## POWER panels carry a power-up id, or Powerups.MYSTERY.
 	var power: String = ""
+	## EXPR panels: a short sum applied left to right, [[kind, value], ...].
+	var ops: Array = []
 
 	func _init(p_kind: int, p_value: float, p_hidden: bool = false) -> void:
 		kind = p_kind
@@ -52,6 +54,38 @@ static func power(id: String) -> GatePanel:
 	return p
 
 
+## A sum: [[Kind.ADD, 3], [Kind.MUL, 2.0]] reads "+3 x2" and is applied in
+## that order. The player has to think, which is the point.
+static func expr(ops: Array, hidden: bool = false) -> GatePanel:
+	var p := GatePanel.new(Kind.EXPR, 0.0, hidden)
+	for op in ops:
+		p.ops.append([int(op[0]), float(op[1])])
+	return p
+
+
+static func _apply_op(count: int, kind: int, value: float) -> int:
+	match kind:
+		Kind.ADD:
+			return maxi(0, count + int(round(value)))
+		Kind.MUL:
+			return maxi(0, int(floor(float(count) * value)))
+	return count
+
+
+static func _op_label(kind: int, value: float) -> String:
+	match kind:
+		Kind.ADD:
+			var v := int(round(value))
+			return ("+%d" % v) if v >= 0 else ("%d" % v)
+		Kind.MUL:
+			if is_equal_approx(value, 0.5):
+				return "÷2"
+			if is_equal_approx(value, round(value)):
+				return "x%d" % int(round(value))
+			return "x%.1f" % value
+	return "?"
+
+
 ## The squad count after walking through [param panel].
 static func apply(count: int, panel: GatePanel) -> int:
 	match panel.kind:
@@ -59,7 +93,16 @@ static func apply(count: int, panel: GatePanel) -> int:
 			return maxi(0, count + int(round(panel.value)))
 		Kind.MUL:
 			return maxi(0, int(floor(float(count) * panel.value)))
+		Kind.EXPR:
+			var c := count
+			for op in panel.ops:
+				c = _apply_op(c, int(op[0]), float(op[1]))
+			return c
 	return count
+
+
+## Reference squad size used to colour and rank panels without a count.
+const REF_COUNT := 12
 
 
 ## True when the panel can only help (used for colouring, never for choice).
@@ -71,11 +114,17 @@ static func is_good(panel: GatePanel) -> bool:
 			return panel.value > 1.0
 		Kind.POWER:
 			return true
+		Kind.EXPR:
+			return apply(REF_COUNT, panel) > REF_COUNT
 	return false
 
 
 static func is_power(panel: GatePanel) -> bool:
 	return panel.kind == Kind.POWER
+
+
+static func is_expr(panel: GatePanel) -> bool:
+	return panel.kind == Kind.EXPR
 
 
 ## What the panel prints on its face.
@@ -94,7 +143,22 @@ static func label(panel: GatePanel) -> String:
 			return "x%.1f" % panel.value
 		Kind.POWER:
 			return Powerups.title(panel.power)
+		Kind.EXPR:
+			var parts := []
+			for op in panel.ops:
+				parts.append(_op_label(int(op[0]), float(op[1])))
+			return " ".join(parts)
 	return "?"
+
+
+## Index of the first additive term of a sum, adding one if there is none,
+## so shooting and theft always have something to move.
+static func _first_add(panel: GatePanel) -> int:
+	for i in range(panel.ops.size()):
+		if int(panel.ops[i][0]) == Kind.ADD:
+			return i
+	panel.ops.append([Kind.ADD, 0.0])
+	return panel.ops.size() - 1
 
 
 ## Register bullet damage on a panel. Returns how many steps the value climbed
@@ -118,6 +182,9 @@ static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> i
 				panel.value += 1.0
 			Kind.MUL:
 				panel.value = minf(panel.value + MUL_STEP, MUL_CAP)
+			Kind.EXPR:
+				var i := _first_add(panel)
+				panel.ops[i][1] = float(panel.ops[i][1]) + 1.0
 	return steps
 
 
@@ -129,17 +196,31 @@ static func steal(panel: GatePanel) -> void:
 		Kind.POWER:
 			# A thief turns a known power-up into a mystery.
 			panel.power = Powerups.MYSTERY
+		Kind.EXPR:
+			var i := _first_add(panel)
+			panel.ops[i][1] = float(panel.ops[i][1]) - STEAL_AMOUNT
 		Kind.ADD:
 			panel.value -= STEAL_AMOUNT
 		Kind.MUL:
 			panel.value = maxf(1.0, panel.value - MUL_STEP)
 
 
+## What a panel is worth to a squad of [param count], for ranking.
+static func worth(panel: GatePanel, count: int) -> int:
+	return apply(count, panel) + (POWER_WORTH if is_power(panel) else 0)
+
+
 ## Index (0 or 1) of the panel that leaves the squad larger. Ties go left.
 static func better_index(left: GatePanel, right: GatePanel, count: int) -> int:
-	# A power-up counts as a handful of soldiers for the comparison.
-	var l := apply(count, left) + (POWER_WORTH if is_power(left) else 0)
-	var r := apply(count, right) + (POWER_WORTH if is_power(right) else 0)
-	if l >= r:
+	if worth(left, count) >= worth(right, count):
 		return 0
 	return 1
+
+
+## Index of the best of any number of panels. Ties go to the lower index.
+static func best_index(panels: Array, count: int) -> int:
+	var best := 0
+	for i in range(1, panels.size()):
+		if worth(panels[i], count) > worth(panels[best], count):
+			best = i
+	return best

@@ -11,6 +11,8 @@ const BAD := Color(0.92, 0.22, 0.22, 0.82)
 const HIDDEN := Color(0.5, 0.5, 0.56, 0.85)
 const CHOSEN := Color(1.0, 0.95, 0.5, 1.0)
 const POWER := Color(0.6, 0.35, 0.9, 0.85)
+## Sum panels: neither blue nor red. You have to work it out.
+const THINK := Color(0.15, 0.7, 0.68, 0.85)
 
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
@@ -20,10 +22,14 @@ var _hot := false
 var _base_color := GOOD
 
 
-func _init() -> void:
+var width := WIDTH
+
+
+func _init(p_width: float = WIDTH) -> void:
+	width = p_width
 	_mesh = MeshInstance3D.new()
 	var bm := BoxMesh.new()
-	bm.size = Vector3(WIDTH, HEIGHT, 0.25)
+	bm.size = Vector3(width, HEIGHT, 0.25)
 	_mesh.mesh = bm
 	_mat = StandardMaterial3D.new()
 	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -44,12 +50,17 @@ func _init() -> void:
 
 func refresh(panel: GateMath.GatePanel) -> void:
 	_label.text = GateMath.label(panel)
-	_label.font_size = 150 if _label.text.length() <= 4 else 84
+	var n := _label.text.length()
+	_label.font_size = 150 if n <= 4 else (84 if n <= 8 else 60)
+	_label.width = (width - 0.2) / 0.01
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	var color := BAD
 	if not panel.revealed:
 		color = HIDDEN
 	elif GateMath.is_power(panel):
 		color = POWER
+	elif GateMath.is_expr(panel):
+		color = THINK
 	elif GateMath.is_good(panel):
 		color = GOOD
 	_base_color = color

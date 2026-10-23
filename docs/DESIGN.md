@@ -30,8 +30,15 @@ other way, and your aim as a resource you have to spend wisely.
 - The world scrolls toward the squad at 9.5 to 14 m/s during gates and
   slows to 2.5 m/s for the boss. The squad stays at the origin and steers across
   a six-metre lane.
-- A gate every 32 m. Each gate is two panels. The squad's x position at
-  the moment the gate reaches it picks the panel. The first gate of every
+- A gate every 32 m. Each gate has one panel per lane: two lanes on
+  level 1, three from the middle of level 2, four from the middle of
+  level 4, five from the middle of level 7 (`Progression.lanes_for`). The
+  squad's x position at the moment the gate reaches it picks the panel.
+  From level 2 some panels are teal sums ("+3 x2") applied left to right;
+  a sum next to a plain gain is tuned to land within 40% of it for the
+  squad you have, so you have to work it out. Three-term sums from level
+  5. Extra lanes hold one rival worth weighing and otherwise traps,
+  losing sums and the odd power-up. The first gate of every
   level is a visible additive gain, a foothold for the fresh squad.
 - Panels are additive (`+n`, `-n`) or multiplicative (`x2`, `x3`, `x0.5`).
   Additive values climb by one per step of bullet damage; multipliers climb
@@ -185,13 +192,17 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 9 result (bot, no upgrades) |
+| Metric | Run 10 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 5 | 93, 49, 63, 58, 51; wiped on level 5, 2.8 min |
-| Endless: after 3 minutes | level 8, peak 498 |
+| Levels: wipe level, four seeds | 5, 6, 5, 7 at 2.4 to 3.9 min |
+| Endless: after 3 minutes | level 8, peak 1113 |
+
+Seeds: `++ --smoke --smoke-seed=N`. One seed is noise; check four.
 
 Regulators that keep a level in range: multipliers are 20% of good panels
-and vanish once the squad passes 150; halving gates appear on the bad side
+and vanish once the squad passes 150 (sums lose their doubling terms at
+the same point); a wider road spawns waves in a band that grows slower
+than the road; halving gates appear on the bad side
 from tier 2; brute health and wave size scale with the squad; and the
 per-level reset caps compounding at eight gates.
 

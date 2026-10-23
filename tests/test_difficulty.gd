@@ -234,3 +234,51 @@ func test_boss_attacks_scale() -> void:
 	check_eq(Difficulty.strike_bite(100), 15, "strike scales")
 	check(Difficulty.boss_adds(1) >= 1 and Difficulty.boss_adds(20) <= 4, "adds bounded")
 	check(Difficulty.STRIKE_INTERVAL_ENRAGED < Difficulty.STRIKE_INTERVAL, "enrage is faster")
+
+
+func test_lanes_progress() -> void:
+	check_eq(Progression.lanes_for(1, 7), 2, "level 1 is two lanes")
+	check_eq(Progression.lanes_for(2, 0), 2, "level 2 opens with two")
+	check_eq(Progression.lanes_for(2, 4), 3, "level 2 widens to three")
+	check_eq(Progression.lanes_for(4, 7), 4, "level 4 ends on four")
+	check_eq(Progression.lanes_for(9, 0), Progression.MAX_LANES, "capped")
+	var last := 0
+	for level in range(1, 12):
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			var n := Progression.lanes_for(level, i)
+			check(n >= last, "lanes never shrink (%d/%d)" % [level, i])
+			last = n
+	check_near(Progression.road_half(2), 3.3, 0.001, "two lanes is the old road")
+
+
+func test_multi_lane_gates() -> void:
+	var gen := Difficulty.new(5)
+	var sums := 0
+	var gates := 0
+	var with_good := 0
+	for level in range(1, 10):
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			var lanes := Progression.lanes_for(level, i)
+			var panels := gen.make_gate(level, i, 20, lanes)
+			gates += 1
+			check_eq(panels.size(), lanes, "one panel per lane (%d/%d)" % [level, i])
+			var any_good := false
+			for p in panels:
+				if GateMath.is_good(p) or GateMath.is_power(p):
+					any_good = true
+				if GateMath.is_expr(p):
+					sums += 1
+					check(level >= Progression.EXPR_LEVEL, "no sums before level %d" % Progression.EXPR_LEVEL)
+					check(p.ops.size() == 2 or (p.ops.size() == 3 and level >= Progression.EXPR_THREE_TERMS_LEVEL), "term count by level")
+			if any_good:
+				with_good += 1
+			if i == 0:
+				check(any_good, "openers always offer a gain")
+				for p in panels:
+					check(not GateMath.is_expr(p) and p.revealed, "openers stay plain")
+	check(sums > 10, "sums appear (%d)" % sums)
+	# Dilemma gates (both sides hurt) are deliberate; everything else offers a gain.
+	check(with_good * 10 >= gates * 8, "most gates offer something (%d of %d)" % [with_good, gates])
+	var rival := GateMath.add(6)
+	var e := gen.make_rival_expr(3, rival, 20)
+	check(GateMath.is_expr(e), "rival is a sum")

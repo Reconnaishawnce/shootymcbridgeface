@@ -13,11 +13,42 @@ const HIDDEN_LEVEL := 2
 const DILEMMA_LEVEL := 2
 
 ## Hints shown at the start of a level, keyed by level.
+## Sum gates (short equations, applied left to right) appear from here.
+const EXPR_LEVEL := 2
+const EXPR_THREE_TERMS_LEVEL := 5
+const LANE_W := 3.3
+const MAX_LANES := 5
+
+
+## How many lanes the road has at gate [param index] of [param level].
+## Two to start; it widens partway through levels 2, 4 and 7 and stays.
+static func lanes_for(level: int, index: int) -> int:
+	var late := index >= 4
+	if level <= 1:
+		return 2
+	if level == 2:
+		return 3 if late else 2
+	if level == 3:
+		return 3
+	if level == 4:
+		return 4 if late else 3
+	if level <= 6:
+		return 4
+	if level == 7:
+		return 5 if late else 4
+	return MAX_LANES
+
+
+static func road_half(lanes: int) -> float:
+	return float(lanes) * LANE_W * 0.5
+
+
 const LEVEL_HINTS := {
 	1: "DRAG LOW TO STEER. HOLD THE ROAD TO AIM.\nZOMBIES THAT REACH YOU CLING ON: HOLD ON THEM",
-	2: "FLICK LOW TO DASH\nDASH OUT OF LIGHTNING RINGS, DASH TO SHAKE OFF CLINGERS",
+	2: "FLICK LOW TO DASH. TEAL GATES ARE SUMS:\n+3 x2 IS NOT x2 +3. WORK IT OUT, LEFT TO RIGHT",
 	3: "PANELS FLASH: HIT THEM THEN FOR x3\nPURPLE LATCHERS ARE TOUGHER: AIM EARLY",
 	4: "RED ON BOTH SIDES NOW\nPICK THE ONE YOU CAN SHOOT UP",
+	5: "THREE-TERM SUMS FROM HERE\nTHE ROAD KEEPS WIDENING",
 }
 
 ## Unfocused fire sprays: each bullet drifts sideways by up to this much

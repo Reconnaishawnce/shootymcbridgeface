@@ -33,7 +33,8 @@ const PACK := Color(0.28, 0.3, 0.22)
 const HAIR_COLORS := [Color(0.35, 0.22, 0.12), Color(0.08, 0.06, 0.05), Color(0.95, 0.55, 0.2), Color(0.85, 0.75, 0.45), Color(0.3, 0.2, 0.55), Color(0.5, 0.5, 0.5)]
 const HAIR_STYLES := ["short", "bun", "spiky", "curly", "short", "bald"]
 ## Hats that cover the hair completely.
-const COVERS_HAIR := ["helmet", "beanie", "wizard", "viking"]
+const COVERS_HAIR := ["helmet", "beanie", "wizard", "viking", "chef"]
+const RAINBOW := [Color(1.0, 0.3, 0.3), Color(1.0, 0.6, 0.2), Color(1.0, 0.9, 0.2), Color(0.3, 0.85, 0.4), Color(0.25, 0.6, 1.0), Color(0.6, 0.35, 0.9), Color(1.0, 0.45, 0.75)]
 
 var target_offset := Vector3.ZERO
 var detailed := true
@@ -49,7 +50,10 @@ var _cape: Node3D
 var _wings: Array[Node3D] = []
 var _flame: MeshInstance3D
 var _halo: Node3D
+var _balloon: Node3D
+var _arms: Array[Node3D] = []
 var _tag: Label3D
+var _cheer_t := 0.0
 var _flash_t := 0.0
 var _recoil := 0.0
 var _phase := randf() * TAU
@@ -75,7 +79,7 @@ func _vest_for_type() -> Color:
 
 func _build() -> void:
 	var skin: Color = look.get("skin", SKIN.lerp(SKIN_DARK, randf() * randf()))
-	var top: Color = look.get("top", _vest_for_type())
+	var top: Color = look.get("top", RAINBOW[randi() % RAINBOW.size()] if str(look.get("crew", "")) == "rainbow" else _vest_for_type())
 	var pants: Color = look.get("pants", PANTS)
 	var hat: String = str(look.get("hat", "helmet"))
 	var hair_style: String = str(look.get("hair_style", HAIR_STYLES[randi() % HAIR_STYLES.size()]))
@@ -145,6 +149,7 @@ func _build() -> void:
 		hand.position.y = -0.4
 		shoulder.add_child(hand)
 		add_child(shoulder)
+		_arms.append(shoulder)
 	if hero:
 		_tag = Label3D.new()
 		_tag.text = str(look.get("name", ""))
@@ -283,6 +288,23 @@ func _add_hat(hat: String, top: Color) -> void:
 			_halo = Mats.torus(0.11, 0.15, Color(1.0, 0.9, 0.4), true)
 			_halo.position.y = 1.5
 			add_child(_halo)
+		"bunny":
+			for side in [-1.0, 1.0]:
+				var ear := Mats.capsule(0.045, 0.3, Color(0.97, 0.95, 0.95))
+				ear.position = Vector3(side * 0.07, 1.46, 0.0)
+				ear.rotation_degrees.z = side * -12.0
+				add_child(ear)
+				var inner := Mats.capsule(0.02, 0.18, Color(1.0, 0.7, 0.8))
+				inner.position = Vector3(side * 0.07, 1.46, -0.03)
+				inner.rotation_degrees.z = side * -12.0
+				add_child(inner)
+		"chef":
+			var toque := Mats.capsule(0.16, 0.42, Color(0.98, 0.98, 0.98))
+			toque.position.y = 1.42
+			add_child(toque)
+			var band := Mats.torus(0.14, 0.18, Color(0.98, 0.98, 0.98))
+			band.position.y = 1.28
+			add_child(band)
 		_:
 			pass
 
@@ -362,8 +384,33 @@ func _add_back(back: String, top: Color) -> void:
 			_flame.position = Vector3(0.0, 0.58, 0.22)
 			_flame.rotation_degrees.x = 180.0
 			add_child(_flame)
+		"balloon":
+			_balloon = Node3D.new()
+			_balloon.position = Vector3(0.0, 0.9, 0.2)
+			var string := Mats.box(Vector3(0.015, 0.7, 0.015), BAND)
+			string.position.y = 0.35
+			_balloon.add_child(string)
+			var ball := Mats.sphere(0.17, RAINBOW[randi() % RAINBOW.size()])
+			ball.position.y = 0.85
+			ball.scale = Vector3(1.0, 1.15, 1.0)
+			_balloon.add_child(ball)
+			add_child(_balloon)
+		"shell":
+			var shell := Mats.sphere(0.26, Color(0.35, 0.55, 0.3))
+			shell.position = Vector3(0.0, 0.8, 0.2)
+			shell.scale = Vector3(1.0, 1.1, 0.6)
+			add_child(shell)
+			var rim := Mats.torus(0.2, 0.27, Color(0.85, 0.75, 0.45))
+			rim.position = Vector3(0.0, 0.8, 0.13)
+			rim.rotation_degrees.x = 90.0
+			add_child(rim)
 		_:
 			pass
+
+
+## A jump with the arms up. The hero jumps higher.
+func cheer() -> void:
+	_cheer_t = 1.0
 
 
 func _ready() -> void:
@@ -387,6 +434,15 @@ func _process(delta: float) -> void:
 	position = position.lerp(target_offset, 1.0 - exp(-10.0 * delta))
 	var t := Time.get_ticks_msec() * 0.001 * _stride + _phase
 	position.y = absf(sin(t)) * 0.06
+	if _cheer_t > 0.0:
+		_cheer_t = maxf(0.0, _cheer_t - delta * 1.1)
+		var hop := sin(_cheer_t * PI * 2.0)
+		position.y += maxf(0.0, hop) * (0.55 if hero else 0.3)
+		for a in _arms:
+			a.rotation_degrees.x = lerpf(75.0, -160.0, clampf(_cheer_t * 1.6, 0.0, 1.0))
+	if _balloon != null:
+		_balloon.rotation.x = sin(t * 0.25) * 0.15
+		_balloon.rotation.z = cos(t * 0.2) * 0.12
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(t + PI * i) * 0.6
 	if _cape != null:

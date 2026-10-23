@@ -159,12 +159,12 @@ bosses were too easy.
   tag and always escapes.
 - Soldier model rebuilt with faces, hair, boots and dress-up slots.
 
-## Run 10.2: characters, pass 2
+## Run 10.2: characters, pass 2 (done)
 
-- The hero cheers on level clear and idles on the title.
-- Crew skins (match, rainbow, shadow) and a few more hats and backs.
-- "You can afford something" nudge after a run; a star for the daily.
-- Share text and the wipe screen lean on the hero.
+- The squad cheers on level clear, leaving the locker, and on the wipe.
+- Crew skins (matching, rainbow, shadow, no hats, twins), bunny ears,
+  chef hat, balloon and shell.
+- "Something new in the locker" nudge after a run; a star for the daily.
 
 ## Run 11: difficulty modifiers and grades
 

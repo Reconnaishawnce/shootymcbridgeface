@@ -9,8 +9,8 @@ extends RefCounted
 ## and none of this shows; the stars still accrue so switching it on later
 ## has something to spend.
 
-const CATEGORIES := ["hero", "outfit", "hat", "weapon", "back"]
-const CATEGORY_TITLES := {"hero": "HEROES", "outfit": "OUTFITS", "hat": "HATS", "weapon": "WEAPONS", "back": "BACKS"}
+const CATEGORIES := ["hero", "outfit", "hat", "weapon", "back", "crew"]
+const CATEGORY_TITLES := {"hero": "HEROES", "outfit": "OUTFITS", "hat": "HATS", "weapon": "WEAPONS", "back": "BACKS", "crew": "CREW"}
 
 ## Every item: category, display name, star cost (0 is free), and the
 ## look fields it sets. Heroes carry a face and a line.
@@ -44,6 +44,8 @@ const CATALOG := {
 	"crown": {"cat": "hat", "name": "CROWN", "cost": 8},
 	"wizard": {"cat": "hat", "name": "WIZARD", "cost": 8},
 	"halo": {"cat": "hat", "name": "HALO", "cost": 10},
+	"bunny": {"cat": "hat", "name": "BUNNY EARS", "cost": 5},
+	"chef": {"cat": "hat", "name": "CHEF", "cost": 3},
 	"none_hat": {"cat": "hat", "name": "NO HAT", "cost": 1},
 	# Weapon skins.
 	"standard": {"cat": "weapon", "name": "STANDARD", "cost": 0},
@@ -59,9 +61,17 @@ const CATALOG := {
 	"cape_blue": {"cat": "back", "name": "BLUE CAPE", "cost": 3},
 	"wings": {"cat": "back", "name": "WINGS", "cost": 6},
 	"jetpack": {"cat": "back", "name": "JETPACK", "cost": 8},
+	"balloon": {"cat": "back", "name": "BALLOON", "cost": 4},
+	"shell": {"cat": "back", "name": "SHELL", "cost": 5},
+	# Crew: how everyone behind the hero dresses.
+	"match": {"cat": "crew", "name": "MATCHING", "cost": 0},
+	"rainbow": {"cat": "crew", "name": "RAINBOW", "cost": 4},
+	"shadow": {"cat": "crew", "name": "SHADOW", "cost": 6},
+	"plain": {"cat": "crew", "name": "NO HATS", "cost": 2},
+	"twins": {"cat": "crew", "name": "TWINS", "cost": 8},
 }
 
-const DEFAULTS := {"hero": "max", "outfit": "ranger", "hat": "helmet", "weapon": "standard", "back": "pack"}
+const DEFAULTS := {"hero": "max", "outfit": "ranger", "hat": "helmet", "weapon": "standard", "back": "pack", "crew": "match"}
 
 var stars := 0
 var owned: Dictionary = {}
@@ -144,14 +154,25 @@ func hero_name() -> String:
 
 
 ## Stars a run pays: one per boss, one per four perfect gates, one for
-## getting through a few gates at all. Endless pays by distance in gates.
-static func stars_for_run(bosses: int, perfect_gates: int, gates: int, endless: bool) -> int:
+## getting through a few gates at all. Endless pays by distance in gates;
+## the daily pays one extra for showing up.
+static func stars_for_run(bosses: int, perfect_gates: int, gates: int, endless: bool, daily: bool = false) -> int:
 	var n := bosses + perfect_gates / 4
 	if endless:
 		n += gates / 8
 	if gates >= 3:
 		n += 1
+		if daily:
+			n += 1
 	return n
+
+
+## Something in the catalog is unowned and affordable right now.
+func can_afford_something() -> bool:
+	for id in CATALOG.keys():
+		if can_buy(id):
+			return true
+	return false
 
 
 ## Everything a Soldier needs to dress the hero. Crew members get the
@@ -174,13 +195,39 @@ func look() -> Dictionary:
 
 
 ## The rest of the squad: same outfit, hat, weapon and back, their own
-## faces (the Soldier picks those).
+## faces (the Soldier picks those). The crew style can change that:
+## rainbow tops, shadow greys, no hats, or twins of the hero.
 func crew_look() -> Dictionary:
 	var l := look()
-	l.erase("skin")
-	l.erase("hair")
-	l.erase("hair_style")
-	l.erase("name")
+	var crew := str(equipped.get("crew", "match"))
+	l.crew = crew
+	match crew:
+		"rainbow":
+			l.erase("top")
+			l.erase("skin")
+			l.erase("hair")
+			l.erase("hair_style")
+			l.erase("name")
+		"shadow":
+			l.top = Color(0.2, 0.2, 0.24)
+			l.pants = Color(0.12, 0.12, 0.15)
+			l.erase("skin")
+			l.erase("hair")
+			l.erase("hair_style")
+			l.erase("name")
+		"plain":
+			l.hat = "none"
+			l.erase("skin")
+			l.erase("hair")
+			l.erase("hair_style")
+			l.erase("name")
+		"twins":
+			l.erase("name")
+		_:
+			l.erase("skin")
+			l.erase("hair")
+			l.erase("hair_style")
+			l.erase("name")
 	l.hero = false
 	return l
 

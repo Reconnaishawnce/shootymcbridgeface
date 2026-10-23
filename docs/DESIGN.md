@@ -197,7 +197,8 @@ auto-player never earns or spends.
 
 The hero is the front soldier, dressed from `Wardrobe.look()` with a name
 tag; the rest wear `crew_look()`: the same outfit, hat, weapon and back
-with their own random faces. The locker shows a big preview in front of
+with their own random faces, unless the CREW tab says rainbow, shadow,
+no hats or twins. The locker shows a big preview in front of
 the camera above the card. On a wipe the hero "escaped": nobody dies in
 character mode, which is the point for a younger player.
 

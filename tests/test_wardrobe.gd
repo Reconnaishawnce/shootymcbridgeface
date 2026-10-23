@@ -40,6 +40,8 @@ func test_stars() -> void:
 	check_eq(Wardrobe.stars_for_run(0, 0, 3, false), 1, "showing up pays one")
 	check_eq(Wardrobe.stars_for_run(3, 8, 30, false), 6, "bosses and perfect gates")
 	check_eq(Wardrobe.stars_for_run(0, 4, 40, true), 7, "endless pays by distance")
+	check_eq(Wardrobe.stars_for_run(1, 0, 8, false, true), 3, "the daily pays one extra")
+	check_eq(Wardrobe.stars_for_run(0, 0, 2, false, true), 0, "but not for nothing")
 
 
 func test_look() -> void:
@@ -84,3 +86,26 @@ func test_round_trip() -> void:
 	check(w3.is_equipped("helmet"), "an unowned equip falls back to the default")
 	check(not w3.owned.has("bogus"), "unknown ids dropped")
 	check(w3.is_equipped("zuri"), "a free hero equips from a save")
+
+
+func test_crew() -> void:
+	var w := Wardrobe.new()
+	check_eq(w.crew_look().crew, "match", "crew matches by default")
+	check(not w.crew_look().has("skin"), "crew have their own faces")
+	w.stars = 30
+	w.tap("rainbow")
+	check(not w.crew_look().has("top"), "rainbow crew pick their own tops")
+	w.tap("shadow")
+	check(w.crew_look().top.r < 0.3, "shadow crew are dark")
+	check(w.look().top.r > 0.1 and w.is_equipped("shadow"), "the hero keeps the outfit")
+	w.tap("plain")
+	check_eq(w.crew_look().hat, "none", "plain crew have no hats")
+	check_eq(w.look().hat, "helmet", "the hero keeps the hat")
+	w.tap("twins")
+	check(w.crew_look().has("skin") and not w.crew_look().has("name"), "twins share the face, not the tag")
+	check(not w.can_afford_something() or w.stars > 0, "nudge is consistent")
+	var w2 := Wardrobe.new()
+	w2.stars = 1
+	check(w2.can_afford_something(), "a star buys a cap")
+	w2.stars = 0
+	check(not w2.can_afford_something(), "nothing for nothing")

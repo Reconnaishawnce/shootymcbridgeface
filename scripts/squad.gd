@@ -340,6 +340,12 @@ func set_looks(p_hero: Dictionary, p_crew: Dictionary) -> void:
 	_sync_visuals()
 
 
+## Everyone jumps: a level clear, a new best, a hero stepping out.
+func cheer() -> void:
+	for s in _soldiers:
+		s.cheer()
+
+
 func _sync_visuals() -> void:
 	var want := mini(count, MAX_VISUAL)
 	while _soldiers.size() < want:

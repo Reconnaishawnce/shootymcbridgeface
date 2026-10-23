@@ -3,6 +3,19 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.12 (run 10.2)
+
+Characters, pass 2.
+
+- CREW tab in the locker: matching (default), rainbow tops, shadow greys,
+  no hats, or twins of the hero. Two more hats (bunny ears, chef) and two
+  more backs (a bobbing balloon, a turtle shell).
+- The squad cheers on a level clear, when the hero steps out of the
+  locker, and on the wipe screen in character mode. Buying or wearing
+  something makes the locker preview jump.
+- The daily pays one extra star. After a run, the wipe screen says when
+  something in the locker has become affordable.
+
 ## 0.11 (run 10.1)
 
 Characters, pass 1: people worth keeping alive. And clingers you can

@@ -276,6 +276,7 @@ func close_locker() -> void:
 	SaveData.save_wardrobe(wardrobe.to_dict())
 	_apply_looks()
 	show_title()
+	squad.cheer()
 
 
 func _on_locker_tab(cat: String) -> void:
@@ -293,6 +294,8 @@ func _on_item_pressed(id: String) -> void:
 	elif what == "equipped":
 		sfx.play("click")
 	_show_locker()
+	if what != "" and _preview != null and _preview.get_child_count() > 0:
+		_preview.get_child(0).cheer()
 
 
 ## A big hero stands in front of the camera above the locker, slowly
@@ -464,12 +467,14 @@ func end_run() -> void:
 			best_endless = score
 		is_best = records.new_best_endless if world.endless else records.new_best_score
 		shown_best = best_endless if world.endless else best
-	var stars_earned := Wardrobe.stars_for_run(bosses_killed, perfect_gates, gates_passed, world.endless)
+	var stars_earned := Wardrobe.stars_for_run(bosses_killed, perfect_gates, gates_passed, world.endless, mode == "daily")
 	if not smoke and stars_earned > 0:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "")
+	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "", character_mode and wardrobe.can_afford_something())
+	if character_mode:
+		squad.cheer()
 	sfx.play("wipe")
 	_shake = 1.0
 
@@ -790,6 +795,7 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	bonus += b
 	hud.show_boss(false)
 	hud.show_banner("LEVEL %d CLEAR\n+%d" % [level, b], 1.8)
+	squad.cheer()
 	hud.flash(0.35)
 	sfx.play("level_clear")
 	_punch(6.0)
@@ -1074,6 +1080,9 @@ func _shots_walkthrough() -> void:
 	await _capture("2d_locker.png", 30)
 	_on_locker_tab("hat")
 	await _capture("2e_locker_hats.png", 5)
+	wardrobe.tap("rainbow")
+	_on_locker_tab("crew")
+	await _capture("2e_locker_crew.png", 5)
 	close_locker()
 	await _capture("2f_title_hero.png", 20)
 	smoke = true

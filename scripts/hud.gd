@@ -371,8 +371,8 @@ func _build_locker(root: Control) -> void:
 	tabs.add_theme_constant_override("separation", 6)
 	box.add_child(tabs)
 	for cat in Wardrobe.CATEGORIES:
-		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 20)
-		b.custom_minimum_size = Vector2(126.0, 48.0)
+		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 18)
+		b.custom_minimum_size = Vector2(106.0, 48.0)
 		b.toggle_mode = true
 		b.pressed.connect(func() -> void: locker_tab.emit(cat))
 		tabs.add_child(b)
@@ -684,6 +684,8 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 		_locker_grid.add_child(b)
 	if tab == "hero":
 		_locker_line.text = "%s: %s" % [w.hero_name(), Wardrobe.hero_line(w.equipped.get("hero", "max"))]
+	elif tab == "crew":
+		_locker_line.text = "How everyone behind %s dresses." % w.hero_name()
 	else:
 		_locker_line.text = "Stars come from bosses, perfect gates and finishing runs."
 
@@ -741,7 +743,7 @@ func show_running() -> void:
 		_prompt_tween.kill()
 
 
-func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "") -> void:
+func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "", locker_nudge: bool = false) -> void:
 	_hide_cards()
 	_over_card.visible = true
 	_pause_button.visible = false
@@ -757,6 +759,8 @@ func show_game_over(score: int, best: int, is_best: bool, level: int, distance: 
 	var coins_line := "no coins in the daily" if mode == "daily" else "+%d coins" % coins_earned
 	if stars_earned > 0:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
+	if locker_nudge:
+		coins_line += "\nSomething new is waiting in the locker!"
 	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	_over_prompt.text = "TAP TO RETRY"
 	_pulse_prompt()

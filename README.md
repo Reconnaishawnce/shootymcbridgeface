@@ -43,9 +43,10 @@ the same key (see below).
   worth weighing and the rest are traps.
 - **Characters.** Settings has a CHARACTERS switch. On, the title gets a
   LOCKER: pick a hero (each has a face and a name), an outfit, a hat, a
-  weapon skin and something for their back. Stars pay for them: one per
-  boss, one per four perfect gates, one for finishing a few gates. The
-  hero leads the squad with a name tag, and always escapes.
+  weapon skin and something for their back, and decide how the crew
+  behind them dresses. Stars pay for them: one per boss, one per four
+  perfect gates, one for finishing a few gates, one more for the daily.
+  The hero leads the squad with a name tag, and always escapes.
 - **Clingers.** From level 2, any walker or runner that reaches you
   clings to the squad's flank and keeps eating until you tap it (a touch
   on a clinger aims at it, wherever it is on the screen) or dash to shake

@@ -59,6 +59,12 @@ var run_meta := Meta.new()
 var daily_day := 0
 var daily_results: Dictionary = {}
 var _last_result := {}
+## Character mode: heroes, outfits, hats, weapons, backs, paid in stars.
+var wardrobe := Wardrobe.new()
+var character_mode := false
+var _locker_tab := "hero"
+var _preview: Node3D
+var _preview_yaw := 0.0
 
 var _frames := 0
 var _smoke_frames := SMOKE_FRAMES
@@ -75,6 +81,8 @@ var _slowmo_until := 0.0
 ## finger landed. The road (upper part of the screen) is for focus fire;
 ## the strip near the squad is for steering and flick-dashing.
 var _touches: Dictionary = {}
+## Touch index to the clinging zombie it is holding fire on.
+var _cling_touch: Dictionary = {}
 const FOCUS_ZONE := 0.62
 ## The screenshot walkthrough sets the spread by hand; the bot leaves it.
 var _bot_spread := true
@@ -102,6 +110,9 @@ func _ready() -> void:
 		squad_type = "rifle"
 	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 	daily_results = Daily.prune(SaveData.load_daily(), daily_day)
+	wardrobe.from_dict(SaveData.load_wardrobe())
+	# The auto-player dresses up so the character code runs in CI too.
+	character_mode = SaveData.load_character_mode() or smoke
 	# Headless CI has no audio device; the dummy driver releases playbacks
 	# on its own thread and can report them as leaked at exit. Keep the
 	# auto-player silent so its exit is deterministic.
@@ -111,6 +122,8 @@ func _ready() -> void:
 	_drag_scale = (squad.road_half * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
 	hud.set_sound(Sfx.enabled)
 	hud.set_music(Sfx.music_on)
+	hud.set_characters(character_mode)
+	_apply_looks()
 	show_title()
 	if smoke:
 		start_run("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels"))
@@ -204,6 +217,13 @@ func _build_scene() -> void:
 	hud.music_toggled.connect(_on_music_toggled)
 	hud.formation_pressed.connect(cycle_formation)
 	hud.bomb_pressed.connect(throw_bomb)
+	hud.settings_opened.connect(open_settings)
+	hud.settings_closed.connect(show_title)
+	hud.characters_toggled.connect(_on_characters_toggled)
+	hud.locker_opened.connect(open_locker)
+	hud.locker_closed.connect(close_locker)
+	hud.locker_tab.connect(_on_locker_tab)
+	hud.item_pressed.connect(_on_item_pressed)
 
 
 # --- menus -----------------------------------------------------------------
@@ -211,7 +231,91 @@ func _build_scene() -> void:
 func show_title() -> void:
 	state = State.TITLE
 	sfx.set_music("calm")
-	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"))
+	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"), wardrobe.stars, wardrobe.hero_name() if character_mode else "")
+
+
+func open_settings() -> void:
+	sfx.play("click")
+	hud.show_settings()
+
+
+func _on_characters_toggled(on: bool) -> void:
+	character_mode = on
+	SaveData.save_character_mode(on)
+	sfx.play("click")
+	_apply_looks()
+
+
+## Dress the squad for the mode: the hero and crew from the locker, or
+## the classic kit.
+func _apply_looks() -> void:
+	if character_mode:
+		squad.set_looks(wardrobe.look(), wardrobe.crew_look())
+	else:
+		squad.set_looks({}, {})
+
+
+# --- locker ----------------------------------------------------------------
+
+func open_locker() -> void:
+	sfx.play("click")
+	_show_locker()
+
+
+func _show_locker() -> void:
+	hud.show_locker(wardrobe, _locker_tab)
+	# The title-screen squad would show through the card: hide it.
+	squad.visible = false
+	_refresh_preview()
+
+
+func close_locker() -> void:
+	sfx.play("click")
+	_drop_preview()
+	squad.visible = true
+	SaveData.save_wardrobe(wardrobe.to_dict())
+	_apply_looks()
+	show_title()
+
+
+func _on_locker_tab(cat: String) -> void:
+	_locker_tab = cat
+	sfx.play("click")
+	_show_locker()
+
+
+func _on_item_pressed(id: String) -> void:
+	var what := wardrobe.tap(id)
+	if what == "bought":
+		sfx.play("gate_good", -4.0)
+		hud.toast("%s UNLOCKED" % Wardrobe.title(id))
+		SaveData.save_wardrobe(wardrobe.to_dict())
+	elif what == "equipped":
+		sfx.play("click")
+	_show_locker()
+
+
+## A big hero stands in front of the camera above the locker, slowly
+## turning, wearing whatever is picked right now.
+func _refresh_preview() -> void:
+	_drop_preview()
+	# A holder node carries the spot; the soldier inside keeps its own
+	# bob and recoil relative to it.
+	_preview = Node3D.new()
+	add_child(_preview)
+	var size := get_viewport().get_visible_rect().size
+	var spot := camera.project_position(Vector2(size.x * 0.5, size.y * 0.2), 6.5)
+	_preview.position = spot - Vector3(0.0, 0.8, 0.0)
+	_preview.look_at(camera.global_position, Vector3.UP)
+	_preview_yaw = _preview.rotation.y
+	_preview.rotation = Vector3(0.0, _preview_yaw, 0.0)
+	_preview.add_child(Soldier.new(true, squad_type, wardrobe.look()))
+
+
+func _drop_preview() -> void:
+	if _preview != null:
+		_preview.queue_free()
+		_preview = null
 
 
 func open_daily() -> void:
@@ -243,7 +347,8 @@ func _result_text(r: Dictionary) -> String:
 			return Daily.share_text(daily_day, r.score, r.level, r.kills, r.peak)
 		"endless":
 			return "Shooty McBridgeface endless\nScore %d · %d m · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.distance, r.kills, r.peak]
-	return "Shooty McBridgeface\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.level, r.kills, r.peak]
+	var who := " as %s" % wardrobe.hero_name().capitalize() if character_mode else ""
+	return "Shooty McBridgeface%s\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [who, r.score, r.level, r.kills, r.peak]
 
 
 func open_shop() -> void:
@@ -301,6 +406,9 @@ func start_run(p_mode: String = "levels") -> void:
 	_slowmo_until = 0.0
 	squad.perks = perks
 	squad.squad_type = "rifle" if mode == "daily" else squad_type
+	_drop_preview()
+	squad.visible = true
+	_apply_looks()
 	world.perks = perks
 	world.perk_count = 0
 	world.endless = mode == "endless"
@@ -313,6 +421,7 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.show_hint(Progression.hint_for(1), 4.0)
 	_touches.clear()
+	_cling_touch.clear()
 	squad.clear_focus()
 	sfx.play("spawn")
 	sfx.set_music("tense" if mode == "endless" else "calm")
@@ -355,8 +464,12 @@ func end_run() -> void:
 			best_endless = score
 		is_best = records.new_best_endless if world.endless else records.new_best_score
 		shown_best = best_endless if world.endless else best
+	var stars_earned := Wardrobe.stars_for_run(bosses_killed, perfect_gates, gates_passed, world.endless)
+	if not smoke and stars_earned > 0:
+		wardrobe.stars += stars_earned
+		SaveData.save_wardrobe(wardrobe.to_dict())
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode)
+	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "")
 	sfx.play("wipe")
 	_shake = 1.0
 
@@ -397,6 +510,8 @@ func _notification(what: int) -> void:
 # --- frame -----------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if _preview != null:
+		_preview.rotation.y = _preview_yaw + sin(Time.get_ticks_msec() * 0.0012) * 0.6
 	_frames += 1
 	match state:
 		State.RUNNING:
@@ -429,6 +544,16 @@ func _tick_run(delta: float) -> void:
 	_run_time += delta
 	squad.now = _run_time
 	world.now = _run_time
+	# A held touch follows its clinger; once it dies, the hold is over.
+	for idx in _cling_touch.keys():
+		var z: Zombie = _cling_touch[idx]
+		if is_instance_valid(z) and z.alive and z.latched:
+			squad.set_focus(z.position)
+		else:
+			_cling_touch.erase(idx)
+			_touches.erase(idx)
+			if _cling_touch.is_empty() and not _touches.values().has("focus"):
+				squad.clear_focus()
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
 	score = int(total_distance) + bonus
@@ -466,16 +591,26 @@ func _unhandled_input(event: InputEvent) -> void:
 			_try_retry()
 			if state == State.RUNNING:
 				var zone := "focus" if event.position.y < get_viewport().get_visible_rect().size.y * FOCUS_ZONE else "steer"
+				# A touch on a clinger aims at it wherever it is, and sticks.
+				var px := Progression.CLING_TAP_PX * get_viewport().get_visible_rect().size.x / 720.0
+				var cling: Zombie = world.latched_near_screen(camera, event.position, px)
+				if cling != null:
+					zone = "cling"
+					_cling_touch[event.index] = cling
+					squad.set_focus(cling.position)
 				_touches[event.index] = zone
 				if zone == "focus":
 					squad.set_focus(_road_point(event.position))
 		else:
-			if _touches.get(event.index, "") == "focus":
+			if _touches.get(event.index, "") in ["focus", "cling"]:
 				squad.clear_focus()
 			_touches.erase(event.index)
+			_cling_touch.erase(event.index)
 	elif event is InputEventScreenDrag and state == State.RUNNING:
 		var zone: String = _touches.get(event.index, "steer")
-		if zone == "focus":
+		if zone == "cling":
+			pass
+		elif zone == "focus":
 			squad.set_focus(_road_point(event.position))
 		else:
 			# A hard flick is a dash; anything gentler steers.
@@ -764,7 +899,7 @@ func _on_dodged() -> void:
 
 func _on_latched(zombie: Zombie) -> void:
 	sfx.play("bite", -8.0, 1.4)
-	hud.show_float("CLINGING! HOLD ON IT", false)
+	hud.show_float("CLINGER! TAP IT OR DASH", false)
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.9, 0.0), Zombie.LATCHER_SKIN, 6, 0.1, 3.0, 0.3)
 	_shake = minf(1.0, _shake + 0.3)
 
@@ -925,7 +1060,22 @@ func _shots_walkthrough() -> void:
 	await _capture("2_shop.png", 5)
 	open_daily()
 	await _capture("2b_daily.png", 5)
-	show_title()
+	open_settings()
+	await _capture("2c_settings.png", 5)
+	character_mode = true
+	hud.set_characters(true)
+	wardrobe.stars = 12
+	wardrobe.tap("luna")
+	wardrobe.tap("sunny")
+	wardrobe.tap("cat")
+	wardrobe.tap("cape_red")
+	_apply_looks()
+	open_locker()
+	await _capture("2d_locker.png", 30)
+	_on_locker_tab("hat")
+	await _capture("2e_locker_hats.png", 5)
+	close_locker()
+	await _capture("2f_title_hero.png", 20)
 	smoke = true
 	start_run("levels")
 	await _capture("3_play_early.png", 240)

@@ -21,11 +21,19 @@ signal music_toggled(on: bool)
 signal formation_pressed
 signal bomb_pressed
 signal quit_pressed
+signal settings_opened
+signal settings_closed
+signal characters_toggled(on: bool)
+signal locker_opened
+signal locker_closed
+signal locker_tab(cat: String)
+signal item_pressed(id: String)
 
 const OUTLINE := Color(0.05, 0.05, 0.08)
 const GAIN := Color(0.45, 0.9, 1.0)
 const LOSS := Color(1.0, 0.4, 0.4)
 const COIN := Color(1.0, 0.85, 0.3)
+const STAR := Color(1.0, 0.95, 0.5)
 const BOSS_BAR := Color(0.95, 0.25, 0.3)
 const BOSS_BAR_BG := Color(0.1, 0.1, 0.12, 0.8)
 ## Gate result text starts a little above centre so it never covers the squad.
@@ -45,6 +53,21 @@ var _records: Label
 var _coins_title: Label
 var _endless_button: Button
 var _squad_button: Button
+var _locker_button: Button
+var _stars_title: Label
+
+var _settings_card: Control
+var _settings_sound: Button
+var _settings_music: Button
+var _settings_characters: Button
+var _pause_characters: Button
+
+var _locker_card: Control
+var _locker_stars: Label
+var _locker_tabs: Dictionary = {}
+var _locker_grid: GridContainer
+var _locker_line: Label
+var _locker_tab := "hero"
 
 var _shop_card: Control
 var _daily_card: Control
@@ -248,6 +271,8 @@ func _init() -> void:
 	_fork_box.add_child(_fork_right)
 
 	_build_title(root)
+	_build_settings(root)
+	_build_locker(root)
 	_build_shop(root)
 	_build_daily(root)
 	_build_combo(root)
@@ -275,12 +300,95 @@ func _build_title(root: Control) -> void:
 	_squad_button = _button("SQUAD: RIFLES", 30)
 	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
 	box.add_child(_squad_button)
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
 	var shop := _button("SHOP", 36)
+	shop.custom_minimum_size.x = 200.0
 	shop.pressed.connect(func() -> void: shop_opened.emit())
-	box.add_child(shop)
+	row.add_child(shop)
+	_locker_button = _button("LOCKER", 36)
+	_locker_button.custom_minimum_size.x = 200.0
+	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
+	row.add_child(_locker_button)
+	var settings := _button("SETTINGS", 30)
+	settings.pressed.connect(func() -> void: settings_opened.emit())
+	box.add_child(settings)
 	_coins_title = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
 	_coins_title.add_theme_color_override("font_color", COIN)
 	box.add_child(_coins_title)
+	_stars_title = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	_stars_title.add_theme_color_override("font_color", STAR)
+	box.add_child(_stars_title)
+
+
+func _build_settings(root: Control) -> void:
+	_settings_card = _card(root)
+	_settings_card.visible = false
+	var box: VBoxContainer = _settings_card.get_meta("box")
+	var head := _label(48, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = "SETTINGS"
+	box.add_child(head)
+	_settings_sound = _button("SOUND: ON", 34)
+	_settings_sound.pressed.connect(_on_sound_pressed)
+	box.add_child(_settings_sound)
+	_settings_music = _button("MUSIC: ON", 34)
+	_settings_music.pressed.connect(_on_music_pressed)
+	box.add_child(_settings_music)
+	_settings_characters = _button("CHARACTERS: OFF", 34)
+	_settings_characters.pressed.connect(_on_characters_pressed)
+	box.add_child(_settings_characters)
+	var blurb := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	blurb.text = "Characters on: pick a hero, outfits, hats,\nweapons and more in the LOCKER. Stars pay for them."
+	blurb.modulate = Color(0.85, 0.85, 0.9)
+	box.add_child(blurb)
+	var back := _button("BACK", 34)
+	back.pressed.connect(func() -> void: settings_closed.emit())
+	box.add_child(back)
+
+
+func _build_locker(root: Control) -> void:
+	_locker_card = _card(root)
+	_locker_card.visible = false
+	# A lighter shade than the other cards: the hero preview stands behind it.
+	var shade: ColorRect = _locker_card.get_child(0)
+	shade.color = Color(0.0, 0.0, 0.0, 0.3)
+	var center: CenterContainer = _locker_card.get_child(1)
+	center.anchor_top = 0.3
+	var box: VBoxContainer = _locker_card.get_meta("box")
+	box.add_theme_constant_override("separation", 10)
+	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = "LOCKER"
+	box.add_child(head)
+	_locker_stars = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
+	_locker_stars.add_theme_color_override("font_color", STAR)
+	box.add_child(_locker_stars)
+	var tabs := HBoxContainer.new()
+	tabs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	tabs.add_theme_constant_override("separation", 6)
+	box.add_child(tabs)
+	for cat in Wardrobe.CATEGORIES:
+		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 20)
+		b.custom_minimum_size = Vector2(126.0, 48.0)
+		b.toggle_mode = true
+		b.pressed.connect(func() -> void: locker_tab.emit(cat))
+		tabs.add_child(b)
+		_locker_tabs[cat] = b
+	_locker_grid = GridContainer.new()
+	_locker_grid.columns = 3
+	_locker_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locker_grid.add_theme_constant_override("h_separation", 8)
+	_locker_grid.add_theme_constant_override("v_separation", 8)
+	box.add_child(_locker_grid)
+	_locker_line = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_locker_line.modulate = Color(0.9, 0.9, 0.95)
+	box.add_child(_locker_line)
+	var back := _button("BACK", 34)
+	back.pressed.connect(func() -> void: locker_closed.emit())
+	box.add_child(back)
 
 
 func _build_shop(root: Control) -> void:
@@ -415,6 +523,9 @@ func _build_pause(root: Control) -> void:
 	_music_button = _button("MUSIC: ON", 34)
 	_music_button.pressed.connect(_on_music_pressed)
 	box.add_child(_music_button)
+	_pause_characters = _button("CHARACTERS: OFF", 34)
+	_pause_characters.pressed.connect(_on_characters_pressed)
+	box.add_child(_pause_characters)
 	var quit := _button("QUIT TO TITLE", 34)
 	quit.pressed.connect(func() -> void: quit_pressed.emit())
 	box.add_child(quit)
@@ -432,10 +543,19 @@ func update_stats(count: int, level: int, distance: float, score: int) -> void:
 
 func set_sound(on: bool) -> void:
 	_sound_button.text = "SOUND: ON" if on else "SOUND: OFF"
+	_settings_sound.text = _sound_button.text
 
 
 func set_music(on: bool) -> void:
 	_music_button.text = "MUSIC: ON" if on else "MUSIC: OFF"
+	_settings_music.text = _music_button.text
+
+
+func set_characters(on: bool) -> void:
+	_pause_characters.text = "CHARACTERS: ON" if on else "CHARACTERS: OFF"
+	_settings_characters.text = _pause_characters.text
+	_locker_button.visible = on
+	_stars_title.visible = on
 
 
 func set_formation(name: String) -> void:
@@ -503,9 +623,11 @@ func _hide_cards() -> void:
 	_daily_card.visible = false
 	_over_card.visible = false
 	_pause_card.visible = false
+	_settings_card.visible = false
+	_locker_card.visible = false
 
 
-func show_title(best: int, best_level: int, best_endless: int, coins: int, endless_unlocked: bool, squad_type: String, shotgun_unlocked: bool) -> void:
+func show_title(best: int, best_level: int, best_endless: int, coins: int, endless_unlocked: bool, squad_type: String, shotgun_unlocked: bool, stars: int = 0, hero_name: String = "") -> void:
 	_hide_cards()
 	_title_card.visible = true
 	_pause_button.visible = false
@@ -523,6 +645,47 @@ func show_title(best: int, best_level: int, best_endless: int, coins: int, endle
 	_squad_button.visible = shotgun_unlocked
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
 	_coins_title.text = "%d COINS" % coins
+	_stars_title.text = "%d STARS   ·   %s" % [stars, hero_name] if hero_name != "" else "%d STARS" % stars
+
+
+func show_settings() -> void:
+	_hide_cards()
+	_settings_card.visible = true
+
+
+## The locker: one tab of items. Owned items say so, the equipped one is
+## pressed in, and anything you cannot afford is greyed.
+func show_locker(w: Wardrobe, tab: String) -> void:
+	_hide_cards()
+	_locker_card.visible = true
+	_locker_tab = tab
+	_locker_stars.text = "%d STARS" % w.stars
+	for cat in _locker_tabs.keys():
+		var b: Button = _locker_tabs[cat]
+		b.button_pressed = cat == tab
+	for child in _locker_grid.get_children():
+		_locker_grid.remove_child(child)
+		child.queue_free()
+	for id in Wardrobe.items_in(tab):
+		var b := _button("", 20)
+		b.custom_minimum_size = Vector2(196.0, 74.0)
+		var state := ""
+		if w.is_equipped(id):
+			state = "WEARING"
+		elif w.is_owned(id):
+			state = "OWNED"
+		else:
+			state = "%d STARS" % Wardrobe.cost(id) if Wardrobe.cost(id) != 1 else "1 STAR"
+			b.disabled = not w.can_buy(id)
+		b.text = "%s\n%s" % [Wardrobe.title(id), state]
+		b.toggle_mode = true
+		b.button_pressed = w.is_equipped(id)
+		b.pressed.connect(func() -> void: item_pressed.emit(id))
+		_locker_grid.add_child(b)
+	if tab == "hero":
+		_locker_line.text = "%s: %s" % [w.hero_name(), Wardrobe.hero_line(w.equipped.get("hero", "max"))]
+	else:
+		_locker_line.text = "Stars come from bosses, perfect gates and finishing runs."
 
 
 ## [param results] maps day number to {score, level, kills, peak}.
@@ -578,12 +741,13 @@ func show_running() -> void:
 		_prompt_tween.kill()
 
 
-func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String) -> void:
+func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "") -> void:
 	_hide_cards()
 	_over_card.visible = true
 	_pause_button.visible = false
 	_boss_box.visible = false
-	_over_title.text = "WIPED OUT"
+	# With characters on, the hero always gets out. Kids keep their people.
+	_over_title.text = "%s ESCAPED" % hero_name if hero_name != "" else "WIPED OUT"
 	var head := "NEW BEST!  %d" % score if is_best else "Score %d   (best %d)" % [score, best]
 	var where := "Level %d   %d m" % [level, distance]
 	if mode == "endless":
@@ -591,6 +755,8 @@ func show_game_over(score: int, best: int, is_best: bool, level: int, distance: 
 	elif mode == "daily":
 		where = "Daily   level %d   %d m" % [level, distance]
 	var coins_line := "no coins in the daily" if mode == "daily" else "+%d coins" % coins_earned
+	if stars_earned > 0:
+		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
 	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	_over_prompt.text = "TAP TO RETRY"
 	_pulse_prompt()
@@ -683,6 +849,12 @@ func _on_sound_pressed() -> void:
 	var on := not _sound_button.text.ends_with("ON")
 	set_sound(on)
 	sound_toggled.emit(on)
+
+
+func _on_characters_pressed() -> void:
+	var on := not _pause_characters.text.ends_with("ON")
+	set_characters(on)
+	characters_toggled.emit(on)
 
 
 func _on_music_pressed() -> void:

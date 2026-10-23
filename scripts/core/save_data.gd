@@ -64,6 +64,23 @@ static func save_squad_type(type: String) -> void:
 	_write(SETTINGS, "squad_type", type)
 
 
+static func load_character_mode() -> bool:
+	return bool(_read(SETTINGS, "character_mode", false))
+
+
+static func save_character_mode(on: bool) -> void:
+	_write(SETTINGS, "character_mode", on)
+
+
+static func load_wardrobe() -> Dictionary:
+	var v = _read(META, "wardrobe", {})
+	return v if v is Dictionary else {}
+
+
+static func save_wardrobe(d: Dictionary) -> void:
+	_write(META, "wardrobe", d)
+
+
 static func load_coins() -> int:
 	return int(_read(META, "coins", 0))
 

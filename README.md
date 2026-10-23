@@ -41,10 +41,16 @@ the same key (see below).
 - **Lanes.** The road starts at two lanes and widens to five as you go,
   one panel per lane. More lanes means more to read: one of the extras is
   worth weighing and the rest are traps.
-- **Clingers.** Any walker or runner that reaches you clings to the
-  squad's flank and keeps eating until you hold focus fire on it, or dash
-  to shake a couple off. Up to six can cling at once. Brutes and tanks
-  still take a slice and go.
+- **Characters.** Settings has a CHARACTERS switch. On, the title gets a
+  LOCKER: pick a hero (each has a face and a name), an outfit, a hat, a
+  weapon skin and something for their back. Stars pay for them: one per
+  boss, one per four perfect gates, one for finishing a few gates. The
+  hero leads the squad with a name tag, and always escapes.
+- **Clingers.** From level 2, any walker or runner that reaches you
+  clings to the squad's flank and keeps eating until you tap it (a touch
+  on a clinger aims at it, wherever it is on the screen) or dash to shake
+  a couple off. Up to six can cling at once. Brutes and tanks still take
+  a slice and go.
 - **Aim matters.** Unfocused fire sprays in a cone, so anything at range
   gets hit by luck. Held focus converges every round on the spot and hits
   harder.

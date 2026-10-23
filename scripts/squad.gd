@@ -60,6 +60,10 @@ var _dash_tween: Tween
 var _laser: MeshInstance3D
 
 var _soldiers: Array[Soldier] = []
+## What the squad wears. The hero look dresses the front soldier; the
+## crew look dresses everyone else. Empty means the classic military kit.
+var hero_look: Dictionary = {}
+var crew_look: Dictionary = {}
 var _fire_accum := 0.0
 var _fire_index := 0
 var _revive_timer := 0.0
@@ -325,10 +329,22 @@ func damage_per_shot() -> float:
 	return dps() / shots_per_second()
 
 
+## Dress the squad: [param p_hero] leads, [param p_crew] is everyone else.
+## Rebuilds the visible soldiers so a change in the locker shows at once.
+func set_looks(p_hero: Dictionary, p_crew: Dictionary) -> void:
+	hero_look = p_hero
+	crew_look = p_crew
+	for s in _soldiers:
+		s.queue_free()
+	_soldiers.clear()
+	_sync_visuals()
+
+
 func _sync_visuals() -> void:
 	var want := mini(count, MAX_VISUAL)
 	while _soldiers.size() < want:
-		var s := Soldier.new(_soldiers.size() < DETAILED, squad_type)
+		var i := _soldiers.size()
+		var s := Soldier.new(i < DETAILED, squad_type, hero_look if (i == 0 and not hero_look.is_empty()) else crew_look)
 		add_child(s)
 		_soldiers.append(s)
 	while _soldiers.size() > want:

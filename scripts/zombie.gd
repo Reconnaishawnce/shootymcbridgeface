@@ -52,6 +52,7 @@ var latch_timer := 0.0
 
 var _body: Node3D
 var _bar: MeshInstance3D
+var _cling_ring: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _arms: Array[Node3D] = []
 var _hit_t := 0.0
@@ -210,6 +211,16 @@ func _build() -> void:
 
 
 ## Returns true when this hit killed the zombie.
+## Start clinging: flagged for the world, and a pulsing red ring on the
+## ground that says "tap me".
+func mark_latched() -> void:
+	latched = true
+	if _cling_ring == null:
+		_cling_ring = Mats.torus(0.42, 0.6, Color(1.0, 0.3, 0.25, 0.9), true)
+		_cling_ring.position.y = 0.04
+		add_child(_cling_ring)
+
+
 func take_damage(amount: float) -> bool:
 	if not alive:
 		return false
@@ -253,6 +264,9 @@ func _process(delta: float) -> void:
 		_legs[i].rotation.x = sin(t + PI * i) * 0.45
 	for i in range(_arms.size()):
 		_arms[i].rotation_degrees.x = -80.0 + sin(t * 0.7 + i) * 10.0
+	if _cling_ring != null:
+		_cling_ring.scale = Vector3.ONE * (1.0 + 0.18 * sin(t * 1.2))
+		_cling_ring.rotation.y = t * 0.3
 	if _hit_t > 0.0:
 		_hit_t = maxf(0.0, _hit_t - delta * 8.0)
 		_body.scale = Vector3.ONE * _base_scale * (1.0 + 0.18 * _hit_t)

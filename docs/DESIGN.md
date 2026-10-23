@@ -185,6 +185,22 @@ other way, and your aim as a resource you have to spend wisely.
   regulators (multipliers vanish past 150 soldiers, halving gates, brute
   health scaling) keep it from exploding.
 
+## Character mode
+
+Off by default: the squad wears the classic military kit. On (Settings,
+title or pause), the title gains a LOCKER. `Wardrobe` (pure, tested) holds
+the catalog: heroes (a face, hair and one line each), outfits, hats,
+weapon skins and backs, a star wallet, what is owned and what is worn.
+Stars come from runs: one per boss, one per four perfect gates, one for
+getting through three gates, endless pays one per eight gates. The
+auto-player never earns or spends.
+
+The hero is the front soldier, dressed from `Wardrobe.look()` with a name
+tag; the rest wear `crew_look()`: the same outfit, hat, weapon and back
+with their own random faces. The locker shows a big preview in front of
+the camera above the card. On a wipe the hero "escaped": nobody dies in
+character mode, which is the point for a younger player.
+
 ## Balance notes
 
 The built-in auto-player (`++ --smoke`, add `--endless` for that mode)

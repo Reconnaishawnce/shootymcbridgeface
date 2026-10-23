@@ -7,8 +7,10 @@ extends RefCounted
 const DASH_LEVEL := 2
 const HOT_LEVEL := 3
 ## Sturdy purple latchers join the waves from here; ordinary walkers and
-## runners that reach the squad latch on from level 1.
+## runners that reach the squad cling on from CLING_LEVEL, the same level
+## the dash arrives, so there is always a way to shake them.
 const LATCHER_LEVEL := 3
+const CLING_LEVEL := 2
 const HIDDEN_LEVEL := 2
 const DILEMMA_LEVEL := 2
 
@@ -44,8 +46,8 @@ static func road_half(lanes: int) -> float:
 
 
 const LEVEL_HINTS := {
-	1: "DRAG LOW TO STEER. HOLD THE ROAD TO AIM.\nZOMBIES THAT REACH YOU CLING ON: HOLD ON THEM",
-	2: "FLICK LOW TO DASH. TEAL GATES ARE SUMS:\n+3 x2 IS NOT x2 +3. WORK IT OUT, LEFT TO RIGHT",
+	1: "DRAG LOW TO STEER. HOLD THE ROAD TO AIM.\nBLUE GATES ADD SOLDIERS, RED ONES TAKE THEM",
+	2: "CLINGERS: TAP ONE TO SHOOT, FLICK LOW TO DASH\nTEAL GATES ARE SUMS, WORKED LEFT TO RIGHT",
 	3: "PANELS FLASH: HIT THEM THEN FOR x3\nPURPLE LATCHERS ARE TOUGHER: AIM EARLY",
 	4: "RED ON BOTH SIDES NOW\nPICK THE ONE YOU CAN SHOOT UP",
 	5: "THREE-TERM SUMS FROM HERE\nTHE ROAD KEEPS WIDENING",
@@ -59,7 +61,12 @@ const FOCUS_DAMAGE_MULT := 1.5
 ## Holding focus on a clinging zombie pours this fraction of squad DPS into
 ## it per second, since bullets cannot reach your own flank.
 const FOCUS_LATCH_DPS_FRACTION := 0.7
-const FOCUS_LATCH_RADIUS := 1.4
+const FOCUS_LATCH_RADIUS := 1.8
+## A touch that lands within this many pixels (at 720 wide) of a clinging
+## zombie aims at it, wherever on the screen it is. Clingers ride beside
+## the squad, deep in the steering zone, so the usual aim zone cannot
+## reach them.
+const CLING_TAP_PX := 110.0
 ## How many zombies can cling at once; the rest bite once and are spent.
 const MAX_LATCHED := 6
 ## A dash throws off this many clingers.
@@ -68,6 +75,10 @@ const DASH_SHAKES_OFF := 2
 
 static func dash_enabled(level: int) -> bool:
 	return level >= DASH_LEVEL
+
+
+static func clinging(level: int) -> bool:
+	return level >= CLING_LEVEL
 
 
 static func hot_panels(level: int) -> bool:

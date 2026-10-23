@@ -151,6 +151,21 @@ bosses were too easy.
   and perk gates share the width.
 - Extra lanes add reading, not free soldiers: one rival, the rest traps.
 
+## Run 10.1: characters, pass 1 (done)
+
+- Clingers can be tapped wherever they ride, and start with the dash.
+- Settings with a CHARACTERS switch; the LOCKER with heroes, outfits,
+  hats, weapon skins and backs paid in stars. The hero leads with a name
+  tag and always escapes.
+- Soldier model rebuilt with faces, hair, boots and dress-up slots.
+
+## Run 10.2: characters, pass 2
+
+- The hero cheers on level clear and idles on the title.
+- Crew skins (match, rainbow, shadow) and a few more hats and backs.
+- "You can afford something" nudge after a run; a star for the daily.
+- Share text and the wipe screen lean on the hero.
+
 ## Run 11: difficulty modifiers and grades
 
 - Hard and Nightmare modifiers with score and coin multipliers.

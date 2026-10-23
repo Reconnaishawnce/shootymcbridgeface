@@ -3,6 +3,31 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.11 (run 10.1)
+
+Characters, pass 1: people worth keeping alive. And clingers you can
+actually fight.
+
+- Fixed: zombies clinging to the squad's flanks could not be shot. They
+  ride beside the squad, deep in the steering zone, so "hold on it"
+  never reached them. Now a touch anywhere within reach of a clinger aims
+  at it and sticks until it dies. Clingers wear a pulsing red ring.
+  Clinging starts on level 2 alongside the dash, so there is always a way
+  to shake one.
+- Settings (title screen and pause) with a CHARACTERS switch. On, the
+  title gets a LOCKER: eight heroes with names and faces, eight outfits,
+  eleven hats, six weapon skins, six backs (capes, wings, a jetpack).
+  Items cost stars; stars come from bosses, perfect gates and finishing
+  runs. The hero leads the squad with a name tag; the crew wear the same
+  outfit, hat, weapon and back with their own faces. The hero always
+  escapes: the wipe screen says who got out.
+- Soldiers rebuilt: boots, belts, eyes, hair, chest plate, recoil. The
+  classic kit is unchanged in spirit (helmet, visor, pack) with better
+  bones under it.
+- Level 1 hint teaches gates; level 2 teaches clingers and sums.
+- Balance, bot with no upgrades, eight seeds: wiped on levels 2, 4, 4,
+  5, 5, 7, 8, 9 (median 5).
+
 ## 0.10 (run 10)
 
 Sums you have to work out, and a road that widens to five lanes.

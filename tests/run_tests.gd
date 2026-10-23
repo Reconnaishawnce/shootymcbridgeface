@@ -13,6 +13,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_meta.gd",
 	"res://tests/test_daily.gd",
 	"res://tests/test_gate_math_extra.gd",
+	"res://tests/test_wardrobe.gd",
 	"res://tests/test_combo.gd",
 	"res://tests/test_powerups.gd",
 	"res://tests/test_progression.gd",

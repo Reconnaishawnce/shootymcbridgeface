@@ -71,7 +71,7 @@ static func sphere(radius: float, color: Color) -> MeshInstance3D:
 	return mi
 
 
-static func cone(radius: float, height: float, color: Color) -> MeshInstance3D:
+static func cone(radius: float, height: float, color: Color, unshaded: bool = false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = 0.0
@@ -80,7 +80,7 @@ static func cone(radius: float, height: float, color: Color) -> MeshInstance3D:
 	mesh.radial_segments = 8
 	mesh.rings = 1
 	mi.mesh = mesh
-	mi.material_override = flat(color)
+	mi.material_override = flat(color, unshaded)
 	return mi
 
 

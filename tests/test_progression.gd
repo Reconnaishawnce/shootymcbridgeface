@@ -33,4 +33,6 @@ func test_latch_and_spray_constants() -> void:
 	check(Progression.SPRAY > 0.0, "spray exists")
 	check(Progression.FOCUS_DAMAGE_MULT > 1.0, "focus hits harder")
 	check(Progression.MAX_LATCHED >= 3 and Progression.DASH_SHAKES_OFF < Progression.MAX_LATCHED, "dash does not clear a full flank")
-	check(Progression.hint_for(1).contains("CLING"), "level 1 teaches clingers")
+	check(Progression.hint_for(Progression.CLING_LEVEL).contains("CLING"), "the cling level teaches clingers")
+	check(Progression.CLING_LEVEL >= Progression.DASH_LEVEL, "clingers never arrive before the dash that shakes them")
+	check(not Progression.clinging(1) and Progression.clinging(Progression.CLING_LEVEL), "cling gate")

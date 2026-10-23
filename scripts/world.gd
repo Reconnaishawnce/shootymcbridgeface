@@ -277,6 +277,24 @@ func _focus_on_latched(delta: float, p_squad: Squad) -> void:
 		break
 
 
+## The clinging zombie whose on-screen position is within [param max_px]
+## of [param screen], or null. Lets a tap land on a clinger wherever it is.
+func latched_near_screen(cam: Camera3D, screen: Vector2, max_px: float) -> Zombie:
+	var best: Zombie = null
+	var best_d := max_px
+	for z in _latched:
+		if not z.alive:
+			continue
+		var at := z.global_position + Vector3(0.0, 0.8, 0.0)
+		if cam.is_position_behind(at):
+			continue
+		var d := cam.unproject_position(at).distance_to(screen)
+		if d < best_d:
+			best_d = d
+			best = z
+	return best
+
+
 ## A dash throws the first few clingers off the flanks.
 func shake_off() -> void:
 	var n := 0
@@ -713,10 +731,10 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 				z.consume()
 				dodged.emit()
 				continue
-			var can_cling: bool = not (z.brute or z.is_tank()) and not p_squad.is_shielded() and _latched.size() < Progression.MAX_LATCHED
+			var can_cling: bool = Progression.clinging(level) and not (z.brute or z.is_tank()) and not p_squad.is_shielded() and _latched.size() < Progression.MAX_LATCHED
 			if can_cling:
 				# Clings to a flank and rides along, eating, until shot off.
-				z.latched = true
+				z.mark_latched()
 				z.latch_timer = Difficulty.LATCH_INTERVAL
 				z.hp = maxf(z.hp, z.max_hp) * Difficulty.LATCH_HP_MULT
 				z.max_hp = z.hp

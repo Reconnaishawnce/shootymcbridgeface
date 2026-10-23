@@ -180,11 +180,18 @@ bosses were too easy.
 - Trade and bet gates in the extra lanes.
 - Flankers over the curbs on wide roads; the horde behind during bosses.
 
-## Run 12: what the phone says
+## Run 12: the weekly and scouts (done)
 
-- Phone feedback pass on modes, deals and the horde.
-- Scout sacrifice gate; a weekly challenge beside the daily.
-- Hero lines on the level banner; a locker preview that turns by touch.
+- Weekly challenge beside the daily: one seed per week, on hard.
+- Scout panels reveal the next three gates for a few soldiers.
+- Hero lines at run start and on level clear; locker preview turns by
+  touch.
+
+## Run 13: feedback and polish
+
+- Phone feedback pass on modes, deals, the horde and the weekly.
+- Achievements board with star rewards; a stats page.
+- Boss variety: a third boss kind.
 
 ## Always
 

@@ -7,7 +7,9 @@ extends RefCounted
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.
 
-enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET }
+enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET, SCOUT }
+## Gates a scout party reveals ahead.
+const SCOUT_GATES := 3
 
 ## Multiplier panels cannot be shot past this.
 const MUL_CAP := 5.0
@@ -61,6 +63,16 @@ static func trade(cost: int, id: String) -> GatePanel:
 	return p
 
 
+## Scouts: send [param cost] soldiers ahead and the next SCOUT_GATES gates
+## show every panel, hidden or not, as soon as they appear.
+static func scout(cost: int) -> GatePanel:
+	return GatePanel.new(Kind.SCOUT, float(-absi(cost)), false)
+
+
+static func is_scout(panel: GatePanel) -> bool:
+	return panel.kind == Kind.SCOUT
+
+
 ## A bet: walk through and clear the next wave without a bite to double the
 ## squad; take a bite and it halves. The world resolves it.
 static func bet() -> GatePanel:
@@ -111,7 +123,7 @@ static func apply(count: int, panel: GatePanel) -> int:
 			for op in panel.ops:
 				c = _apply_op(c, int(op[0]), float(op[1]))
 			return c
-		Kind.TRADE:
+		Kind.TRADE, Kind.SCOUT:
 			return maxi(0, count + int(round(panel.value)))
 	return count
 
@@ -148,7 +160,7 @@ static func is_bet(panel: GatePanel) -> bool:
 
 ## Panels that carry a deal rather than a number: coloured amber.
 static func is_deal(panel: GatePanel) -> bool:
-	return is_trade(panel) or is_bet(panel)
+	return is_trade(panel) or is_bet(panel) or is_scout(panel)
 
 
 static func is_expr(panel: GatePanel) -> bool:
@@ -180,6 +192,8 @@ static func label(panel: GatePanel) -> String:
 			return "%s %d" % [Powerups.title(panel.power), int(round(panel.value))]
 		Kind.BET:
 			return "BET x2"
+		Kind.SCOUT:
+			return "SCOUT %d" % int(round(panel.value))
 	return "?"
 
 
@@ -210,9 +224,9 @@ static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> i
 		panel.shot_progress -= cost
 		steps += 1
 		match panel.kind:
-			Kind.ADD, Kind.TRADE:
-				# A trade shot up gets cheaper, never below free.
-				panel.value = minf(panel.value + 1.0, 0.0) if panel.kind == Kind.TRADE else panel.value + 1.0
+			Kind.ADD, Kind.TRADE, Kind.SCOUT:
+				# A deal shot up gets cheaper, never below free.
+				panel.value = minf(panel.value + 1.0, 0.0) if panel.kind != Kind.ADD else panel.value + 1.0
 			Kind.MUL:
 				panel.value = minf(panel.value + MUL_STEP, MUL_CAP)
 			Kind.EXPR:
@@ -232,7 +246,7 @@ static func steal(panel: GatePanel) -> void:
 		Kind.EXPR:
 			var i := _first_add(panel)
 			panel.ops[i][1] = float(panel.ops[i][1]) - STEAL_AMOUNT
-		Kind.ADD, Kind.TRADE:
+		Kind.ADD, Kind.TRADE, Kind.SCOUT:
 			panel.value -= STEAL_AMOUNT
 		Kind.MUL:
 			panel.value = maxf(1.0, panel.value - MUL_STEP)

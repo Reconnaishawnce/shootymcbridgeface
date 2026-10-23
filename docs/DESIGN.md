@@ -204,6 +204,15 @@ weighs it by the cost alone. A bet changes nothing at the gate and is
 resolved by the wave that follows: cleared with no bite doubles the
 squad, a bite or a leak halves it.
 
+A scout panel costs a few soldiers and reveals the next three gates
+(those already on the road and those still to spawn) as soon as they
+exist. It appears from level 2, when hidden panels start, on three lanes
+or more, and like the other deals it gets cheaper when shot.
+
+The weekly is the daily's bigger sibling: one seed per UTC week, played
+on hard with no upgrades and rifles, its own results and share line, two
+extra stars for a scoring run.
+
 Flankers are runners spawned just outside the curbs beside the squad as a
 gate passes, from level 4 on four-lane roads. The horde is a wall behind
 the squad that creeps up while the road is stopped for a boss (0.65 m/s,

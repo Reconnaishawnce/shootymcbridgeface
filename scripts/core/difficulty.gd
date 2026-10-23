@@ -440,6 +440,9 @@ const EXPR_CHANCE := [0.0, 0.35, 0.4, 0.45]
 const TRADE_LEVEL := 3
 const BET_LEVEL := 4
 const TRADE_CHANCE := 0.14
+## Scouts: cheap, from the first level with hidden panels, three lanes up.
+const SCOUT_LEVEL := 2
+const SCOUT_CHANCE := 0.12
 const BET_CHANCE := 0.1
 const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
 ## Flankers come over the curbs on wide roads from this level.
@@ -520,6 +523,9 @@ func make_gate(level: int, index: int, count: int, lanes: int) -> Array:
 		elif not deal_done and i > 0 and level >= BET_LEVEL and rng.randf() < BET_CHANCE:
 			deal_done = true
 			panels.append(GateMath.bet())
+		elif not deal_done and level >= SCOUT_LEVEL and rng.randf() < SCOUT_CHANCE:
+			deal_done = true
+			panels.append(GateMath.scout(maxi(2, int(float(count) * rng.randf_range(0.06, 0.12)))))
 		elif not deal_done and i > 0 and level >= TRADE_LEVEL and rng.randf() < TRADE_CHANCE:
 			deal_done = true
 			var cost := maxi(3, int(float(count) * rng.randf_range(0.15, 0.3)))

@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.15 (run 12)
+
+The weekly, scouts, and a hero with something to say.
+
+- WEEKLY on the daily card: one road for everyone all week, on hard, no
+  upgrades, rifles. Best of the week counts, pays two extra stars, and
+  copies as its own share line.
+- Scout panels, amber, from level 2 on three lanes or more: pay a few
+  soldiers and the next three gates show every panel the moment they
+  appear, hidden ones included. Shooting a scout panel makes it cheaper.
+- In character mode the hero says their line as a run starts and shouts
+  something fitting on each level clear, by grade.
+- The locker preview turns when you drag it.
+- Auto-player takes `--weekly`.
+
 ## 0.14 (run 11)
 
 Modes, grades, deals, flankers and the horde.

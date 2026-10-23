@@ -27,6 +27,8 @@ signal lanes_changed(lanes: int)
 ## A bet placed at a gate came due: doubled (won) or halved.
 signal bet_resolved(won: bool, before: int, after: int)
 signal bet_placed
+## Scouts went ahead: the next few gates are open books.
+signal scouts_sent(gates: int)
 ## The boss fight proper has started: the road slows, the clock runs.
 signal boss_engaged
 ## The horde behind caught up and ate.
@@ -51,6 +53,8 @@ var lanes := 2
 var modifier := "normal"
 ## Bet bookkeeping: the wave the bet rides on, and whether it was bitten.
 var _bet_wave := -1
+## Gates still to be revealed by a scout party.
+var _scout_left := 0
 var _bet_bitten := false
 ## The horde behind the squad: creeps up while the road is stopped.
 var horde_z := HORDE_REST_Z
@@ -150,6 +154,7 @@ func reset(seed_value: int) -> void:
 	_gates_passed = 0
 	_bet_wave = -1
 	_bet_bitten = false
+	_scout_left = 0
 	horde_z = HORDE_REST_Z
 	_place_horde()
 	set_lanes(2, false)
@@ -536,6 +541,9 @@ func _spawn() -> void:
 			var g := Gate.new()
 			g.setup(gen.make_gate(_gate_level(_next_gate), _gate_index(_next_gate), count, lanes), Progression.LANE_W)
 			g.index = _gate_index(_next_gate)
+			if _scout_left > 0:
+				g.reveal_all()
+				_scout_left -= 1
 			g.hot_enabled = Progression.hot_panels(level)
 			g.hot_phase = gen.rng.randf_range(0.0, Progression.HOT_PERIOD)
 			g.position = Vector3(0.0, 0.0, z)
@@ -745,6 +753,13 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 					powerup_granted.emit(Powerups.resolve(panel.power, gen.rng), false)
 				elif GateMath.is_trade(panel):
 					powerup_granted.emit(panel.power, false)
+				elif GateMath.is_scout(panel):
+					_scout_left = GateMath.SCOUT_GATES
+					for other in gates:
+						if not other.passed and other != g and _scout_left > 0:
+							other.reveal_all()
+							_scout_left -= 1
+					scouts_sent.emit(GateMath.SCOUT_GATES)
 				elif GateMath.is_bet(panel):
 					# Rides on the wave after this gate: the next wave id.
 					_bet_wave = _wave_seq + 1

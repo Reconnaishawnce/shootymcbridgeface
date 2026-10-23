@@ -153,6 +153,21 @@ func hero_name() -> String:
 	return title(equipped.get("hero", "max"))
 
 
+## What the hero shouts on a level clear, by grade.
+const CHEERS := {
+	"S": ["FLAWLESS!", "NOBODY DOES IT BETTER", "THAT'S HOW IT'S DONE"],
+	"A": ["NICE ONE!", "KEEP THAT UP", "THE SQUAD'S PROUD"],
+	"B": ["WE'LL TAKE IT", "ONWARD!", "NOT BAD, NOT BAD"],
+	"C": ["CLOSE ONE", "WE LIVE TO FIGHT", "PHEW"],
+	"D": ["STILL STANDING", "THAT HURT", "NEXT ONE'S OURS"],
+}
+
+
+static func cheer_line(hero: String, grade: String, pick: int) -> String:
+	var lines: Array = CHEERS.get(grade, CHEERS["B"])
+	return "%s: %s" % [hero, lines[absi(pick) % lines.size()]]
+
+
 ## Stars a run pays: one per boss, one per four perfect gates, one for
 ## getting through a few gates at all. Endless pays by distance in gates;
 ## the daily pays one extra for showing up.

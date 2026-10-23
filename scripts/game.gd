@@ -58,6 +58,10 @@ var _level_peak := 1
 var run_meta := Meta.new()
 var daily_day := 0
 var daily_results: Dictionary = {}
+var week_number := 0
+var weekly_results: Dictionary = {}
+## While a finger is dragging the locker preview round, the idle turn waits.
+var _preview_drag_until := 0.0
 var _last_result := {}
 ## Character mode: heroes, outfits, hats, weapons, backs, paid in stars.
 var wardrobe := Wardrobe.new()
@@ -78,6 +82,7 @@ var _frames := 0
 var _smoke_frames := SMOKE_FRAMES
 var _smoke_endless := false
 var _smoke_daily := false
+var _smoke_weekly := false
 var _shots_dir := ""
 var _since_game_over := 0.0
 var _shake := 0.0
@@ -101,6 +106,7 @@ func _ready() -> void:
 	smoke = args.has("--smoke")
 	_smoke_endless = args.has("--endless")
 	_smoke_daily = args.has("--daily")
+	_smoke_weekly = args.has("--weekly")
 	if args.has("--hard"):
 		modifier = "hard"
 	elif args.has("--nightmare"):
@@ -125,6 +131,8 @@ func _ready() -> void:
 		squad_type = "rifle"
 	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 	daily_results = Daily.prune(SaveData.load_daily(), daily_day)
+	week_number = Daily.week_number(int(Time.get_unix_time_from_system()))
+	weekly_results = Daily.prune_weeks(SaveData.load_weekly(), week_number)
 	wardrobe.from_dict(SaveData.load_wardrobe())
 	# The auto-player dresses up so the character code runs in CI too.
 	character_mode = SaveData.load_character_mode() or smoke
@@ -141,7 +149,7 @@ func _ready() -> void:
 	_apply_looks()
 	show_title()
 	if smoke:
-		start_run("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels"))
+		start_run("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels")))
 	elif _shots_dir != "":
 		_shots_walkthrough()
 
@@ -203,6 +211,9 @@ func _build_scene() -> void:
 	world.shaken_off.connect(_on_shaken_off)
 	world.lanes_changed.connect(_on_lanes_changed)
 	world.bet_placed.connect(_on_bet_placed)
+	world.scouts_sent.connect(func(n: int) -> void:
+		hud.show_banner("SCOUTS OUT\nNEXT %d GATES REVEALED" % n, 1.4)
+		sfx.play("powerup", -4.0, 1.4))
 	world.bet_resolved.connect(_on_bet_resolved)
 	world.horde_bit.connect(_on_horde_bit)
 	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
@@ -369,7 +380,9 @@ func open_daily() -> void:
 	sfx.play("click")
 	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 	daily_results = Daily.prune(daily_results, daily_day)
-	hud.show_daily(daily_day, daily_results)
+	week_number = Daily.week_number(int(Time.get_unix_time_from_system()))
+	weekly_results = Daily.prune_weeks(weekly_results, week_number)
+	hud.show_daily(daily_day, daily_results, week_number, weekly_results)
 
 
 ## Put the last result (or today's daily best) on the clipboard.
@@ -380,6 +393,9 @@ func copy_result() -> void:
 	elif daily_results.has(daily_day):
 		var r: Dictionary = daily_results[daily_day]
 		text = Daily.share_text(daily_day, int(r.score), int(r.level), int(r.kills), int(r.peak))
+	elif weekly_results.has(week_number):
+		var r: Dictionary = weekly_results[week_number]
+		text = Daily.week_share_text(week_number, int(r.score), int(r.level), int(r.kills), int(r.peak))
 	if text == "":
 		hud.toast("Nothing to copy yet")
 		return
@@ -392,6 +408,8 @@ func _result_text(r: Dictionary) -> String:
 	match r.mode:
 		"daily":
 			return Daily.share_text(daily_day, r.score, r.level, r.kills, r.peak)
+		"weekly":
+			return Daily.week_share_text(week_number, r.score, r.level, r.kills, r.peak)
 		"endless":
 			return "Shooty McBridgeface endless\nScore %d · %d m · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.distance, r.kills, r.peak]
 	var who := " as %s" % wardrobe.hero_name().capitalize() if character_mode else ""
@@ -429,10 +447,13 @@ func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
 	run_seed = _smoke_seed if smoke else randi()
 	# The daily: one seed for everyone, no upgrades, rifles.
-	run_meta = Meta.new() if mode == "daily" else meta
+	run_meta = Meta.new() if mode in ["daily", "weekly"] else meta
 	if mode == "daily":
 		daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 		run_seed = Daily.seed_for_day(daily_day)
+	elif mode == "weekly":
+		week_number = Daily.week_number(int(Time.get_unix_time_from_system()))
+		run_seed = Daily.seed_for_week(week_number)
 	squad.meta = run_meta
 	world.meta = run_meta
 	total_distance = 0.0
@@ -454,14 +475,14 @@ func start_run(p_mode: String = "levels") -> void:
 	Engine.time_scale = 1.0
 	_slowmo_until = 0.0
 	squad.perks = perks
-	squad.squad_type = "rifle" if mode == "daily" else squad_type
+	squad.squad_type = "rifle" if mode in ["daily", "weekly"] else squad_type
 	_drop_preview()
 	squad.visible = true
 	_apply_looks()
 	world.perks = perks
 	world.perk_count = 0
 	world.endless = mode == "endless"
-	world.modifier = "normal" if mode == "daily" else modifier
+	world.modifier = "normal" if mode == "daily" else (Daily.WEEKLY_MODIFIER if mode == "weekly" else modifier)
 	grades = []
 	_level_gates = 0
 	_level_perfect = 0
@@ -475,6 +496,8 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.show_hint(Progression.hint_for(1), 4.0)
+	if character_mode:
+		hud.toast("%s: %s" % [wardrobe.hero_name(), Wardrobe.hero_line(wardrobe.equipped.get("hero", "max"))])
 	_touches.clear()
 	_cling_touch.clear()
 	squad.clear_focus()
@@ -492,7 +515,7 @@ func end_run() -> void:
 	hud.set_danger(0.0)
 	sfx.set_music("")
 	_since_game_over = 0.0
-	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
@@ -506,6 +529,14 @@ func end_run() -> void:
 			is_best = out.new_best
 			SaveData.save_daily(daily_results)
 			SaveData.record_run(score, world.level, true)
+		shown_best = maxi(prev, score)
+	elif mode == "weekly":
+		var prev := int(weekly_results.get(week_number, {}).get("score", 0))
+		if not smoke:
+			var out := Daily.record(weekly_results, week_number, score, world.level, kills, peak_squad)
+			weekly_results = out.results
+			is_best = out.new_best
+			SaveData.save_weekly(weekly_results)
 		shown_best = maxi(prev, score)
 	else:
 		if not smoke:
@@ -522,6 +553,8 @@ func end_run() -> void:
 	var stars_earned := Wardrobe.stars_for_run(bosses_killed, perfect_gates, gates_passed, world.endless, mode == "daily")
 	if stars_earned > 0 and bosses_killed > 0:
 		stars_earned += int(world.mod("stars"))
+	if mode == "weekly" and stars_earned > 0:
+		stars_earned += 2
 	if not smoke and stars_earned > 0:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
@@ -570,7 +603,8 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	if _preview != null:
-		_preview.rotation.y = _preview_yaw + sin(Time.get_ticks_msec() * 0.0012) * 0.6
+		var t := Time.get_ticks_msec() * 0.001
+		_preview.rotation.y = _preview_yaw + (0.0 if t < _preview_drag_until else sin(t * 1.2) * 0.6)
 	_frames += 1
 	match state:
 		State.RUNNING:
@@ -669,6 +703,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				squad.clear_focus()
 			_touches.erase(event.index)
 			_cling_touch.erase(event.index)
+	elif event is InputEventScreenDrag and state == State.TITLE and _preview != null:
+		# Spin the hero round with a finger.
+		_preview_yaw += event.relative.x * 0.012
+		_preview_drag_until = Time.get_ticks_msec() * 0.001 + 1.5
 	elif event is InputEventScreenDrag and state == State.RUNNING:
 		var zone: String = _touches.get(event.index, "steer")
 		if zone == "cling":
@@ -859,6 +897,8 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 		print("SMOKE_GRADE ", JSON.stringify({"level": level, "grade": letter, "boss_seconds": snappedf(_run_time - _boss_start, 0.1)}))
 	hud.show_boss(false)
 	hud.show_banner("LEVEL %d CLEAR   GRADE %s\n+%d" % [level, letter, b], 1.8)
+	if character_mode:
+		hud.show_float(Wardrobe.cheer_line(wardrobe.hero_name(), letter, level + bosses_killed), true)
 	squad.cheer()
 	hud.flash(0.35)
 	sfx.play("level_clear")

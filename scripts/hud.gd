@@ -75,6 +75,8 @@ var _shop_card: Control
 var _daily_card: Control
 var _daily_title: Label
 var _daily_lines: Label
+var _weekly_title: Label
+var _weekly_lines: Label
 var _toast: Label
 var _toast_tween: Tween
 var _over_copy: Button
@@ -448,7 +450,17 @@ func _build_daily(root: Control) -> void:
 	var play := _button("PLAY TODAY", 40)
 	play.pressed.connect(func() -> void: play_pressed.emit("daily"))
 	box.add_child(play)
-	var copy := _button("COPY TODAY'S RESULT", 28)
+	_weekly_title = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_weekly_title)
+	var wblurb := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	wblurb.text = "One road all week, on HARD. No upgrades.\nBest of the week counts, and pays two extra stars."
+	box.add_child(wblurb)
+	_weekly_lines = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_weekly_lines)
+	var wplay := _button("PLAY THIS WEEK", 34)
+	wplay.pressed.connect(func() -> void: play_pressed.emit("weekly"))
+	box.add_child(wplay)
+	var copy := _button("COPY LATEST RESULT", 26)
 	copy.pressed.connect(func() -> void: copy_pressed.emit())
 	box.add_child(copy)
 	var back := _button("BACK", 34)
@@ -699,21 +711,27 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 
 
 ## [param results] maps day number to {score, level, kills, peak}.
-func show_daily(day: int, results: Dictionary) -> void:
+func show_daily(day: int, results: Dictionary, week: int = 0, weekly: Dictionary = {}) -> void:
 	_hide_cards()
 	_daily_card.visible = true
 	_daily_title.text = Daily.label(day)
+	_daily_lines.text = _result_lines(results, day, "today", "No result yet today.")
+	_weekly_title.text = Daily.week_label(week)
+	_weekly_lines.text = _result_lines(weekly, week, "this week", "No result yet this week.")
+
+
+func _result_lines(results: Dictionary, current: int, now_tag: String, empty: String) -> String:
 	var lines := []
-	var days := results.keys()
-	days.sort()
-	days.reverse()
-	for d in days:
-		var r: Dictionary = results[d]
-		var tag := "today" if int(d) == day else "#%d" % int(d)
+	var keys := results.keys()
+	keys.sort()
+	keys.reverse()
+	for k in keys:
+		var r: Dictionary = results[k]
+		var tag := now_tag if int(k) == current else "#%d" % int(k)
 		lines.append("%s   %d pts   level %d" % [tag, int(r.get("score", 0)), int(r.get("level", 0))])
 	if lines.is_empty():
-		lines.append("No result yet today.")
-	_daily_lines.text = "\n".join(lines)
+		lines.append(empty)
+	return "\n".join(lines)
 
 
 func toast(text: String) -> void:
@@ -764,11 +782,13 @@ func show_game_over(score: int, best: int, is_best: bool, level: int, distance: 
 		where = "Endless   %d m" % distance
 	elif mode == "daily":
 		where = "Daily   level %d   %d m" % [level, distance]
-	if modifier != "normal" and mode != "daily":
+	elif mode == "weekly":
+		where = "Weekly   level %d   %d m" % [level, distance]
+	if modifier != "normal" and mode != "daily" and mode != "weekly":
 		where = "%s   ·   %s" % [Modifiers.title(modifier), where]
 	if grades != "":
 		where += "\nGrades  %s" % grades
-	var coins_line := "no coins in the daily" if mode == "daily" else "+%d coins" % coins_earned
+	var coins_line := "no coins in the daily" if mode == "daily" else ("no coins in the weekly" if mode == "weekly" else "+%d coins" % coins_earned)
 	if stars_earned > 0:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
 	if locker_nudge:

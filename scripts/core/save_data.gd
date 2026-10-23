@@ -122,6 +122,15 @@ static func save_daily(results: Dictionary) -> void:
 	_write(STATS, "daily", results)
 
 
+static func load_weekly() -> Dictionary:
+	var v = _read(STATS, "weekly", {})
+	return v if v is Dictionary else {}
+
+
+static func save_weekly(results: Dictionary) -> void:
+	_write(STATS, "weekly", results)
+
+
 ## Record a finished run. Returns which records it broke.
 static func record_run(score: int, level: int, endless: bool = false, modifier: String = "normal") -> Dictionary:
 	var cfg := _load()

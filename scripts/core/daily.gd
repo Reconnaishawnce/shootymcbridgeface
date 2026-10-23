@@ -28,6 +28,40 @@ static func share_text(day: int, score: int, level: int, kills: int, peak: int) 
 	return "Shooty McBridgeface daily #%d\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [day, score, level, kills, peak]
 
 
+# --- the weekly ------------------------------------------------------------
+## One seed per UTC week, played on hard with no upgrades. Weeks count
+## from the same epoch as days, so week 1 holds day 1.
+
+const KEEP_WEEKS := 4
+const WEEKLY_MODIFIER := "hard"
+
+
+static func week_number(unix_time: int) -> int:
+	return (day_number(unix_time) - 1) / 7 + 1
+
+
+static func seed_for_week(week: int) -> int:
+	return int((week * 40503 + 7919) * 2654435761 % 2147483647)
+
+
+static func week_label(week: int) -> String:
+	return "WEEKLY #%d" % week
+
+
+static func week_share_text(week: int, score: int, level: int, kills: int, peak: int) -> String:
+	return "Shooty McBridgeface weekly #%d (hard)\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [week, score, level, kills, peak]
+
+
+## Keep only the newest KEEP_WEEKS results. [param results] maps week -> dict.
+static func prune_weeks(results: Dictionary, this_week: int) -> Dictionary:
+	var out := {}
+	for k in results:
+		var w := int(k)
+		if w > this_week - KEEP_WEEKS and w <= this_week:
+			out[w] = results[k]
+	return out
+
+
 ## Keep only the newest KEEP_DAYS results. [param results] maps day -> dict.
 static func prune(results: Dictionary, today: int) -> Dictionary:
 	var out := {}

@@ -49,6 +49,8 @@ the same key (see below).
 - **Deals.** Amber panels in the extra lanes. A trade costs soldiers now
   for a power-up now; shoot it to make it cheaper. A bet doubles the
   squad if you clear the next wave without a bite, and halves it if not.
+  A scout panel sends a few soldiers ahead and the next three gates show
+  every panel, hidden ones included.
 - **The horde.** From level 4 a wall of zombies creeps up behind you
   while the road is stopped for a boss. Kill the boss fast or it eats.
   Flankers also come over the curbs on wide roads.
@@ -119,6 +121,8 @@ the same key (see below).
   time slows for a beat.
 - **Endless**: unlocked by clearing level 3. No bosses, no reset, gates
   forever, separate best score.
+- **Weekly**: on the daily card. One road for everyone all week, on hard,
+  no upgrades. Best of the week counts and pays two extra stars.
 - **Daily**: the same gates for everyone on a given UTC day, no upgrades,
   rifles only. Your best of the day is kept for a week on the Daily card.
   Copy the one-line result to paste anywhere; the game-over card has a

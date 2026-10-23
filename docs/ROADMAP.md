@@ -171,13 +171,20 @@ bosses were too easy.
 - Round, big-headed soldiers from smooth primitives with soft shading,
   faces, and dress-up slots sized to the new head.
 
-## Run 11: difficulty modifiers and grades
+## Run 11: difficulty modifiers and grades (done)
 
-- Hard and Nightmare modifiers with score and coin multipliers.
-- Level grades (S to D) on the clear banner.
-- Trade gates, bet gates, scout sacrifice.
-- Flankers over the curbs; the horde behind you.
-- Fifth phone feedback pass.
+- Hard and Nightmare with score, coin and star multipliers, own bests,
+  threat ramping in over the first levels.
+- Level grades S to D with a bonus, on the banner, the wipe screen and
+  the share text.
+- Trade and bet gates in the extra lanes.
+- Flankers over the curbs on wide roads; the horde behind during bosses.
+
+## Run 12: what the phone says
+
+- Phone feedback pass on modes, deals and the horde.
+- Scout sacrifice gate; a weekly challenge beside the daily.
+- Hero lines on the level banner; a locker preview that turns by touch.
 
 ## Always
 

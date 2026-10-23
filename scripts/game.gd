@@ -61,6 +61,14 @@ var daily_results: Dictionary = {}
 var _last_result := {}
 ## Character mode: heroes, outfits, hats, weapons, backs, paid in stars.
 var wardrobe := Wardrobe.new()
+## Difficulty modifier for the next run (the daily ignores it).
+var modifier := "normal"
+## Level grades this run, S to D, one per boss killed.
+var grades: Array = []
+var _level_gates := 0
+var _level_perfect := 0
+var _boss_start := 0.0
+var _horde_warned := false
 var character_mode := false
 var _locker_tab := "hero"
 var _preview: Node3D
@@ -93,6 +101,10 @@ func _ready() -> void:
 	smoke = args.has("--smoke")
 	_smoke_endless = args.has("--endless")
 	_smoke_daily = args.has("--daily")
+	if args.has("--hard"):
+		modifier = "hard"
+	elif args.has("--nightmare"):
+		modifier = "nightmare"
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
@@ -100,9 +112,12 @@ func _ready() -> void:
 			_smoke_seed = int(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):
 			_shots_dir = a.get_slice("=", 1)
-	best = SaveData.load_best()
-	best_level = SaveData.load_best_level()
-	best_endless = SaveData.load_best_endless()
+	modifier = SaveData.load_modifier()
+	if not Modifiers.unlocked(modifier, SaveData.load_best_level("normal"), SaveData.load_best_level("hard")):
+		modifier = "normal"
+	_load_bests()
+	if smoke:
+		modifier = "hard" if args.has("--hard") else ("nightmare" if args.has("--nightmare") else "normal")
 	coins = SaveData.load_coins()
 	meta.levels = SaveData.load_upgrades()
 	squad_type = SaveData.load_squad_type()
@@ -187,6 +202,10 @@ func _build_scene() -> void:
 	world.strike_landed.connect(_on_strike_landed)
 	world.shaken_off.connect(_on_shaken_off)
 	world.lanes_changed.connect(_on_lanes_changed)
+	world.bet_placed.connect(_on_bet_placed)
+	world.bet_resolved.connect(_on_bet_resolved)
+	world.horde_bit.connect(_on_horde_bit)
+	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
 	world.powerups = powerups
 
 	squad = Squad.new()
@@ -209,6 +228,7 @@ func _build_scene() -> void:
 	hud.shop_closed.connect(show_title)
 	hud.buy_pressed.connect(buy_upgrade)
 	hud.squad_toggled.connect(toggle_squad)
+	hud.mode_pressed.connect(cycle_mode)
 	hud.menu_pressed.connect(show_title)
 	hud.pause_pressed.connect(pause_game)
 	hud.resume_pressed.connect(resume_game)
@@ -231,7 +251,30 @@ func _build_scene() -> void:
 func show_title() -> void:
 	state = State.TITLE
 	sfx.set_music("calm")
-	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(best_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"), wardrobe.stars, wardrobe.hero_name() if character_mode else "")
+	var normal_level := SaveData.load_best_level("normal")
+	var hard_level := SaveData.load_best_level("hard")
+	var hint := ""
+	if modifier == "normal" and not Modifiers.unlocked("hard", normal_level, hard_level):
+		hint = "Hard mode: %s" % Modifiers.unlock_text("hard")
+	elif modifier == "hard" and not Modifiers.unlocked("nightmare", normal_level, hard_level):
+		hint = "Nightmare: %s" % Modifiers.unlock_text("nightmare")
+	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(normal_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"), wardrobe.stars, wardrobe.hero_name() if character_mode else "", modifier, hint)
+
+
+func _load_bests() -> void:
+	best = SaveData.load_best(modifier)
+	best_level = SaveData.load_best_level(modifier)
+	best_endless = SaveData.load_best_endless(modifier)
+
+
+func cycle_mode() -> void:
+	modifier = Modifiers.next(modifier, SaveData.load_best_level("normal"), SaveData.load_best_level("hard"))
+	SaveData.save_modifier(modifier)
+	_load_bests()
+	sfx.play("click")
+	show_title()
+	if modifier != "normal":
+		hud.toast(Modifiers.blurb(modifier))
 
 
 func open_settings() -> void:
@@ -352,7 +395,9 @@ func _result_text(r: Dictionary) -> String:
 		"endless":
 			return "Shooty McBridgeface endless\nScore %d · %d m · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [r.score, r.distance, r.kills, r.peak]
 	var who := " as %s" % wardrobe.hero_name().capitalize() if character_mode else ""
-	return "Shooty McBridgeface%s\nScore %d · level %d · %d kills · peak squad %d\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [who, r.score, r.level, r.kills, r.peak]
+	var how := "" if str(r.get("modifier", "normal")) == "normal" else " · %s" % Modifiers.title(str(r.modifier)).capitalize()
+	var g := "" if str(r.get("grades", "")) == "" else "\nGrades %s" % r.grades
+	return "Shooty McBridgeface%s%s\nScore %d · level %d · %d kills · peak squad %d%s\nhttps://github.com/Reconnaishawnce/shootymcbridgeface" % [who, how, r.score, r.level, r.kills, r.peak, g]
 
 
 func open_shop() -> void:
@@ -416,6 +461,12 @@ func start_run(p_mode: String = "levels") -> void:
 	world.perks = perks
 	world.perk_count = 0
 	world.endless = mode == "endless"
+	world.modifier = "normal" if mode == "daily" else modifier
+	grades = []
+	_level_gates = 0
+	_level_perfect = 0
+	_boss_start = 0.0
+	_horde_warned = false
 	state = State.RUNNING
 	squad.reset(run_meta.start_squad())
 	world.reset(run_seed)
@@ -441,8 +492,8 @@ func end_run() -> void:
 	hud.set_danger(0.0)
 	sfx.set_music("")
 	_since_game_over = 0.0
-	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult()))
-	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad}
+	var earned := 0 if mode == "daily" else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
+	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
 	var is_best := false
@@ -458,7 +509,7 @@ func end_run() -> void:
 		shown_best = maxi(prev, score)
 	else:
 		if not smoke:
-			records = SaveData.record_run(score, world.level, world.endless)
+			records = SaveData.record_run(score, world.level, world.endless, modifier)
 			coins = SaveData.add_coins(earned)
 		if records.new_best_score:
 			best = score
@@ -469,11 +520,13 @@ func end_run() -> void:
 		is_best = records.new_best_endless if world.endless else records.new_best_score
 		shown_best = best_endless if world.endless else best
 	var stars_earned := Wardrobe.stars_for_run(bosses_killed, perfect_gates, gates_passed, world.endless, mode == "daily")
+	if stars_earned > 0 and bosses_killed > 0:
+		stars_earned += int(world.mod("stars"))
 	if not smoke and stars_earned > 0:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "", character_mode and wardrobe.can_afford_something())
+	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "", character_mode and wardrobe.can_afford_something(), " ".join(grades), world.modifier)
 	if character_mode:
 		squad.cheer()
 	sfx.play("wipe")
@@ -562,7 +615,11 @@ func _tick_run(delta: float) -> void:
 				squad.clear_focus()
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
-	score = int(total_distance) + bonus
+	score = int((total_distance + float(bonus)) * world.mod("score"))
+	if world.horde_z < World.HORDE_REST_Z - 0.5 and not _horde_warned:
+		_horde_warned = true
+		hud.show_banner("THE HORDE IS COMING\nKILL IT FAST", 1.6)
+		sfx.play("boss_roar", -6.0, 0.8)
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.set_combo(combo.count if combo.alive(_run_time) else 0, combo.multiplier(), combo.remaining(_run_time))
 	# Danger pulse: the squad is a shadow of what it was this level.
@@ -708,6 +765,7 @@ func _punch(amount: float) -> void:
 
 func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void:
 	gates_passed += 1
+	_level_gates += 1
 	if smoke:
 		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "dist": int(world.level_distance), "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
 	var text := GateMath.label(panel)
@@ -793,9 +851,14 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	if smoke:
 		print("SMOKE_BOSS_DOWN ", JSON.stringify({"level": level, "squad_left": squad_left, "frame": _frames}))
 	var b := Difficulty.level_bonus(level, squad_left)
+	var letter := Grades.grade(_level_perfect, _level_gates, _level_peak, squad_left, _run_time - _boss_start)
+	grades.append(letter)
+	b += Grades.bonus(letter)
 	bonus += b
+	if smoke:
+		print("SMOKE_GRADE ", JSON.stringify({"level": level, "grade": letter, "boss_seconds": snappedf(_run_time - _boss_start, 0.1)}))
 	hud.show_boss(false)
-	hud.show_banner("LEVEL %d CLEAR\n+%d" % [level, b], 1.8)
+	hud.show_banner("LEVEL %d CLEAR   GRADE %s\n+%d" % [level, letter, b], 1.8)
 	squad.cheer()
 	hud.flash(0.35)
 	sfx.play("level_clear")
@@ -812,6 +875,9 @@ func _on_level_started(level: int) -> void:
 	hud.show_banner("LEVEL %d" % level, 1.0)
 	hud.show_hint(Progression.hint_for(level), 3.6)
 	_level_peak = 1
+	_level_gates = 0
+	_level_perfect = 0
+	_horde_warned = false
 	if not world.endless:
 		squad.redeploy(Difficulty.carry_over(squad.count, run_meta.start_squad()))
 		sfx.play("spawn")
@@ -868,6 +934,29 @@ func _on_fork_chosen(route: Dictionary, _side: int) -> void:
 	hud.show_banner("%s ROUTE" % route.name, 0.9)
 	sfx.play("powerup" if route.name == "RICH" else "spawn", -4.0)
 	_punch(2.0)
+
+
+func _on_bet_placed() -> void:
+	hud.show_banner("BET ON!\nCLEAR THE WAVE, NO BITES", 1.4)
+	sfx.play("powerup", -4.0, 1.2)
+
+
+func _on_bet_resolved(won: bool, before: int, after: int) -> void:
+	if won:
+		hud.show_banner("BET WON   x2\n%d > %d" % [before, after], 1.6)
+		squad.rally()
+		sfx.play("rally")
+		_punch(6.0)
+	else:
+		hud.show_banner("BET LOST   ÷2\n%d > %d" % [before, after], 1.6)
+		sfx.play("gate_bad", -2.0, 0.8)
+		_shake = 0.5
+
+
+func _on_horde_bit(bite: int) -> void:
+	hud.show_float("THE HORDE  -%d" % bite, false)
+	sfx.play("bite", -4.0, 0.7)
+	_shake = minf(1.0, _shake + 0.4)
 
 
 func _on_fork_merged() -> void:
@@ -933,6 +1022,7 @@ func _on_wave_cleared(level: int) -> void:
 
 func _on_gate_perfect(_gate, _index: int) -> void:
 	perfect_gates += 1
+	_level_perfect += 1
 	bonus += Difficulty.PERFECT_BONUS
 	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
 	sfx.play("level_clear", -8.0, 1.5)
@@ -1069,6 +1159,11 @@ func _shots_walkthrough() -> void:
 	await _capture("2b_daily.png", 5)
 	open_settings()
 	await _capture("2c_settings.png", 5)
+	show_title()
+	modifier = "hard"
+	show_title()
+	await _capture("2g_title_hard.png", 5)
+	modifier = "normal"
 	character_mode = true
 	hud.set_characters(true)
 	wardrobe.stars = 12
@@ -1115,6 +1210,11 @@ func _shots_walkthrough() -> void:
 			break
 		await get_tree().process_frame
 	await _capture("5f_three_lanes.png", 2)
+	world.horde_z = 3.0
+	world._place_horde()
+	await _capture("5g_horde.png", 2)
+	world.horde_z = World.HORDE_REST_Z
+	world._place_horde()
 	for i in range(600):
 		if world.fork != null and world.fork.chosen:
 			break

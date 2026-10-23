@@ -24,6 +24,13 @@ signal latched(zombie: Zombie)
 signal strike_landed(at: Vector3, hit: bool)
 signal shaken_off(count: int)
 signal lanes_changed(lanes: int)
+## A bet placed at a gate came due: doubled (won) or halved.
+signal bet_resolved(won: bool, before: int, after: int)
+signal bet_placed
+## The boss fight proper has started: the road slows, the clock runs.
+signal boss_engaged
+## The horde behind caught up and ate.
+signal horde_bit(bite: int)
 signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
@@ -40,6 +47,20 @@ const BITE_Z := -0.9
 ## Half the road width; two lanes to start. The road widens with the level.
 var road_half := Progression.road_half(2)
 var lanes := 2
+## Difficulty modifier in force: see Modifiers.
+var modifier := "normal"
+## Bet bookkeeping: the wave the bet rides on, and whether it was bitten.
+var _bet_wave := -1
+var _bet_bitten := false
+## The horde behind the squad: creeps up while the road is stopped.
+var horde_z := HORDE_REST_Z
+var _horde: Node3D
+var _horde_timer := 0.0
+const HORDE_REST_Z := 10.0
+const HORDE_BITE_Z := 1.6
+const HORDE_SPEED := 0.65
+const HORDE_RETREAT_SPEED := 2.5
+const HORDE_INTERVAL := 0.6
 ## Steering margin inside the curbs.
 const EDGE := 0.4
 ## The boss fight starts when the boss has walked this close.
@@ -110,7 +131,13 @@ var _curbs: Array[MeshInstance3D] = []
 var _lane_tween: Tween
 
 
+func _on_own_bite(_bite: int, _heavy: bool) -> void:
+	if _bet_wave >= 0:
+		_bet_bitten = true
+
+
 func _init() -> void:
+	squad_bitten.connect(_on_own_bite)
 	bullets = Node3D.new()
 	add_child(bullets)
 	_build_dressing()
@@ -121,6 +148,10 @@ func reset(seed_value: int) -> void:
 	_clear_actors()
 	world_speed = Difficulty.world_speed(1)
 	_gates_passed = 0
+	_bet_wave = -1
+	_bet_bitten = false
+	horde_z = HORDE_REST_Z
+	_place_horde()
 	set_lanes(2, false)
 	start_level(1)
 
@@ -254,7 +285,38 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_bombs(p_squad)
 	_move_strikes(delta, p_squad)
 	_focus_on_latched(delta, p_squad)
+	_tick_horde(delta, p_squad)
 	return world_speed
+
+
+## The horde behind: while the road is stopped for a boss it creeps up,
+## and if it arrives it eats on a timer. Kill the boss and it falls back.
+func _tick_horde(delta: float, p_squad: Squad) -> void:
+	var active := level >= int(Modifiers.get_value(modifier, "horde_level")) and not endless
+	var pressing := active and phase == Phase.BOSS and boss != null and boss.alive and boss.position.z > BOSS_ENGAGE_Z - 2.0
+	if pressing:
+		horde_z = maxf(HORDE_BITE_Z, horde_z - HORDE_SPEED * mod("horde_speed") * _pace() * delta)
+	else:
+		horde_z = minf(HORDE_REST_Z, horde_z + HORDE_RETREAT_SPEED * delta)
+	_place_horde()
+	if pressing and horde_z <= HORDE_BITE_Z + 0.05:
+		_horde_timer -= delta
+		if _horde_timer <= 0.0:
+			_horde_timer = HORDE_INTERVAL
+			if not p_squad.is_shielded():
+				var bite := _bite(Difficulty.horde_bite(p_squad.count))
+				p_squad.add(-bite)
+				squad_bitten.emit(bite, true)
+				horde_bit.emit(bite)
+	else:
+		_horde_timer = 0.0
+
+
+func _place_horde() -> void:
+	if _horde == null:
+		return
+	_horde.position.z = horde_z
+	_horde.visible = horde_z < HORDE_REST_Z - 0.05
 
 
 ## Holding focus on a clinging zombie pours fire into it. Bullets cannot
@@ -311,6 +373,22 @@ func shake_off() -> void:
 
 
 ## How much slower everything that walks is going right now.
+## The modifier's multiplier for [param key]. The threat multipliers
+## (waves, health, boss, bites) ramp in over the first levels, so a hard
+## run is still playable from one soldier; the payouts are full from the
+## start.
+func mod(key: String) -> float:
+	var v := float(Modifiers.get_value(modifier, key))
+	if key in ["wave", "hp", "boss", "bite"]:
+		return 1.0 + (v - 1.0) * Modifiers.ramp(level)
+	return v
+
+
+## Scale a bite by the modifier; never below one.
+func _bite(n: int) -> int:
+	return maxi(1, int(round(float(n) * mod("bite"))))
+
+
 func _pace() -> float:
 	return powerups.world_speed_mult(now) if powerups != null else 1.0
 
@@ -479,7 +557,7 @@ func _spawn() -> void:
 	if not endless and not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
 		_boss_spawned = true
 		boss = Boss.new()
-		boss.setup(Difficulty.boss_hp(level, perk_count), Difficulty.boss_kind(level))
+		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss"), Difficulty.boss_kind(level))
 		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
 		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
 		add_child(boss)
@@ -487,7 +565,7 @@ func _spawn() -> void:
 
 
 func _spawn_wave(n: int, count: int) -> void:
-	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
+	var spec := _spec(_gate_level(n), _gate_index(n), count)
 	var base_z := -(Difficulty.wave_distance(n) - level_distance)
 	# A wave that sits inside the fork is split per route: each side gets
 	# its own crowd, scaled by how rich that route is.
@@ -522,9 +600,41 @@ func _spawn_wave(n: int, count: int) -> void:
 		_spawn_zombie(spec.thief_hp, spec.speed, Zombie.Kind.THIEF, z)
 
 
+## A wave spec with the modifier applied: more bodies, more health.
+func _spec(p_level: int, index: int, count: int) -> Dictionary:
+	var spec := Difficulty.wave_for(p_level, index, count)
+	var w := mod("wave")
+	var h := mod("hp")
+	spec.count = mini(int(ceil(float(spec.count) * w)), Difficulty.MAX_WAVE + 12)
+	spec.runners = int(ceil(float(spec.runners) * w))
+	for key in ["hp", "brute_hp", "tank_hp", "thief_hp", "runner_hp", "latcher_hp"]:
+		spec[key] = float(spec[key]) * h
+	return spec
+
+
+## Flankers: runners that come over the curbs beside the squad. Only on a
+## road wide enough to have room out there (four lanes and up).
+func _spawn_flankers(spec: Dictionary, p_squad: Squad) -> void:
+	if lanes < 4 or int(spec.flankers) <= 0:
+		return
+	_wave_seq += 1
+	var wave := _wave_seq
+	for i in range(int(spec.flankers)):
+		var side := -1.0 if gen.rng.randf() < 0.5 else 1.0
+		var zb := Zombie.new()
+		zb.setup(float(spec.runner_hp), float(spec.speed) * 1.2, Zombie.Kind.RUNNER)
+		zb.wave_id = wave
+		zb.lane_min = -road_half + 0.6
+		zb.lane_max = road_half - 0.6
+		zb.position = Vector3(side * (road_half + 1.4), 0.0, -6.0 - gen.rng.randf_range(0.0, 5.0))
+		add_child(zb)
+		zombies.append(zb)
+		_wave_alive[wave] = int(_wave_alive.get(wave, 0)) + 1
+
+
 ## Runners come in a tight pack from one side, released as a gate passes.
 func _spawn_runners(n: int, count: int) -> void:
-	var spec := Difficulty.wave_for(_gate_level(n), _gate_index(n), count)
+	var spec := _spec(_gate_level(n), _gate_index(n), count)
 	var base_z := Difficulty.runner_release_z(level)
 	var side := -1.0 if gen.rng.randf() < 0.5 else 1.0
 	var lo := -road_half + 0.5
@@ -574,6 +684,8 @@ func _note_wave_death(z: Zombie) -> void:
 	if left <= 0:
 		if not _wave_voided.has(z.wave_id):
 			wave_cleared.emit(level)
+		if z.wave_id == _bet_wave:
+			_resolve_bet(not _wave_voided.has(z.wave_id) and not _bet_bitten)
 		_wave_alive.erase(z.wave_id)
 		_wave_voided.erase(z.wave_id)
 
@@ -585,8 +697,22 @@ func _note_wave_leak(z: Zombie) -> void:
 	var left := int(_wave_alive.get(z.wave_id, 1)) - 1
 	_wave_alive[z.wave_id] = left
 	if left <= 0:
+		if z.wave_id == _bet_wave:
+			_resolve_bet(false)
 		_wave_alive.erase(z.wave_id)
 		_wave_voided.erase(z.wave_id)
+
+
+## Double or half. A bite during the wave, or a zombie that got through,
+## loses it.
+func _resolve_bet(won: bool) -> void:
+	_bet_wave = -1
+	if squad == null:
+		return
+	var before := squad.count
+	var after := before * 2 if won else maxi(1, before / 2)
+	squad.set_count(after)
+	bet_resolved.emit(won, before, after)
 
 
 ## The nearest unpassed gate ahead of [param z] (more negative), or null.
@@ -617,6 +743,13 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 				var after := GateMath.apply(before, panel)
 				if GateMath.is_power(panel):
 					powerup_granted.emit(Powerups.resolve(panel.power, gen.rng), false)
+				elif GateMath.is_trade(panel):
+					powerup_granted.emit(panel.power, false)
+				elif GateMath.is_bet(panel):
+					# Rides on the wave after this gate: the next wave id.
+					_bet_wave = _wave_seq + 1
+					_bet_bitten = false
+					bet_placed.emit()
 				if after > 0:
 					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
 						after += meta.gate_bonus()
@@ -626,6 +759,7 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 				_gates_passed += 1
 				gate_passed.emit(panel, before, after)
 				_spawn_runners(_next_runners, p_squad.count)
+				_spawn_flankers(_spec(_gate_level(_next_runners), _gate_index(_next_runners), p_squad.count), p_squad)
 				_next_runners += 1
 				if after > 0 and g.steps_up[index] >= Difficulty.PERFECT_STEPS:
 					gate_perfect.emit(g, index)
@@ -756,7 +890,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 					fraction = meta.brute_bite_fraction(fraction)
 				if perks != null:
 					fraction *= perks.brute_bite_mult()
-				bite = maxi(1, int(Difficulty.brute_bite(p_squad.count, fraction) * p_squad.bite_mult()))
+				bite = _bite(maxi(1, int(Difficulty.brute_bite(p_squad.count, fraction) * p_squad.bite_mult())))
 			p_squad.add(-bite)
 			squad_bitten.emit(bite, z.brute or z.is_tank())
 		elif z.position.z > DESPAWN_Z:
@@ -816,6 +950,7 @@ func _move_boss(delta: float) -> void:
 			# never crawls with a number gate still ahead.
 			if boss.position.z >= BOSS_ENGAGE_Z and _all_gates_passed():
 				phase = Phase.BOSS
+				boss_engaged.emit()
 		Phase.BOSS:
 			var walk := BOSS_WALK_SPEED * _pace() * (1.6 if boss_enraged() else 1.0)
 			if boss.is_spitter():
@@ -850,7 +985,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	_strike_timer -= delta * _pace()
 	if _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
 		_strike_timer = Difficulty.STRIKE_INTERVAL_ENRAGED if enraged else Difficulty.STRIKE_INTERVAL
-		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0)
+		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0) + int(mod("strikes"))
 		for i in range(n):
 			var offset := 0.0 if i == 0 else gen.rng.randf_range(-road_half * 0.7, road_half * 0.7)
 			var st := Strike.new()
@@ -861,7 +996,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	_adds_timer -= delta * _pace()
 	if _adds_timer <= 0.0:
 		_adds_timer = Difficulty.BOSS_ADDS_INTERVAL * (0.7 if enraged else 1.0)
-		var spec := Difficulty.wave_for(level, Difficulty.GATES_PER_LEVEL - 1, p_squad.count)
+		var spec := _spec(level, Difficulty.GATES_PER_LEVEL - 1, p_squad.count)
 		for i in range(Difficulty.boss_adds(level)):
 			var zb := Zombie.new()
 			zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
@@ -899,7 +1034,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 		if p_squad.is_shielded():
 			shield_blocked.emit()
 			return
-		var bite := Difficulty.boss_bite(p_squad.count)
+		var bite := _bite(Difficulty.boss_bite(p_squad.count))
 		p_squad.add(-bite)
 		squad_bitten.emit(bite, true)
 
@@ -917,7 +1052,7 @@ func _move_spits(p_squad: Squad) -> void:
 			shield_blocked.emit()
 			hit = false
 		elif hit:
-			var bite := Difficulty.spit_bite(p_squad.count)
+			var bite := _bite(Difficulty.spit_bite(p_squad.count))
 			p_squad.add(-bite)
 			squad_bitten.emit(bite, true)
 		spit_landed.emit(hit)
@@ -935,7 +1070,7 @@ func _move_strikes(delta: float, p_squad: Squad) -> void:
 				shield_blocked.emit()
 				hit = false
 			elif hit:
-				var bite := Difficulty.strike_bite(p_squad.count)
+				var bite := _bite(Difficulty.strike_bite(p_squad.count))
 				p_squad.add(-bite)
 				squad_bitten.emit(bite, true)
 			strike_landed.emit(st.position, hit)
@@ -1009,7 +1144,27 @@ func _on_boss_dead() -> void:
 	boss_killed.emit(level, squad_left)
 
 
+## A wall of cheap zombies: dark bodies, red eyes, spread across the
+## widest road. It lives behind the squad and only shows when it moves.
+func _build_horde() -> void:
+	_horde = Node3D.new()
+	var half := Progression.road_half(Progression.MAX_LANES)
+	for i in range(18):
+		var x := -half + (float(i) + 0.5) * (half * 2.0 / 18.0)
+		var zb := Mats.pill(0.3, 0.9, Zombie.SKIN.darkened(0.35))
+		zb.position = Vector3(x + randf_range(-0.2, 0.2), 0.75, randf_range(0.0, 1.6))
+		_horde.add_child(zb)
+		for side in [-1.0, 1.0]:
+			var eye := Mats.box(Vector3(0.07, 0.07, 0.05), Zombie.EYE, true)
+			eye.position = zb.position + Vector3(side * 0.1, 0.45, -0.28)
+			_horde.add_child(eye)
+	_horde.position.z = HORDE_REST_Z
+	_horde.visible = false
+	add_child(_horde)
+
+
 func _build_dressing() -> void:
+	_build_horde()
 	_road = Mats.box(Vector3(7.2, 0.2, 260.0), ROAD)
 	_road.position = Vector3(0.0, -0.1, -100.0)
 	add_child(_road)

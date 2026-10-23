@@ -13,6 +13,7 @@ signal shop_opened
 signal shop_closed
 signal buy_pressed(id: String)
 signal squad_toggled
+signal mode_pressed
 signal menu_pressed
 signal pause_pressed
 signal resume_pressed
@@ -54,6 +55,7 @@ var _coins_title: Label
 var _endless_button: Button
 var _squad_button: Button
 var _locker_button: Button
+var _mode_button: Button
 var _stars_title: Label
 
 var _settings_card: Control
@@ -297,6 +299,9 @@ func _build_title(root: Control) -> void:
 	var daily := _button("DAILY", 36)
 	daily.pressed.connect(func() -> void: daily_opened.emit())
 	box.add_child(daily)
+	_mode_button = _button("MODE: NORMAL", 30)
+	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
+	box.add_child(_mode_button)
 	_squad_button = _button("SQUAD: RIFLES", 30)
 	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
 	box.add_child(_squad_button)
@@ -627,7 +632,7 @@ func _hide_cards() -> void:
 	_locker_card.visible = false
 
 
-func show_title(best: int, best_level: int, best_endless: int, coins: int, endless_unlocked: bool, squad_type: String, shotgun_unlocked: bool, stars: int = 0, hero_name: String = "") -> void:
+func show_title(best: int, best_level: int, best_endless: int, coins: int, endless_unlocked: bool, squad_type: String, shotgun_unlocked: bool, stars: int = 0, hero_name: String = "", modifier: String = "normal", mode_hint: String = "") -> void:
 	_hide_cards()
 	_title_card.visible = true
 	_pause_button.visible = false
@@ -638,8 +643,11 @@ func show_title(best: int, best_level: int, best_endless: int, coins: int, endle
 	if best_endless > 0:
 		lines.append("Endless best %d" % best_endless)
 	if lines.is_empty():
-		lines.append("Every level starts with one soldier.")
+		lines.append("Every level starts with one soldier." if modifier == "normal" else Modifiers.blurb(modifier))
+	if mode_hint != "":
+		lines.append(mode_hint)
 	_records.text = "\n".join(lines)
+	_mode_button.text = "MODE: %s" % Modifiers.title(modifier)
 	_endless_button.disabled = not endless_unlocked
 	_endless_button.text = "ENDLESS" if endless_unlocked else "ENDLESS  (clear level %d)" % Meta.ENDLESS_UNLOCK_LEVEL
 	_squad_button.visible = shotgun_unlocked
@@ -743,7 +751,7 @@ func show_running() -> void:
 		_prompt_tween.kill()
 
 
-func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "", locker_nudge: bool = false) -> void:
+func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "", locker_nudge: bool = false, grades: String = "", modifier: String = "normal") -> void:
 	_hide_cards()
 	_over_card.visible = true
 	_pause_button.visible = false
@@ -756,6 +764,10 @@ func show_game_over(score: int, best: int, is_best: bool, level: int, distance: 
 		where = "Endless   %d m" % distance
 	elif mode == "daily":
 		where = "Daily   level %d   %d m" % [level, distance]
+	if modifier != "normal" and mode != "daily":
+		where = "%s   ·   %s" % [Modifiers.title(modifier), where]
+	if grades != "":
+		where += "\nGrades  %s" % grades
 	var coins_line := "no coins in the daily" if mode == "daily" else "+%d coins" % coins_earned
 	if stars_earned > 0:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]

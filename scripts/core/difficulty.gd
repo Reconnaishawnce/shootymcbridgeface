@@ -202,7 +202,16 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 		"latcher_hp": hp * 2.5,
 		# Runners: fast, thin, and they find you. The near-miss engine.
 		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS),
+		# Flankers: runners that come over the curbs beside you. The world
+		# only spawns them on a road wide enough to have curbs worth hopping.
+		"flankers": mini(1 + int(lv / 3.0), MAX_FLANKERS) if level >= FLANKER_LEVEL and index >= 1 else 0,
 	}
+
+
+## The horde behind you: it creeps up while the road is stopped for a
+## boss, and eats if it arrives. Soldiers per bite.
+static func horde_bite(squad_count: int) -> int:
+	return maxi(2, int(float(squad_count) * 0.05))
 
 
 ## Soldiers a brute takes when it reaches the squad: a slice, not a nibble.
@@ -426,6 +435,16 @@ func make_fork(level: int) -> Dictionary:
 
 ## Chance a gate (after the opener) carries a sum panel, by tier.
 const EXPR_CHANCE := [0.0, 0.35, 0.4, 0.45]
+## Deals in the extra lanes: a trade (soldiers for a power-up) from
+## TRADE_LEVEL, a bet (double or half on the next wave) from BET_LEVEL.
+const TRADE_LEVEL := 3
+const BET_LEVEL := 4
+const TRADE_CHANCE := 0.14
+const BET_CHANCE := 0.1
+const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
+## Flankers come over the curbs on wide roads from this level.
+const FLANKER_LEVEL := 4
+const MAX_FLANKERS := 4
 ## How close a sum's result sits to the plain panel it competes with, so
 ## the comparison takes thought rather than a glance.
 const EXPR_BAND := 0.4
@@ -494,9 +513,17 @@ func make_gate(level: int, index: int, count: int, lanes: int) -> Array:
 	for i in range(panels.size()):
 		if GateMath.is_good(panels[i]) and not GateMath.is_power(panels[i]) and not GateMath.is_expr(panels[i]):
 			best_i = i
+	var deal_done := false
 	for i in range(lanes - 2):
 		if index == 0:
 			panels.append(GateMath.add(rng.randi_range(1, 3)))
+		elif not deal_done and i > 0 and level >= BET_LEVEL and rng.randf() < BET_CHANCE:
+			deal_done = true
+			panels.append(GateMath.bet())
+		elif not deal_done and i > 0 and level >= TRADE_LEVEL and rng.randf() < TRADE_CHANCE:
+			deal_done = true
+			var cost := maxi(3, int(float(count) * rng.randf_range(0.15, 0.3)))
+			panels.append(GateMath.trade(cost, TRADE_POWERS[rng.randi_range(0, TRADE_POWERS.size() - 1)]))
 		elif i == 0 and best_i >= 0 and level >= Progression.EXPR_LEVEL and rng.randf() < 0.6:
 			panels.append(make_rival_expr(level, panels[best_i], count))
 		elif i == 0 and rng.randf() < 0.6:

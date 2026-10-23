@@ -13,6 +13,8 @@ const CHOSEN := Color(1.0, 0.95, 0.5, 1.0)
 const POWER := Color(0.6, 0.35, 0.9, 0.85)
 ## Sum panels: neither blue nor red. You have to work it out.
 const THINK := Color(0.15, 0.7, 0.68, 0.85)
+## Trades and bets: amber. A deal, not a number.
+const DEAL := Color(0.95, 0.6, 0.15, 0.85)
 
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
@@ -59,6 +61,8 @@ func refresh(panel: GateMath.GatePanel) -> void:
 		color = HIDDEN
 	elif GateMath.is_power(panel):
 		color = POWER
+	elif GateMath.is_deal(panel):
+		color = DEAL
 	elif GateMath.is_expr(panel):
 		color = THINK
 	elif GateMath.is_good(panel):

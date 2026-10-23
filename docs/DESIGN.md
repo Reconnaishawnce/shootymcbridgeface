@@ -185,6 +185,31 @@ other way, and your aim as a resource you have to spend wisely.
   regulators (multipliers vanish past 150 soldiers, halving gates, brute
   health scaling) keep it from exploding.
 
+## Modes, grades and deals
+
+`Modifiers` scales the threat (waves, health, boss, bites, an extra
+strike) and the pay (score, coins, stars). The threat ramps in over the
+first three levels (`Modifiers.ramp`) so a one-soldier opener on
+nightmare is survivable. Hard opens at normal level 3, nightmare at hard
+level 4; each mode keeps its own bests under suffixed save keys. The
+daily is always normal.
+
+`Grades` turns a cleared level into a letter: 35% perfect gates, 40% of
+the level's peak squad kept, 25% boss speed (six seconds is full marks,
+twenty is none). S pays 600 points, down to nothing for a D.
+
+Deals are amber panels in the extra lanes, at most one per gate and only
+on four lanes or more. A trade is a cost now for a power-up now; the bot
+weighs it by the cost alone. A bet changes nothing at the gate and is
+resolved by the wave that follows: cleared with no bite doubles the
+squad, a bite or a leak halves it.
+
+Flankers are runners spawned just outside the curbs beside the squad as a
+gate passes, from level 4 on four-lane roads. The horde is a wall behind
+the squad that creeps up while the road is stopped for a boss (0.65 m/s,
+faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
+arrives, and falls back when the boss dies. It is the boss clock.
+
 ## Character mode
 
 Off by default: the squad wears the classic military kit. On (Settings,
@@ -209,9 +234,11 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 10 result (bot, no upgrades) |
+| Metric | Run 11 result (bot, no upgrades) |
 |---|---|
-| Levels: wipe level, four seeds | 5, 6, 5, 7 at 2.4 to 3.9 min |
+| Normal: wipe level, four seeds | 6, 7, 7, 9 |
+| Hard: wipe level, two seeds | 4, 5 |
+| Nightmare: wipe level, three seeds | 2, 3, 3 |
 | Endless: after 3 minutes | level 8, peak 1113 |
 
 Seeds: `++ --smoke --smoke-seed=N`. One seed is noise; check four.

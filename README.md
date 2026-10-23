@@ -41,6 +41,17 @@ the same key (see below).
 - **Lanes.** The road starts at two lanes and widens to five as you go,
   one panel per lane. More lanes means more to read: one of the extras is
   worth weighing and the rest are traps.
+- **Modes.** MODE on the title cycles NORMAL, HARD (reach level 3) and
+  NIGHTMARE (reach level 4 on hard). Harder modes throw more at you and
+  pay more score, coins and stars. Each keeps its own bests.
+- **Grades.** Every level you clear gets a letter, S to D, for perfect
+  gates, soldiers kept and boss speed. Better letters pay more.
+- **Deals.** Amber panels in the extra lanes. A trade costs soldiers now
+  for a power-up now; shoot it to make it cheaper. A bet doubles the
+  squad if you clear the next wave without a bite, and halves it if not.
+- **The horde.** From level 4 a wall of zombies creeps up behind you
+  while the road is stopped for a boss. Kill the boss fast or it eats.
+  Flankers also come over the curbs on wide roads.
 - **Characters.** Settings has a CHARACTERS switch. On, the title gets a
   LOCKER: pick a hero (each has a face and a name), an outfit, a hat, a
   weapon skin and something for their back, and decide how the crew

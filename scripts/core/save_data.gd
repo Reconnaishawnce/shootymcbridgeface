@@ -24,16 +24,25 @@ static func _write(section: String, key: String, value) -> void:
 	cfg.save(PATH)
 
 
-static func load_best() -> int:
-	return int(_read(STATS, "best_score", 0))
+static func load_best(modifier: String = "normal") -> int:
+	return int(_read(STATS, "best_score" + Modifiers.key_suffix(modifier), 0))
 
 
-static func load_best_level() -> int:
-	return int(_read(STATS, "best_level", 0))
+static func load_best_level(modifier: String = "normal") -> int:
+	return int(_read(STATS, "best_level" + Modifiers.key_suffix(modifier), 0))
 
 
-static func load_best_endless() -> int:
-	return int(_read(STATS, "best_endless", 0))
+static func load_best_endless(modifier: String = "normal") -> int:
+	return int(_read(STATS, "best_endless" + Modifiers.key_suffix(modifier), 0))
+
+
+static func load_modifier() -> String:
+	var id := str(_read(SETTINGS, "modifier", "normal"))
+	return id if Modifiers.TABLE.has(id) else "normal"
+
+
+static func save_modifier(id: String) -> void:
+	_write(SETTINGS, "modifier", id)
 
 
 static func load_runs() -> int:
@@ -114,20 +123,21 @@ static func save_daily(results: Dictionary) -> void:
 
 
 ## Record a finished run. Returns which records it broke.
-static func record_run(score: int, level: int, endless: bool = false) -> Dictionary:
+static func record_run(score: int, level: int, endless: bool = false, modifier: String = "normal") -> Dictionary:
 	var cfg := _load()
+	var sfx := Modifiers.key_suffix(modifier)
 	var result := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
 	if endless:
-		var best_e := int(cfg.get_value(STATS, "best_endless", 0))
+		var best_e := int(cfg.get_value(STATS, "best_endless" + sfx, 0))
 		result.new_best_endless = score > best_e
-		cfg.set_value(STATS, "best_endless", maxi(best_e, score))
+		cfg.set_value(STATS, "best_endless" + sfx, maxi(best_e, score))
 	else:
-		var best := int(cfg.get_value(STATS, "best_score", 0))
-		var best_level := int(cfg.get_value(STATS, "best_level", 0))
+		var best := int(cfg.get_value(STATS, "best_score" + sfx, 0))
+		var best_level := int(cfg.get_value(STATS, "best_level" + sfx, 0))
 		result.new_best_score = score > best
 		result.new_best_level = level > best_level
-		cfg.set_value(STATS, "best_score", maxi(best, score))
-		cfg.set_value(STATS, "best_level", maxi(best_level, level))
+		cfg.set_value(STATS, "best_score" + sfx, maxi(best, score))
+		cfg.set_value(STATS, "best_level" + sfx, maxi(best_level, level))
 	cfg.set_value(STATS, "runs", int(cfg.get_value(STATS, "runs", 0)) + 1)
 	cfg.save(PATH)
 	return result

@@ -3,6 +3,35 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.14 (run 11)
+
+Modes, grades, deals, flankers and the horde.
+
+- MODE on the title: NORMAL, HARD (reach level 3) and NIGHTMARE (reach
+  level 4 on hard). Hard throws 35% more zombies with 25% more health,
+  bosses at 1.4x, bites at 1.3x, an extra lightning bolt, for 1.5x score
+  and coins and a bonus star. Nightmare: 1.6x waves, 1.35x health, 1.8x
+  bosses, 1.45x bites, 2.5x score and coins, two bonus stars. The threat
+  ramps in over the first three levels so level 1 is harder, not
+  hopeless. Each mode keeps its own bests. The daily is always normal.
+- Level grades S to D on the clear banner: perfect gates, soldiers kept,
+  boss time. S pays 600, A 350, B 150, C 50. Grades show on the wipe
+  screen and in the share text.
+- Deals in the extra lanes, amber: trades from level 3 (pay 15 to 30% of
+  the squad for a shield, bomb, frenzy or slow, now; shooting a trade
+  makes it cheaper) and bets from level 4 (walk through, clear the next
+  wave without a bite and the squad doubles; a bite or a leak halves it).
+  One deal per gate at most, never on a road under four lanes.
+- Flankers from level 4 on four-lane roads: runners that come over the
+  curbs beside you when a gate passes.
+- The horde behind: from level 4 (level 2 on hard, level 1 on nightmare)
+  a wall of zombies creeps up while the road is stopped for a boss. Kill
+  the boss in about twelve seconds or it starts eating. It falls back
+  when the boss dies.
+- Auto-player takes `--hard` and `--nightmare`; prints a grade per level.
+- Balance, bot, no upgrades: normal wiped on levels 6, 7, 7, 9; hard on
+  4 and 5; nightmare on 2, 3, 3.
+
 ## 0.13 (run 10.3)
 
 Cuter characters.

@@ -224,3 +224,13 @@ func test_level_one_is_simple() -> void:
 	check_eq(Difficulty.wave_for(2, 3).latchers, 0, "no latchers before level 3")
 	check(Difficulty.wave_for(3, 3).latchers >= 1, "latchers from level 3")
 	check(Difficulty.wave_for(3, 3).latcher_hp > Difficulty.wave_for(3, 3).hp, "latchers are sturdier than walkers")
+
+
+func test_boss_attacks_scale() -> void:
+	check_eq(Difficulty.strikes_per_volley(1), 1, "one ring on level 1")
+	check(Difficulty.strikes_per_volley(7) >= 2, "more rings later")
+	check(Difficulty.strikes_per_volley(40) <= 3, "rings capped")
+	check_eq(Difficulty.strike_bite(10), 3, "strike floor")
+	check_eq(Difficulty.strike_bite(100), 15, "strike scales")
+	check(Difficulty.boss_adds(1) >= 1 and Difficulty.boss_adds(20) <= 4, "adds bounded")
+	check(Difficulty.STRIKE_INTERVAL_ENRAGED < Difficulty.STRIKE_INTERVAL, "enrage is faster")

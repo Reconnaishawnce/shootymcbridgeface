@@ -27,3 +27,10 @@ func test_dash_constants_are_sane() -> void:
 	check(Progression.DASH_IFRAMES >= Progression.DASH_SECONDS, "invulnerable for the whole dash")
 	check(Progression.DASH_COOLDOWN > Progression.DASH_IFRAMES, "cannot chain dashes")
 	check(Progression.DASH_DISTANCE < Squad.LANE_HALF * 2.0, "a dash stays on the road")
+
+
+func test_latch_and_spray_constants() -> void:
+	check(Progression.SPRAY > 0.0, "spray exists")
+	check(Progression.FOCUS_DAMAGE_MULT > 1.0, "focus hits harder")
+	check(Progression.MAX_LATCHED >= 3 and Progression.DASH_SHAKES_OFF < Progression.MAX_LATCHED, "dash does not clear a full flank")
+	check(Progression.hint_for(1).contains("CLING"), "level 1 teaches clingers")

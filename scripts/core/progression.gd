@@ -6,17 +6,33 @@ extends RefCounted
 
 const DASH_LEVEL := 2
 const HOT_LEVEL := 3
+## Sturdy purple latchers join the waves from here; ordinary walkers and
+## runners that reach the squad latch on from level 1.
 const LATCHER_LEVEL := 3
 const HIDDEN_LEVEL := 2
 const DILEMMA_LEVEL := 2
 
 ## Hints shown at the start of a level, keyed by level.
 const LEVEL_HINTS := {
-	1: "DRAG LOW TO STEER\nHOLD THE ROAD TO FOCUS FIRE",
-	2: "FLICK LOW TO DASH\nDASH THROUGH SPIT",
-	3: "PANELS FLASH: HIT THEM THEN FOR x3\nLATCHERS GRAB YOUR FRONT: FOCUS ON THEM",
+	1: "DRAG LOW TO STEER. HOLD THE ROAD TO AIM.\nZOMBIES THAT REACH YOU CLING ON: HOLD ON THEM",
+	2: "FLICK LOW TO DASH\nDASH OUT OF LIGHTNING RINGS, DASH TO SHAKE OFF CLINGERS",
+	3: "PANELS FLASH: HIT THEM THEN FOR x3\nPURPLE LATCHERS ARE TOUGHER: AIM EARLY",
 	4: "RED ON BOTH SIDES NOW\nPICK THE ONE YOU CAN SHOOT UP",
 }
+
+## Unfocused fire sprays: each bullet drifts sideways by up to this much
+## (m/s). At range that means misses. Focus fire has no spray and hits
+## harder. Aiming is the skill.
+const SPRAY := 1.6
+const FOCUS_DAMAGE_MULT := 1.5
+## Holding focus on a clinging zombie pours this fraction of squad DPS into
+## it per second, since bullets cannot reach your own flank.
+const FOCUS_LATCH_DPS_FRACTION := 0.7
+const FOCUS_LATCH_RADIUS := 1.4
+## How many zombies can cling at once; the rest bite once and are spent.
+const MAX_LATCHED := 6
+## A dash throws off this many clingers.
+const DASH_SHAKES_OFF := 2
 
 
 static func dash_enabled(level: int) -> bool:

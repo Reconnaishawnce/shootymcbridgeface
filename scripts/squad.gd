@@ -6,6 +6,7 @@ extends Node3D
 
 signal count_changed(new_count: int)
 signal wiped_out
+signal dashed
 
 const LANE_HALF := 2.6
 const MAX_VISUAL := 60
@@ -197,7 +198,9 @@ func is_invulnerable() -> bool:
 ## Aim every gun at a point on the road, or stop.
 func set_focus(point: Vector3) -> void:
 	focus_on = true
-	focus_point = Vector3(clampf(point.x, -LANE_HALF - 0.5, LANE_HALF + 0.5), 0.0, clampf(point.z, -70.0, -2.0))
+	# z may come right up to the squad: that is how you hold fire on a
+	# zombie clinging to your own flank.
+	focus_point = Vector3(clampf(point.x, -LANE_HALF - 1.0, LANE_HALF + 1.0), 0.0, clampf(point.z, -70.0, 1.5))
 
 
 func clear_focus() -> void:
@@ -220,7 +223,15 @@ func dash(direction: float) -> bool:
 		_dash_tween.kill()
 	_dash_tween = create_tween()
 	_dash_tween.tween_property(self, "position:x", target_x, Progression.DASH_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	dashed.emit()
 	return true
+
+
+## Where a clinging zombie rides: alternating flanks, a little back each.
+func latch_slot(i: int) -> Vector3:
+	var side := -1.0 if i % 2 == 0 else 1.0
+	var hw := Formation.half_width(mini(count, MAX_VISUAL), spread)
+	return Vector3(side * (hw + 0.45), 0.0, -0.6 + 0.5 * float(i / 2))
 
 
 ## New level: back to the starting squad where you stand.
@@ -424,9 +435,13 @@ func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> vo
 	b.damage = damage
 	if focus_on:
 		# Converge on the focus point: sideways speed that gets there as the
-		# bullet covers the distance.
+		# bullet covers the distance. Focused rounds also hit harder.
 		var dz := maxf(0.5, origin.z - focus_point.z)
 		vx += (focus_point.x - origin.x) / (dz / Bullet.SPEED)
+		b.damage *= Progression.FOCUS_DAMAGE_MULT
+	else:
+		# Spray. Close targets still get hit; far ones need aiming.
+		vx += randf_range(-Progression.SPRAY, Progression.SPRAY)
 	b.vx = vx
 	b.world = world
 	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0

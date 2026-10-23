@@ -21,6 +21,8 @@ signal bomb_exploded(at: Vector3, kills: int)
 signal fork_ahead(routes: Dictionary)
 signal dodged
 signal latched(zombie: Zombie)
+signal strike_landed(at: Vector3, hit: bool)
+signal shaken_off(count: int)
 signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
@@ -87,6 +89,10 @@ var _boss_spawned := false
 var _chew_timer := 0.0
 var _clear_timer := 0.0
 var _spits: Array[Spit] = []
+var _strikes: Array[Strike] = []
+var _strike_timer := 1.5
+var _adds_timer := Difficulty.BOSS_ADDS_INTERVAL
+var _latched: Array[Zombie] = []
 var _crates: Array[Crate] = []
 var _crate_plan: Array = []
 var _bombs: Array[Bomb] = []
@@ -130,6 +136,9 @@ func start_level(n: int) -> void:
 	for z in zombies:
 		z.consume()
 	zombies.clear()
+	_latched.clear()
+	_strike_timer = 1.5
+	_adds_timer = Difficulty.BOSS_ADDS_INTERVAL
 	level_started.emit(level)
 
 
@@ -158,6 +167,10 @@ func _clear_actors() -> void:
 	for sp in _spits:
 		sp.queue_free()
 	_spits.clear()
+	for st in _strikes:
+		st.queue_free()
+	_strikes.clear()
+	_latched.clear()
 	for c in _crates:
 		c.queue_free()
 	_crates.clear()
@@ -193,7 +206,44 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_spits(p_squad)
 	_move_crates(delta, p_squad)
 	_move_bombs(p_squad)
+	_move_strikes(delta, p_squad)
+	_focus_on_latched(delta, p_squad)
 	return world_speed
+
+
+## Holding focus on a clinging zombie pours fire into it. Bullets cannot
+## reach your own flank, so this is the only way to shake one loose
+## without dashing.
+func _focus_on_latched(delta: float, p_squad: Squad) -> void:
+	if not p_squad.focus_on or _latched.is_empty():
+		return
+	var fp := p_squad.focus_point
+	for z in _latched.duplicate():
+		var d := Vector2(z.position.x - fp.x, z.position.z - fp.z).length()
+		if d > Progression.FOCUS_LATCH_RADIUS:
+			continue
+		if z.take_damage(p_squad.dps() * Progression.FOCUS_LATCH_DPS_FRACTION * delta):
+			_latched.erase(z)
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			z.die()
+		break
+
+
+## A dash throws the first few clingers off the flanks.
+func shake_off() -> void:
+	var n := 0
+	for z in _latched.duplicate():
+		if n >= Progression.DASH_SHAKES_OFF:
+			break
+		_latched.erase(z)
+		zombies.erase(z)
+		_note_wave_leak(z)
+		z.consume()
+		n += 1
+	if n > 0:
+		shaken_off.emit(n)
 
 
 ## How much slower everything that walks is going right now.
@@ -252,7 +302,7 @@ func try_hit(b: Bullet) -> bool:
 	var z_lo := minf(b.prev_z, b.position.z) - 0.35
 	var z_hi := maxf(b.prev_z, b.position.z) + 0.35
 	for z in zombies.duplicate():
-		if z.position.z < z_lo or z.position.z > z_hi:
+		if z.latched or z.position.z < z_lo or z.position.z > z_hi:
 			continue
 		if absf(z.position.x - b.position.x) > z.radius * b.radius_mult:
 			continue
@@ -610,11 +660,14 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 				z.consume()
 				dodged.emit()
 				continue
-			if z.is_latcher() and not p_squad.is_shielded():
-				# Grabs the front rank and rides along, eating, until shot off.
+			var can_cling: bool = not (z.brute or z.is_tank()) and not p_squad.is_shielded() and _latched.size() < Progression.MAX_LATCHED
+			if can_cling:
+				# Clings to a flank and rides along, eating, until shot off.
 				z.latched = true
-				z.latch_offset_x = clampf(z.position.x - p_squad.position.x, -1.2, 1.2)
 				z.latch_timer = Difficulty.LATCH_INTERVAL
+				z.hp = maxf(z.hp, z.max_hp) * Difficulty.LATCH_HP_MULT
+				z.max_hp = z.hp
+				_latched.append(z)
 				latched.emit(z)
 				continue
 			zombies.erase(z)
@@ -644,17 +697,20 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 ## A latched zombie clings to the squad's front rank and eats on a timer.
 ## It is a target on your own doorstep: focus fire takes it off.
 func _tick_latched(delta: float, z: Zombie, p_squad: Squad) -> void:
-	var front_z := -(Formation.half_width(mini(p_squad.count, Squad.MAX_VISUAL), p_squad.spread) * 0.9 + 0.9)
-	z.position.x = lerpf(z.position.x, p_squad.position.x + z.latch_offset_x, 1.0 - exp(-12.0 * delta))
-	z.position.z = lerpf(z.position.z, front_z, 1.0 - exp(-12.0 * delta))
+	var slot := p_squad.latch_slot(_latched.find(z))
+	var target := p_squad.position + slot
+	z.position.x = lerpf(z.position.x, target.x, 1.0 - exp(-12.0 * delta))
+	z.position.z = lerpf(z.position.z, target.z, 1.0 - exp(-12.0 * delta))
+	z.look_at(p_squad.position + Vector3(0.0, 0.0, z.position.z - p_squad.position.z), Vector3.UP)
 	z.latch_timer -= delta
 	if z.latch_timer <= 0.0:
 		z.latch_timer = Difficulty.LATCH_INTERVAL
-		if p_squad.is_shielded() or p_squad.is_invulnerable():
+		if p_squad.is_shielded():
 			return
 		p_squad.add(-Difficulty.LATCH_BITE)
 		squad_bitten.emit(Difficulty.LATCH_BITE, false)
 		if p_squad.count <= 0:
+			_latched.erase(z)
 			zombies.erase(z)
 			z.consume()
 
@@ -690,7 +746,7 @@ func _move_boss(delta: float) -> void:
 			if boss.position.z >= BOSS_ENGAGE_Z and _all_gates_passed():
 				phase = Phase.BOSS
 		Phase.BOSS:
-			var walk := BOSS_WALK_SPEED * _pace()
+			var walk := BOSS_WALK_SPEED * _pace() * (1.6 if boss_enraged() else 1.0)
 			if boss.is_spitter():
 				boss.position.z = minf(boss.position.z + walk * delta, Boss.SPITTER_HOLD_Z)
 				boss.position.x = boss.sway_x
@@ -711,23 +767,55 @@ func _all_gates_passed() -> bool:
 	return true
 
 
+func boss_enraged() -> bool:
+	return boss != null and boss.alive and boss.hp <= boss.max_hp * Difficulty.ENRAGE_FRACTION
+
+
 func _tick_boss(delta: float, p_squad: Squad) -> void:
 	if boss == null or not boss.alive:
 		return
+	var enraged := boss_enraged()
+	# Lightning: rings near the squad, then bolts. Move or dash out.
+	_strike_timer -= delta * _pace()
+	if _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
+		_strike_timer = Difficulty.STRIKE_INTERVAL_ENRAGED if enraged else Difficulty.STRIKE_INTERVAL
+		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0)
+		for i in range(n):
+			var offset := 0.0 if i == 0 else gen.rng.randf_range(-2.2, 2.2)
+			var st := Strike.new()
+			st.setup(clampf(p_squad.position.x + p_squad.velocity_x * 0.5 + offset, -LANE_HALF, LANE_HALF))
+			add_child(st)
+			_strikes.append(st)
+	# Adds: the boss calls runners down the road.
+	_adds_timer -= delta * _pace()
+	if _adds_timer <= 0.0:
+		_adds_timer = Difficulty.BOSS_ADDS_INTERVAL * (0.7 if enraged else 1.0)
+		var spec := Difficulty.wave_for(level, Difficulty.GATES_PER_LEVEL - 1, p_squad.count)
+		for i in range(Difficulty.boss_adds(level)):
+			var zb := Zombie.new()
+			zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
+			zb.lane_offset = gen.rng.randf_range(-1.0, 1.0)
+			zb.position = Vector3(gen.rng.randf_range(-LANE_HALF + 0.6, LANE_HALF - 0.6), 0.0, boss.position.z + 1.0)
+			add_child(zb)
+			zombies.append(zb)
 	if boss.is_spitter():
 		if boss.position.z < Boss.SPITTER_HOLD_Z - 0.5:
 			return
 		boss.spit_timer -= delta * _pace()
 		if boss.spit_timer <= 0.0:
-			# Faster once hurt. Aim where the squad will be, not where it is.
-			boss.spit_timer = Boss.SPIT_INTERVAL if boss.hp > boss.max_hp * 0.5 else Boss.SPIT_INTERVAL * 0.6
+			# Faster once hurt, and a volley instead of a single glob. Aim
+			# where the squad will be, not where it is.
+			boss.spit_timer = Boss.SPIT_INTERVAL * 0.6 if enraged else Boss.SPIT_INTERVAL
 			var from := boss.position + Vector3(0.0, 3.3, 0.8)
 			var flight := -from.z / Spit.SPEED
-			var to_x := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -LANE_HALF + 0.3, LANE_HALF - 0.3)
-			var sp := Spit.new()
-			add_child(sp)
-			sp.launch(from, to_x, self)
-			_spits.append(sp)
+			var aim := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -LANE_HALF + 0.3, LANE_HALF - 0.3)
+			var volley := Difficulty.SPIT_VOLLEY if enraged else 1
+			for i in range(volley):
+				var to_x := clampf(aim + (float(i) - float(volley - 1) * 0.5) * 1.6, -LANE_HALF + 0.3, LANE_HALF - 0.3)
+				var sp := Spit.new()
+				add_child(sp)
+				sp.launch(from, to_x, self)
+				_spits.append(sp)
 		return
 	if boss.position.z < BOSS_CHEW_Z:
 		return
@@ -765,6 +853,34 @@ func _move_spits(p_squad: Squad) -> void:
 		sp.queue_free()
 
 
+func _move_strikes(delta: float, p_squad: Squad) -> void:
+	for st in _strikes.duplicate():
+		if st.tick(delta):
+			var hit := absf(st.x - p_squad.position.x) <= p_squad.reach() + Difficulty.STRIKE_RADIUS * 0.5
+			if hit and (p_squad.is_invulnerable()):
+				dodged.emit()
+				hit = false
+			elif hit and p_squad.is_shielded():
+				shield_blocked.emit()
+				hit = false
+			elif hit:
+				var bite := Difficulty.strike_bite(p_squad.count)
+				p_squad.add(-bite)
+				squad_bitten.emit(bite, true)
+			strike_landed.emit(st.position, hit)
+		if st.done:
+			_strikes.erase(st)
+			st.queue_free()
+
+
+## True when a warning ring is about to fire within [param dx] of x.
+func strike_threat_at(x: float, dx: float) -> bool:
+	for st in _strikes:
+		if not st.fired and absf(st.x - x) <= dx:
+			return true
+	return false
+
+
 func _move_crates(delta: float, p_squad: Squad) -> void:
 	for c in _crates.duplicate():
 		c.position.z += world_speed * delta
@@ -794,7 +910,7 @@ func _move_bombs(p_squad: Squad) -> void:
 		var kills := 0
 		var heavy := (p_squad.dps() if p_squad != null else 10.0) * 3.0
 		for z in zombies.duplicate():
-			if z.position.distance_to(at) > Bomb.RADIUS:
+			if z.latched or z.position.distance_to(at) > Bomb.RADIUS:
 				continue
 			var dead := true
 			if z.brute or z.is_tank():

@@ -3,6 +3,25 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.9 (run 9)
+
+Clingers, spray, and bosses that fight back.
+
+- Any walker or runner that reaches the squad now clings to a flank with
+  doubled health and eats a soldier every 0.7 s until you hold focus fire
+  on it or dash to shake two off. Six can cling at once. From level 1.
+- Unfocused fire sprays sideways; focus fire converges and hits 1.5x.
+  Aiming is now the difference between hitting a brute at range and not.
+- Bosses: lightning rings near the squad with a one-second warning, then
+  a bolt that takes 15%. Runner adds every six seconds. Below half health
+  bosses enrage: an extra ring, faster strikes, spitter volleys of three,
+  the walker closes 60% faster.
+- Hints rewritten for the new rules.
+- Balance, bot with no upgrades: squad at the boss on levels 1 to 5 was
+  93, 49, 63, 58, 51, and each boss now costs it 7 to 15 soldiers to
+  lightning; died on level 5 after 2.8 minutes; best combo 83, 20
+  perfect gates. Endless: level 8 at three minutes, peak 498.
+
 ## 0.8 (run 8)
 
 Skill, pressure, and a run that teaches itself.

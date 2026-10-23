@@ -76,10 +76,23 @@ other way, and your aim as a resource you have to spend wisely.
 - Hot panels. From level 3 every panel flashes white for 0.45 s of every
   2.2 s, each side out of phase. Hits during the flash count triple
   toward stepping the value. Rhythm, not just position.
-- Latchers. From level 3, sturdier purple zombies that grab the front rank
-  instead of biting once: they ride along eating a soldier every 0.7 s
-  until shot off. They sit just ahead of the front row, so back-row fire
-  and focus fire both reach them.
+- Clingers. From level 1, any walker or runner that reaches the squad
+  clings to a flank slot (alternating sides, a little further back each)
+  with doubled health and eats a soldier every 0.7 s until it is dealt
+  with. Bullets cannot reach the squad's own flank, so there are exactly
+  two answers: hold focus fire within 1.4 m of it, which pours 70% of
+  squad DPS into it, or dash, which throws the first two off. Six can
+  cling at once; the rest bite once and are spent. Purple latchers from
+  level 3 are the same thing with more health, arriving on purpose.
+- Spray. Unfocused rounds drift sideways by up to 1.6 m/s, so a target
+  twenty metres out is hit by luck; focused rounds converge and deal 1.5x.
+  That is the point of aiming.
+- Bosses attack. Lightning: every 3.2 s (2 s enraged) the boss drops one
+  to three red rings near the squad, biased to where it is heading; a
+  second later a bolt lands and anyone inside loses 15% (floor three).
+  Move or dash out; a dash through one is a DODGED. Adds: runners every
+  6 s. Enrage below half health: an extra ring per volley, the spitter
+  fires volleys of three across 3.2 m, the walker closes 60% faster.
 - Firepower caps at forty soldiers' worth. Past that, more soldiers are
   more to lose, so waves and bosses stay dangerous to a big squad and the
   count reads as health.
@@ -172,10 +185,10 @@ picks the better panel, shoots whatever is close, tracks the boss core and
 takes the first perk offered. It is a strong proxy for a practised human;
 a newcomer lands well below it.
 
-| Metric | Run 8 result (bot, no upgrades) |
+| Metric | Run 9 result (bot, no upgrades) |
 |---|---|
-| Levels: squad at each boss, 1 to 4 | 79, 122, 168, 28; wiped on level 5, 2.6 min |
-| Endless: after 3 minutes | level 7, peak 705 |
+| Levels: squad at each boss, 1 to 5 | 93, 49, 63, 58, 51; wiped on level 5, 2.8 min |
+| Endless: after 3 minutes | level 8, peak 498 |
 
 Regulators that keep a level in range: multipliers are 20% of good panels
 and vanish once the squad passes 150; halving gates appear on the bad side

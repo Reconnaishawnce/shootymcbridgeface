@@ -235,6 +235,36 @@ static func boss_hp(level: int, perk_count: int = 0) -> float:
 	return base * (1.0 + BOSS_HP_PER_PERK * float(perk_count))
 
 
+## Boss lightning: strikes land near the squad after a warning ring.
+const STRIKE_WARNING := 1.0
+const STRIKE_INTERVAL := 3.2
+const STRIKE_INTERVAL_ENRAGED := 2.0
+const STRIKE_BITE_FRACTION := 0.15
+const STRIKE_RADIUS := 1.1
+## How many rings a volley puts down.
+static func strikes_per_volley(level: int) -> int:
+	return clampi(1 + (level - 1) / 3, 1, 3)
+
+
+## Soldiers a lightning strike takes when it lands on the squad.
+static func strike_bite(squad_count: int) -> int:
+	return maxi(3, int(float(squad_count) * STRIKE_BITE_FRACTION))
+
+
+## Runners the boss calls every BOSS_ADDS_INTERVAL seconds.
+const BOSS_ADDS_INTERVAL := 6.0
+static func boss_adds(level: int) -> int:
+	return clampi(1 + level / 2, 1, 4)
+
+
+## Below this fraction of health the boss attacks faster and harder.
+const ENRAGE_FRACTION := 0.5
+## Spit per volley once enraged (spread across the lane).
+const SPIT_VOLLEY := 3
+## Latched walkers and runners eat on this timer, each.
+const LATCH_HP_MULT := 2.0
+
+
 ## Soldiers one landed glob of spit takes.
 static func spit_bite(squad_count: int) -> int:
 	return maxi(2, int(float(squad_count) * SPIT_BITE_FRACTION))

@@ -34,11 +34,21 @@ the same key (see below).
   to spraying ahead. The button at the bottom right cycles tight, normal
   and wide. On desktop: arrows or WASD, Q/E to dash, click and hold the
   road to focus, F to cycle, B to throw a bomb.
-- The game teaches itself one line at a time. Level 1 is steer and pick.
-  Level 2 adds the dash and the spitter. Level 3 adds flashing panels (hit
-  them during the flash for triple steps) and latchers, zombies that grab
-  your front rank and keep eating until you focus fire on them. From
-  level 4 gates are often red on both sides.
+- **Clingers.** Any walker or runner that reaches you clings to the
+  squad's flank and keeps eating until you hold focus fire on it, or dash
+  to shake a couple off. Up to six can cling at once. Brutes and tanks
+  still take a slice and go.
+- **Aim matters.** Unfocused fire sprays in a cone, so anything at range
+  gets hit by luck. Held focus converges every round on the spot and hits
+  harder.
+- **Bosses fight back.** Red rings on the road warn of lightning for one
+  second, then it lands; move or dash out. Bosses call runners every few
+  seconds. Below half health they enrage: more rings, faster strikes, the
+  spitter fires volleys of three and the walker charges.
+- The game teaches itself one line at a time. Level 1 is steer, pick and
+  shake off clingers. Level 2 adds the dash and the spitter. Level 3 adds
+  flashing panels (hit them during the flash for triple steps) and the
+  tougher purple latchers. From level 4 gates are often red on both sides.
 - Firepower stops growing past forty soldiers. Beyond that, soldiers are
   health: a big squad is something to protect, not a win button.
 - Dashing through a bite, a spit or the boss's chew pays a DODGED bonus.

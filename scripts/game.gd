@@ -168,6 +168,8 @@ func _build_scene() -> void:
 	world.fork_merged.connect(_on_fork_merged)
 	world.dodged.connect(_on_dodged)
 	world.latched.connect(_on_latched)
+	world.strike_landed.connect(_on_strike_landed)
+	world.shaken_off.connect(_on_shaken_off)
 	world.powerups = powerups
 
 	squad = Squad.new()
@@ -178,6 +180,7 @@ func _build_scene() -> void:
 	add_child(squad)
 	squad.count_changed.connect(_on_count_changed)
 	squad.wiped_out.connect(_on_wiped_out)
+	squad.dashed.connect(func() -> void: world.shake_off())
 	squad.reset()
 
 	hud = Hud.new()
@@ -734,9 +737,21 @@ func _on_dodged() -> void:
 
 func _on_latched(zombie: Zombie) -> void:
 	sfx.play("bite", -8.0, 1.4)
-	hud.show_float("LATCHED!", false)
+	hud.show_float("CLINGING! HOLD ON IT", false)
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.9, 0.0), Zombie.LATCHER_SKIN, 6, 0.1, 3.0, 0.3)
 	_shake = minf(1.0, _shake + 0.3)
+
+
+func _on_shaken_off(n: int) -> void:
+	hud.show_float("SHOOK OFF %d" % n, true)
+	sfx.play("block", -4.0, 0.8)
+
+
+func _on_strike_landed(at: Vector3, hit: bool) -> void:
+	sfx.play("explosion", -2.0 if hit else -8.0, 1.5)
+	hud.flash(0.25 if hit else 0.1)
+	_shake = minf(1.0, _shake + (0.8 if hit else 0.3))
+	Burst.spawn(world, at + Vector3(0.0, 0.4, 0.0), Strike.BOLT, 18, 0.14, 7.0, 0.5)
 
 
 func _on_wave_cleared(level: int) -> void:
@@ -824,6 +839,11 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
+	# Lightning ring on top of us: dash out of it.
+	if Progression.dash_enabled(world.level) and world.strike_threat_at(squad.position.x, squad.reach() + 0.6) and squad.can_dash():
+		var away := -1.0 if squad.position.x > 0.0 else 1.0
+		if squad.dash(away):
+			_on_dash()
 	var focus := world.focus_target(24.0)
 	if focus != null:
 		squad.set_focus(focus.position)

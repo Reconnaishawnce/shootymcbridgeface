@@ -131,13 +131,24 @@ From the third play session: too easy, nothing to get good at.
 - Progressive unlocks with one-line hints: level 1 is plain, dash at 2,
   hot panels and latchers at 3, both-red gates at 4.
 
-## Run 9: difficulty modifiers and grades
+## Run 9: clingers, spray, bosses that fight back (done)
+
+From the fourth play session: zombies did not stick, aiming had no point,
+bosses were too easy.
+
+- Clinging from level 1 for every walker and runner that reaches you;
+  focus fire or dash is the only answer.
+- Unfocused fire sprays; focus converges and hits harder.
+- Boss lightning with warning rings, runner adds, enrage below half,
+  spitter volleys, walker charge.
+
+## Run 10: difficulty modifiers and grades
 
 - Hard and Nightmare modifiers with score and coin multipliers.
 - Level grades (S to D) on the clear banner.
 - Trade gates, bet gates, scout sacrifice.
 - Flankers over the curbs; the horde behind you.
-- Fourth phone feedback pass.
+- Fifth phone feedback pass.
 
 ## Always
 

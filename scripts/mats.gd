@@ -38,6 +38,51 @@ static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 	return m
 
 
+## Character material: wrapped lighting so curves shade softly instead of
+## splitting into a lit half and a dark half, and a little sheen. Reads as
+## a toy, not a crate.
+static func soft(color: Color) -> StandardMaterial3D:
+	var cache := _cache()
+	var key := "soft|%s" % color.to_html(true)
+	if cache.has(key):
+		return cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.62
+	m.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	m.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
+	if color.a < 0.999:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cache[key] = m
+	return m
+
+
+## A smooth sphere for faces and round bodies: more segments, soft shading.
+static func ball(radius: float, color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	mesh.radial_segments = 20
+	mesh.rings = 10
+	mi.mesh = mesh
+	mi.material_override = soft(color)
+	return mi
+
+
+## A smooth capsule for limbs and bodies.
+static func pill(radius: float, height: float, color: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = height
+	mesh.radial_segments = 16
+	mesh.rings = 6
+	mi.mesh = mesh
+	mi.material_override = soft(color)
+	return mi
+
+
 static func box(size: Vector3, color: Color, unshaded: bool = false) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var mesh := BoxMesh.new()

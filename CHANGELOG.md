@@ -3,6 +3,16 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.13 (run 10.3)
+
+Cuter characters.
+
+- Soldiers rebuilt as round, big-headed little people: smooth spheres and
+  capsules instead of boxes, soft wrapped lighting with a little sheen,
+  big eyes with a catchlight, pink cheeks, a smile, rounded shoes, a belt
+  with a buckle, stubby arms on a smaller gun. Hair, hats and backs
+  resized to the new head. The locker preview is bigger.
+
 ## 0.12 (run 10.2)
 
 Characters, pass 2.

@@ -166,6 +166,11 @@ bosses were too easy.
   chef hat, balloon and shell.
 - "Something new in the locker" nudge after a run; a star for the daily.
 
+## Run 10.3: cuter characters (done)
+
+- Round, big-headed soldiers from smooth primitives with soft shading,
+  faces, and dress-up slots sized to the new head.
+
 ## Run 11: difficulty modifiers and grades
 
 - Hard and Nightmare modifiers with score and coin multipliers.

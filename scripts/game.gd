@@ -308,7 +308,8 @@ func _refresh_preview() -> void:
 	add_child(_preview)
 	var size := get_viewport().get_visible_rect().size
 	var spot := camera.project_position(Vector2(size.x * 0.5, size.y * 0.2), 6.5)
-	_preview.position = spot - Vector3(0.0, 0.8, 0.0)
+	_preview.position = spot - Vector3(0.0, 0.95, 0.0)
+	_preview.scale = Vector3.ONE * 1.25
 	_preview.look_at(camera.global_position, Vector3.UP)
 	_preview_yaw = _preview.rotation.y
 	_preview.rotation = Vector3(0.0, _preview_yaw, 0.0)

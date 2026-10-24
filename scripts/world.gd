@@ -23,7 +23,7 @@ signal dodged
 signal latched(zombie: Zombie)
 signal strike_landed(at: Vector3, hit: bool)
 signal shaken_off(count: int)
-signal lanes_changed(lanes: int)
+signal lanes_changed(lanes: int, animated: bool)
 ## A bet placed at a gate came due: doubled (won) or halved.
 signal bet_resolved(won: bool, before: int, after: int)
 signal bet_placed
@@ -51,8 +51,16 @@ var road_half := Progression.road_half(2)
 var lanes := 2
 ## Difficulty modifier in force: see Modifiers.
 var modifier := "normal"
-## Bet bookkeeping: the wave the bet rides on, and whether it was bitten.
-var _bet_wave := -1
+## Bet bookkeeping: the wave ids the bet rides on (a fork splits one wave
+## in two), whether it is already lost, whether a bite landed, and the
+## wave index still waiting to spawn.
+var _bet_waves: Array = []
+var _bet_lost := false
+var _bet_pending_index := -1
+## Wave index -> ids of the waves spawned for it, this level.
+var _wave_id_for: Dictionary = {}
+## Set once the run is over: bullets still in the air hit nothing.
+var frozen := false
 ## Gates still to be revealed by a scout party.
 var _scout_left := 0
 var _bet_bitten := false
@@ -136,7 +144,7 @@ var _lane_tween: Tween
 
 
 func _on_own_bite(_bite: int, _heavy: bool) -> void:
-	if _bet_wave >= 0:
+	if not _bet_waves.is_empty():
 		_bet_bitten = true
 
 
@@ -152,9 +160,9 @@ func reset(seed_value: int) -> void:
 	_clear_actors()
 	world_speed = Difficulty.world_speed(1)
 	_gates_passed = 0
-	_bet_wave = -1
-	_bet_bitten = false
+	_clear_bet()
 	_scout_left = 0
+	frozen = false
 	horde_z = HORDE_REST_Z
 	_place_horde()
 	set_lanes(2, false)
@@ -182,7 +190,7 @@ func set_lanes(n: int, animate: bool = true) -> void:
 	else:
 		_apply_road_width(target)
 		_place_dashes(n)
-	lanes_changed.emit(n)
+	lanes_changed.emit(n, animate)
 
 
 func _apply_road_width(h: float) -> void:
@@ -198,9 +206,21 @@ func _apply_road_width(h: float) -> void:
 		_posts[i].position.x = side * (h + 0.65)
 
 
+func _clear_bet() -> void:
+	_bet_waves = []
+	_bet_lost = false
+	_bet_bitten = false
+	_bet_pending_index = -1
+
+
 func start_level(n: int) -> void:
 	level = n
 	phase = Phase.GATES
+	# Waves that outlived the level are gone with it; so is any open bet.
+	_wave_alive.clear()
+	_wave_voided.clear()
+	_wave_id_for.clear()
+	_clear_bet()
 	if not endless or n == 1:
 		level_distance = 0.0
 		_next_gate = 0
@@ -446,6 +466,8 @@ func nearest_upcoming_gate() -> Gate:
 ## bullet is spent. Sweeps from the bullet's previous z so fast tracers
 ## cannot tunnel through thin targets.
 func try_hit(b: Bullet) -> bool:
+	if frozen:
+		return true
 	var z_lo := minf(b.prev_z, b.position.z) - 0.35
 	var z_hi := maxf(b.prev_z, b.position.z) + 0.35
 	for z in zombies.duplicate():
@@ -583,6 +605,7 @@ func _spawn_wave(n: int, count: int) -> void:
 			var route: Dictionary = _fork_routes["left" if side < 0 else "right"]
 			_wave_seq += 1
 			var wave := _wave_seq
+			_note_wave_id(n, wave)
 			var lo := 0.6 if side > 0 else -road_half + 0.5
 			var hi := road_half - 0.5 if side > 0 else -0.6
 			for i in range(int(ceil(spec.count * float(route.wave_mult)))):
@@ -592,6 +615,7 @@ func _spawn_wave(n: int, count: int) -> void:
 		return
 	_wave_seq += 1
 	var wave := _wave_seq
+	_note_wave_id(n, wave)
 	for i in range(spec.count):
 		_spawn_zombie(spec.hp, spec.speed, Zombie.Kind.NORMAL, base_z - gen.rng.randf_range(0.0, 7.0), wave)
 	for i in range(spec.brutes):
@@ -606,6 +630,16 @@ func _spawn_wave(n: int, count: int) -> void:
 	for i in range(spec.thieves):
 		var z := base_z - (Difficulty.GATE_SPACING - Difficulty.WAVE_OFFSET) + 14.0 + gen.rng.randf_range(0.0, 3.0)
 		_spawn_zombie(spec.thief_hp, spec.speed, Zombie.Kind.THIEF, z)
+
+
+## Remember which wave ids belong to wave index [param n], and hand them
+## to a bet that was waiting for this wave to spawn.
+func _note_wave_id(n: int, wave: int) -> void:
+	var ids: Array = _wave_id_for.get(n, [])
+	ids.append(wave)
+	_wave_id_for[n] = ids
+	if n == _bet_pending_index:
+		_bet_waves = ids.duplicate()
 
 
 ## A wave spec with the modifier applied: more bodies, more health.
@@ -692,8 +726,7 @@ func _note_wave_death(z: Zombie) -> void:
 	if left <= 0:
 		if not _wave_voided.has(z.wave_id):
 			wave_cleared.emit(level)
-		if z.wave_id == _bet_wave:
-			_resolve_bet(not _wave_voided.has(z.wave_id) and not _bet_bitten)
+		_bet_wave_done(z.wave_id, _wave_voided.has(z.wave_id) or _bet_bitten)
 		_wave_alive.erase(z.wave_id)
 		_wave_voided.erase(z.wave_id)
 
@@ -705,16 +738,26 @@ func _note_wave_leak(z: Zombie) -> void:
 	var left := int(_wave_alive.get(z.wave_id, 1)) - 1
 	_wave_alive[z.wave_id] = left
 	if left <= 0:
-		if z.wave_id == _bet_wave:
-			_resolve_bet(false)
+		_bet_wave_done(z.wave_id, true)
 		_wave_alive.erase(z.wave_id)
 		_wave_voided.erase(z.wave_id)
+
+
+## One of the bet's waves finished. The bet settles when the last does.
+func _bet_wave_done(wave: int, lost: bool) -> void:
+	if not _bet_waves.has(wave):
+		return
+	_bet_waves.erase(wave)
+	if lost:
+		_bet_lost = true
+	if _bet_waves.is_empty():
+		_resolve_bet(not _bet_lost)
 
 
 ## Double or half. A bite during the wave, or a zombie that got through,
 ## loses it.
 func _resolve_bet(won: bool) -> void:
-	_bet_wave = -1
+	_clear_bet()
 	if squad == null:
 		return
 	var before := squad.count
@@ -761,9 +804,14 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 							_scout_left -= 1
 					scouts_sent.emit(GateMath.SCOUT_GATES)
 				elif GateMath.is_bet(panel):
-					# Rides on the wave after this gate: the next wave id.
-					_bet_wave = _wave_seq + 1
-					_bet_bitten = false
+					# Rides on the wave that follows this gate, which shares
+					# its index. Usually spawned already; else it is pending.
+					_clear_bet()
+					var ids: Array = _wave_id_for.get(_next_runners, [])
+					if ids.is_empty():
+						_bet_pending_index = _next_runners
+					else:
+						_bet_waves = ids.duplicate()
 					bet_placed.emit()
 				if after > 0:
 					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
@@ -1016,6 +1064,8 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			var zb := Zombie.new()
 			zb.setup(spec.runner_hp, spec.speed, Zombie.Kind.RUNNER)
 			zb.lane_offset = gen.rng.randf_range(-1.0, 1.0)
+			zb.lane_min = -road_half + 0.6
+			zb.lane_max = road_half - 0.6
 			zb.position = Vector3(gen.rng.randf_range(-road_half + 0.6, road_half - 0.6), 0.0, boss.position.z + 1.0)
 			add_child(zb)
 			zombies.append(zb)

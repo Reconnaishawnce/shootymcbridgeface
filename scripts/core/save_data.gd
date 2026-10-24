@@ -10,7 +10,9 @@ const META := "meta"
 
 static func _load() -> ConfigFile:
 	var cfg := ConfigFile.new()
-	cfg.load(PATH)
+	# A fresh install has no file yet; loading it would log an error.
+	if FileAccess.file_exists(PATH):
+		cfg.load(PATH)
 	return cfg
 
 
@@ -150,6 +152,13 @@ static func record_run(score: int, level: int, endless: bool = false, modifier: 
 	cfg.set_value(STATS, "runs", int(cfg.get_value(STATS, "runs", 0)) + 1)
 	cfg.save(PATH)
 	return result
+
+
+## A daily or weekly counts as a run without touching any best.
+static func count_run() -> void:
+	var cfg := _load()
+	cfg.set_value(STATS, "runs", int(cfg.get_value(STATS, "runs", 0)) + 1)
+	cfg.save(PATH)
 
 
 static func wipe() -> void:

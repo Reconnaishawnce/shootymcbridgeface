@@ -3,6 +3,32 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.16 (cleanup and QA)
+
+No new features. A review pass over the whole game, and the bugs it found.
+
+- Fixed: a dash late in one run left the next run invulnerable, and
+  unable to dash, for as long as the first run had lasted. Run clocks
+  now reset with the squad.
+- Fixed: a bet rode on the wrong wave (two waves on, or a flanker pack).
+  Bets now settle on the wave that follows the gate, both halves of it
+  at a fork, and a pending bet dies with the level.
+- Fixed: a daily run was being saved as the endless high score. Daily
+  and weekly runs now only count toward the run total.
+- Fixed: retrying after a run that widened the road played a "2 LANES"
+  banner, a chime and a camera glide at the start of the next run.
+- Fixed: boss adds on four- and five-lane roads could not reach a squad
+  parked wide. Bullets still in the air after a wipe no longer score
+  kills, grades or a boss clear over the wipe screen.
+- Fixed: after a daily or weekly the title squad kept rifles while the
+  button said shotguns or medics.
+- Long HUD text wraps instead of running off a phone screen.
+- First launch no longer logs an error for the save file it has not
+  written yet. The title and wipe screens take one record each instead
+  of a dozen positional arguments. Stale comments about two-panel gates
+  updated. The auto-player takes a bet when it can afford to, so that
+  path runs in CI, and logs how it went.
+
 ## 0.15 (run 12)
 
 The weekly, scouts, and a hero with something to say.

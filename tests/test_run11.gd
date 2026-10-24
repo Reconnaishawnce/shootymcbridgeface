@@ -82,4 +82,8 @@ func test_modifier_records() -> void:
 	check_eq(SaveData.load_best("hard"), 500, "hard still 500")
 	SaveData.save_modifier("nightmare")
 	check_eq(SaveData.load_modifier(), "nightmare", "modifier persists")
+	var runs := SaveData.load_runs()
+	SaveData.count_run()
+	check_eq(SaveData.load_runs(), runs + 1, "a daily counts as a run")
+	check_eq(SaveData.load_best_endless(), 0, "without touching the endless best")
 	SaveData.wipe()

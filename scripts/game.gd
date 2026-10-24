@@ -262,6 +262,10 @@ func _build_scene() -> void:
 func show_title() -> void:
 	state = State.TITLE
 	sfx.set_music("calm")
+	# A daily or weekly forces rifles; the title squad shows the real pick.
+	if squad.squad_type != squad_type:
+		squad.squad_type = squad_type
+		_apply_looks()
 	var normal_level := SaveData.load_best_level("normal")
 	var hard_level := SaveData.load_best_level("hard")
 	var hint := ""
@@ -269,7 +273,13 @@ func show_title() -> void:
 		hint = "Hard mode: %s" % Modifiers.unlock_text("hard")
 	elif modifier == "hard" and not Modifiers.unlocked("nightmare", normal_level, hard_level):
 		hint = "Nightmare: %s" % Modifiers.unlock_text("nightmare")
-	hud.show_title(best, best_level, best_endless, coins, Meta.endless_unlocked(normal_level), squad_type, meta.shotgun_unlocked() or meta.squad_unlocked("medic"), wardrobe.stars, wardrobe.hero_name() if character_mode else "", modifier, hint)
+	hud.show_title({
+		"best": best, "best_level": best_level, "best_endless": best_endless, "coins": coins,
+		"endless_unlocked": Meta.endless_unlocked(normal_level), "squad_type": squad_type,
+		"shotgun_unlocked": meta.shotgun_unlocked() or meta.squad_unlocked("medic"),
+		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
+		"modifier": modifier, "mode_hint": hint,
+	})
 
 
 func _load_bests() -> void:
@@ -488,9 +498,13 @@ func start_run(p_mode: String = "levels") -> void:
 	_level_perfect = 0
 	_boss_start = 0.0
 	_horde_warned = false
-	state = State.RUNNING
+	squad.now = 0.0
+	world.now = 0.0
 	squad.reset(run_meta.start_squad())
+	# Reset before RUNNING: a road snapping back to two lanes must not
+	# banner, chime or glide the camera like a mid-run widening.
 	world.reset(run_seed)
+	state = State.RUNNING
 	squad.active = true
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
@@ -510,6 +524,7 @@ func end_run() -> void:
 		return
 	state = State.GAME_OVER
 	squad.active = false
+	world.frozen = true
 	Engine.time_scale = 1.0
 	hud.set_combo(0, 1.0, 0.0)
 	hud.set_danger(0.0)
@@ -528,7 +543,7 @@ func end_run() -> void:
 			daily_results = out.results
 			is_best = out.new_best
 			SaveData.save_daily(daily_results)
-			SaveData.record_run(score, world.level, true)
+			SaveData.count_run()
 		shown_best = maxi(prev, score)
 	elif mode == "weekly":
 		var prev := int(weekly_results.get(week_number, {}).get("score", 0))
@@ -537,6 +552,7 @@ func end_run() -> void:
 			weekly_results = out.results
 			is_best = out.new_best
 			SaveData.save_weekly(weekly_results)
+			SaveData.count_run()
 		shown_best = maxi(prev, score)
 	else:
 		if not smoke:
@@ -559,7 +575,13 @@ func end_run() -> void:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over(score, shown_best, is_best, world.level, int(total_distance), kills, peak_squad, earned, mode, stars_earned, wardrobe.hero_name() if character_mode else "", character_mode and wardrobe.can_afford_something(), " ".join(grades), world.modifier)
+	hud.show_game_over({
+		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
+		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned,
+		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
+		"locker_nudge": character_mode and wardrobe.can_afford_something(),
+		"grades": " ".join(grades), "modifier": world.modifier,
+	})
 	if character_mode:
 		squad.cheer()
 	sfx.play("wipe")
@@ -981,7 +1003,17 @@ func _on_bet_placed() -> void:
 	sfx.play("powerup", -4.0, 1.2)
 
 
+func _bot_panel(g: Gate) -> int:
+	if squad.count >= 24:
+		for i in range(g.panels.size()):
+			if GateMath.is_bet(g.panels[i]):
+				return i
+	return GateMath.best_index(g.panels, squad.count)
+
+
 func _on_bet_resolved(won: bool, before: int, after: int) -> void:
+	if smoke:
+		print("SMOKE_BET ", JSON.stringify({"won": won, "before": before, "after": after, "level": world.level, "frame": _frames}))
 	if won:
 		hud.show_banner("BET WON   x2\n%d > %d" % [before, after], 1.6)
 		squad.rally()
@@ -1004,9 +1036,9 @@ func _on_fork_merged() -> void:
 
 
 ## The road widened: pull the camera back so the whole thing fits, and say so.
-func _on_lanes_changed(n: int) -> void:
-	_fit_camera(n, true)
-	if state == State.RUNNING:
+func _on_lanes_changed(n: int, animated: bool) -> void:
+	_fit_camera(n, animated)
+	if state == State.RUNNING and animated:
 		hud.show_banner("%d LANES" % n, 1.4)
 		sfx.play("powerup", -4.0, 0.7)
 		_punch(-4.0)
@@ -1035,7 +1067,7 @@ func _on_dodged() -> void:
 
 func _on_latched(zombie: Zombie) -> void:
 	sfx.play("bite", -8.0, 1.4)
-	hud.show_float("CLINGER! TAP IT OR DASH", false)
+	hud.show_float("CLINGER! TAP IT", false)
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.9, 0.0), Zombie.LATCHER_SKIN, 6, 0.1, 3.0, 0.3)
 	_shake = minf(1.0, _shake + 0.3)
 
@@ -1174,9 +1206,10 @@ func _bot_steer() -> void:
 	var z := world.nearest_zombie(22.0)
 	var g := world.nearest_upcoming_gate()
 	var pg := world.nearest_upcoming_perk_gate()
-	# A gate about to arrive outranks a zombie: pick the panel first.
+	# A gate about to arrive outranks a zombie: pick the panel first. The
+	# bot takes a bet when it can afford to lose, so that path gets tested.
 	if g != null and g.position.z > -12.0:
-		squad.target_x = g.panel_center_x(GateMath.best_index(g.panels, squad.count))
+		squad.target_x = g.panel_center_x(_bot_panel(g))
 		return
 	if pg != null and (g == null or pg.position.z > g.position.z):
 		if z != null and z.position.z > pg.position.z:
@@ -1187,7 +1220,7 @@ func _bot_steer() -> void:
 	if z != null and (g == null or z.position.z > g.position.z):
 		squad.target_x = clampf(z.position.x, -squad.road_half, squad.road_half)
 	elif g != null:
-		squad.target_x = g.panel_center_x(GateMath.best_index(g.panels, squad.count))
+		squad.target_x = g.panel_center_x(_bot_panel(g))
 
 
 func _shots_walkthrough() -> void:
@@ -1261,12 +1294,12 @@ func _shots_walkthrough() -> void:
 		await get_tree().process_frame
 	await _capture("5e_route.png", 30)
 	for i in range(3000):
-		if world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0:
+		if state != State.RUNNING or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.position.z > -14.0):
 			break
 		await get_tree().process_frame
 	await _capture("6_boss.png", 5)
 	for i in range(3000):
-		if world.phase != World.Phase.BOSS:
+		if state != State.RUNNING or world.phase != World.Phase.BOSS:
 			break
 		await get_tree().process_frame
 	await _capture("7_level_clear.png", 20)

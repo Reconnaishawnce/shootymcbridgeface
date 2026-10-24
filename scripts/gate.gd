@@ -1,6 +1,6 @@
 class_name Gate
 extends Node3D
-## A pair of panels spanning the lane. Scrolled by the world; chosen by the
+## One panel per lane, spanning the road. Scrolled by the world; chosen by the
 ## squad's x position at the moment it passes z = 0.
 
 const POST := Color(0.25, 0.25, 0.28)

@@ -176,6 +176,8 @@ func _init() -> void:
 	_float.set_anchors_preset(Control.PRESET_CENTER)
 	_float.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_float.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_float.custom_minimum_size.x = 680.0
+	_float.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_float.modulate.a = 0.0
 	_float_anchor.add_child(_float)
 
@@ -185,6 +187,7 @@ func _init() -> void:
 	_banner.anchor_top = 0.3
 	_banner.anchor_bottom = 0.3
 	_banner.offset_bottom = 160.0
+	_banner.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_banner.modulate.a = 0.0
 	root.add_child(_banner)
 
@@ -227,6 +230,7 @@ func _init() -> void:
 	_hint.anchor_top = 0.44
 	_hint.anchor_bottom = 0.44
 	_hint.offset_bottom = 120.0
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_hint.modulate.a = 0.0
 	_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
 	root.add_child(_hint)
@@ -513,6 +517,8 @@ func _build_over(root: Control) -> void:
 	_over_title = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_title)
 	_over_lines = _label(34, HORIZONTAL_ALIGNMENT_CENTER)
+	_over_lines.custom_minimum_size.x = 660.0
+	_over_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(_over_lines)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_prompt)
@@ -644,7 +650,20 @@ func _hide_cards() -> void:
 	_locker_card.visible = false
 
 
-func show_title(best: int, best_level: int, best_endless: int, coins: int, endless_unlocked: bool, squad_type: String, shotgun_unlocked: bool, stars: int = 0, hero_name: String = "", modifier: String = "normal", mode_hint: String = "") -> void:
+## [param t] keys: best, best_level, best_endless, coins, endless_unlocked,
+## squad_type, shotgun_unlocked, stars, hero_name, modifier, mode_hint.
+func show_title(t: Dictionary) -> void:
+	var best: int = t.get("best", 0)
+	var best_level: int = t.get("best_level", 0)
+	var best_endless: int = t.get("best_endless", 0)
+	var coins: int = t.get("coins", 0)
+	var endless_unlocked: bool = t.get("endless_unlocked", false)
+	var squad_type: String = t.get("squad_type", "rifle")
+	var shotgun_unlocked: bool = t.get("shotgun_unlocked", false)
+	var stars: int = t.get("stars", 0)
+	var hero_name: String = t.get("hero_name", "")
+	var modifier: String = t.get("modifier", "normal")
+	var mode_hint: String = t.get("mode_hint", "")
 	_hide_cards()
 	_title_card.visible = true
 	_pause_button.visible = false
@@ -769,7 +788,23 @@ func show_running() -> void:
 		_prompt_tween.kill()
 
 
-func show_game_over(score: int, best: int, is_best: bool, level: int, distance: int, kills: int, peak: int, coins_earned: int, mode: String, stars_earned: int = 0, hero_name: String = "", locker_nudge: bool = false, grades: String = "", modifier: String = "normal") -> void:
+## [param r] keys: score, best, is_best, level, distance, kills, peak,
+## coins_earned, mode, stars_earned, hero_name, locker_nudge, grades, modifier.
+func show_game_over(r: Dictionary) -> void:
+	var score: int = r.get("score", 0)
+	var best: int = r.get("best", 0)
+	var is_best: bool = r.get("is_best", false)
+	var level: int = r.get("level", 1)
+	var distance: int = r.get("distance", 0)
+	var kills: int = r.get("kills", 0)
+	var peak: int = r.get("peak", 1)
+	var coins_earned: int = r.get("coins_earned", 0)
+	var mode: String = r.get("mode", "levels")
+	var stars_earned: int = r.get("stars_earned", 0)
+	var hero_name: String = r.get("hero_name", "")
+	var locker_nudge: bool = r.get("locker_nudge", false)
+	var grades: String = r.get("grades", "")
+	var modifier: String = r.get("modifier", "normal")
 	_hide_cards()
 	_over_card.visible = true
 	_pause_button.visible = false

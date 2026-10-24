@@ -2,7 +2,7 @@ class_name GateMath
 extends RefCounted
 ## Pure gate arithmetic. No nodes, no scene tree, fully unit-testable.
 ##
-## A gate is a pair of panels. The squad passes through exactly one panel and
+## A gate is a row of panels, one per lane. The squad passes through exactly one and
 ## that panel's operation is applied to the squad count. Panels can be shot:
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.

@@ -111,6 +111,15 @@ func reset(start_count: int = 1) -> void:
 	velocity_x = 0.0
 	spread = 1.0
 	_fire_accum = 0.0
+	# Run clocks restart at zero: a dash from the last run must not leave
+	# this one invulnerable, or unable to dash, for minutes.
+	now = 0.0
+	dash_ready_at = 0.0
+	invulnerable_until = 0.0
+	_revive_timer = 0.0
+	if _dash_tween != null:
+		_dash_tween.kill()
+		_dash_tween = null
 	for s in _soldiers:
 		s.queue_free()
 	_soldiers.clear()

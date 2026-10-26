@@ -87,3 +87,41 @@ func test_modifier_records() -> void:
 	check_eq(SaveData.load_runs(), runs + 1, "a daily counts as a run")
 	check_eq(SaveData.load_best_endless(), 0, "without touching the endless best")
 	SaveData.wipe()
+
+
+func test_rubber_band() -> void:
+	var expected := int(float(Difficulty.expected_squad(3)) * Difficulty.BAND_NEUTRAL)
+	check_near(Difficulty.rubber_band(expected, 3), 0.0, 0.0001, "at the neutral point: no change")
+	check(Difficulty.rubber_band(Difficulty.expected_squad(3), 3) > 0.0, "the expected squad sits just above neutral")
+	check(Difficulty.rubber_band(expected * 3, 3) > 0.0, "ahead: harder")
+	check_near(Difficulty.rubber_band(expected * 10, 3), Difficulty.BAND_UP, 0.0001, "capped above")
+	check(Difficulty.rubber_band(1, 3) < 0.0, "behind: easier")
+	check_near(Difficulty.rubber_band(1, 3), Difficulty.BAND_DOWN, 0.0001, "capped below")
+	check(Difficulty.rubber_band(expected, 3, 2) > 0.0, "vehicles count")
+	check_near(Difficulty.band_wave(0.5), 1.5, 0.0001, "wave scale")
+	check_near(Difficulty.band_bite(0.5), 1.3, 0.0001, "bites scale half as much")
+	check_near(Difficulty.band_boss(-0.2), 0.9, 0.0001, "boss eases too")
+
+
+func test_compounding_caps() -> void:
+	check_eq(Difficulty.bet_win(30), 60, "a small bet still doubles")
+	check_eq(Difficulty.bet_win(500), 580, "a big bet is capped")
+	var gen := Difficulty.new(5)
+	var muls := 0
+	for i in range(40):
+		var f := gen.make_fork(6, Difficulty.BIG_SQUAD + 50)
+		for side in ["left", "right"]:
+			for p in f[side].panels:
+				if p.kind == GateMath.Kind.MUL:
+					muls += 1
+				if p.kind == GateMath.Kind.ADD and p.value > 0.0:
+					check(p.value <= float(Difficulty.BIG_FORK_ADD_CAP) or p.value <= 14.0 + 3.0 * 5.0, "fork gains stay flat for a big squad")
+	check_eq(muls, 0, "no multipliers at the fork past the big-squad line")
+	var small := 0
+	for i in range(40):
+		var f := gen.make_fork(6, 20)
+		for side in ["left", "right"]:
+			for p in f[side].panels:
+				if p.kind == GateMath.Kind.MUL:
+					small += 1
+	check(small > 0, "a small squad still finds multipliers")

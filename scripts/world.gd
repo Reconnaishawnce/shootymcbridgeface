@@ -233,7 +233,7 @@ func start_level(n: int) -> void:
 	_chew_timer = 0.0
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
-	_fork_routes = gen.make_fork(level) if gen != null else {}
+	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
 	fork_side = 0
 	if squad != null:
 		squad.set_lane(-squad.road_half, squad.road_half)
@@ -416,7 +416,14 @@ func mod(key: String) -> float:
 ## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
 	var armor := meta.bite_mult() if meta != null else 1.0
-	return maxi(1, int(round(float(n) * mod("bite") * armor)))
+	return maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
+
+
+## The rubber band for the squad as it stands right now.
+func band() -> float:
+	if squad == null:
+		return 0.0
+	return Difficulty.rubber_band(squad.count, level, squad.vehicles_alive())
 
 
 func _pace() -> float:
@@ -597,7 +604,7 @@ func _spawn() -> void:
 		_boss_spawned = true
 		boss = Boss.new()
 		var convoy := squad.vehicles_alive() if squad != null else 0
-		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)), Difficulty.boss_kind(level))
+		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)) * Difficulty.band_boss(band()), Difficulty.boss_kind(level))
 		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
 		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
 		add_child(boss)
@@ -656,8 +663,9 @@ func _note_wave_id(n: int, wave: int) -> void:
 func _spec(p_level: int, index: int, count: int) -> Dictionary:
 	var convoy := squad.vehicles_alive() if squad != null else 0
 	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV)
-	var w := mod("wave")
-	var h := mod("hp")
+	var bw := Difficulty.band_wave(band())
+	var w := mod("wave") * bw
+	var h := mod("hp") * bw
 	spec.count = mini(int(ceil(float(spec.count) * w)), Difficulty.MAX_WAVE + 12)
 	spec.runners = int(ceil(float(spec.runners) * w))
 	for key in ["hp", "brute_hp", "tank_hp", "thief_hp", "runner_hp", "latcher_hp"]:
@@ -772,7 +780,7 @@ func _resolve_bet(won: bool) -> void:
 	if squad == null:
 		return
 	var before := squad.count
-	var after := before * 2 if won else maxi(1, before / 2)
+	var after := Difficulty.bet_win(before) if won else maxi(1, before / 2)
 	squad.set_count(after)
 	bet_resolved.emit(won, before, after)
 

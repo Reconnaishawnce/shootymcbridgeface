@@ -51,6 +51,9 @@ the same key (see below).
 - **How to play.** The HOW TO PLAY button on the title (and in pause)
   explains everything below in plain words, with the real numbers.
 - **Records.** Lifetime stats and achievements that pay stars once each.
+- **The road watches you.** Run bigger than a level expects and the
+  zombies come thicker and bite harder, up to half again; run smaller
+  and they ease off. A nudge, not a wall.
 - **Modes.** MODE on the title cycles NORMAL, HARD (reach level 3) and
   NIGHTMARE (reach level 4 on hard). Harder modes throw more at you and
   pay more score, coins and stars. Each keeps its own bests.

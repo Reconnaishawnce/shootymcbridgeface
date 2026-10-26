@@ -219,6 +219,19 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## The rubber band
+
+`Difficulty.rubber_band(count, level, vehicles)` reads the squad (plus
+twenty per vehicle) against `BAND_NEUTRAL` times the level's expected
+squad and returns -0.2 to +0.5. `World._spec` scales wave count and
+health by `band_wave`, `World._bite` scales heavy bites by `band_bite`
+(0.6 of the wave effect) and boss health takes `band_boss` (half). It is
+a nudge that keeps a strong run busy and gives a weak one slack; the
+modifiers multiply on top. Compounding is capped at its sources:
+`bet_win` adds at most `BET_WIN_CAP`, and a fork for a squad past
+`BIG_SQUAD` swaps multipliers for flat gains of at most
+`BIG_FORK_ADD_CAP`.
+
 ## Quests and the season
 
 `Quests.for_day` draws three templates and targets from the day number,

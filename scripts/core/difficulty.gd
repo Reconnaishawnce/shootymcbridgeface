@@ -237,6 +237,41 @@ static func expected_squad(level: int) -> int:
 	return 70 + 15 * (level - 1)
 
 
+## The rubber band: the road reads your squad against what the level
+## expects. Ahead of the curve, zombies get a little hungrier; behind it,
+## they ease off. Small on purpose: never more than +50% or -25%.
+const BAND_UP := 0.5
+const BAND_DOWN := -0.2
+const BAND_SLOPE := 0.5
+## The read is neutral a little under the expected squad, so a practised
+## player sits just above neutral and a struggling one gets the slack.
+const BAND_NEUTRAL := 0.9
+## Vehicles count as soldiers for the read.
+const BAND_VEHICLE_EQUIV := 20
+
+
+## -0.2 .. +0.5: how far the squad is from the level's expected size.
+static func rubber_band(count: int, level: int, vehicles: int = 0) -> float:
+	var expected := float(expected_squad(level)) * BAND_NEUTRAL
+	var have := float(count + vehicles * BAND_VEHICLE_EQUIV)
+	return clampf((have / maxf(expected, 1.0) - 1.0) * BAND_SLOPE, BAND_DOWN, BAND_UP)
+
+
+## What waves (count and health) are scaled by.
+static func band_wave(p: float) -> float:
+	return 1.0 + p
+
+
+## What heavy bites are scaled by: half as strong as the wave effect.
+static func band_bite(p: float) -> float:
+	return 1.0 + p * 0.6
+
+
+## What boss health is scaled by.
+static func band_boss(p: float) -> float:
+	return 1.0 + p * 0.5
+
+
 static func boss_hp(level: int, perk_count: int = 0) -> float:
 	var base := float(expected_squad(level)) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
 	if boss_kind(level) == Boss.Kind.SPITTER:
@@ -449,7 +484,19 @@ static func route_needs(level: int, threat: int, squad_count: int = 20) -> int:
 	return maxi(3, int(ceil(hp / (DPS_PER_SOLDIER * seconds))))
 
 
-func _route(level: int, threat: int) -> Dictionary:
+## A won bet adds at most this many soldiers: doubling a huge squad is
+## how runs ran away.
+const BET_WIN_CAP := 80
+## Past BIG_SQUAD a fork's multipliers become flat gains of at most this.
+const BIG_FORK_ADD_CAP := 40
+
+
+## What a won bet pays a squad of [param count].
+static func bet_win(count: int) -> int:
+	return count + mini(count, BET_WIN_CAP)
+
+
+func _route(level: int, threat: int, count: int = 0) -> Dictionary:
 	var lv := level - 1
 	var route := {
 		"threat": threat,
@@ -470,6 +517,9 @@ func _route(level: int, threat: int) -> Dictionary:
 				panel = GateMath.mul(2.0) if roll < 0.35 else GateMath.add(rng.randi_range(6, 10) + 2 * lv)
 			_:
 				panel = GateMath.mul(3.0) if roll < 0.3 else (GateMath.mul(2.0) if roll < 0.7 else GateMath.add(rng.randi_range(10, 14) + 3 * lv))
+		# A big squad gets no multipliers on the fork either: a flat gain.
+		if count >= BIG_SQUAD and panel.kind == GateMath.Kind.MUL:
+			panel = GateMath.add(mini(count / 2, BIG_FORK_ADD_CAP))
 		route.panels.append(panel)
 	# A heavy route may hide one panel, and a hidden panel may be a trap.
 	if threat >= 3 and level >= Progression.HIDDEN_LEVEL and rng.randf() < RICH_HIDDEN_CHANCE:
@@ -481,7 +531,7 @@ func _route(level: int, threat: int) -> Dictionary:
 	return route
 
 
-func make_fork(level: int) -> Dictionary:
+func make_fork(level: int, count: int = 0) -> Dictionary:
 	var t := tier_for_level(level)
 	var heavy := 3 if t >= 2 else 2
 	if t >= 3 or (t == 2 and rng.randf() < 0.35):
@@ -490,8 +540,8 @@ func make_fork(level: int) -> Dictionary:
 	# Sometimes neither side is gentle: pick the lesser evil.
 	if level >= 3 and rng.randf() < 0.25:
 		light = 2
-	var a := _route(level, heavy)
-	var b := _route(level, light)
+	var a := _route(level, heavy, count)
+	var b := _route(level, light, count)
 	if rng.randf() < 0.5:
 		return {"left": a, "right": b}
 	return {"left": b, "right": a}

@@ -3,6 +3,23 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.27 (feedback pass: the road watches you)
+
+- The rubber band. Every level expects a squad of a certain size. Run
+  bigger and zombies come thicker and bite harder, up to half again as
+  much; run smaller and they ease off, up to a fifth. Bosses follow at
+  half strength. The convoy counts toward the read. Neutral sits a
+  little under the expected squad, so a practised player stays busy and
+  a struggling one gets slack. Modifiers stack on top.
+- Squad compounding capped: a won bet pays at most 80 soldiers instead
+  of doubling whatever you have, and past 150 soldiers the fork offers
+  flat gains instead of x2 and x3. Peak squads on long bot runs fall
+  from around twelve thousand to a few hundred; endless from eleven
+  hundred to about five hundred.
+- Bot with no upgrades, four seeds: wipes on levels 4, 5, 11 and 12,
+  peak squads 157 to 667. The spread between seeds is wide; the middle
+  is where it was.
+
 ## 0.26 (graphics pass 3: effects and motion)
 
 - Particles on the Compatibility renderer: a splash when a zombie dies,

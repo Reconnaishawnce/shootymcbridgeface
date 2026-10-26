@@ -211,8 +211,8 @@ word on a sign, everything can be seen and counted.
    gradually, hit-stop on the big moments.
 5. Come back tomorrow (done): daily quests feeding a free season track.
    (A trophy road with checkpoints stays on the list for later.)
-6. Feedback pass from the phone (balance and QA done; phone feedback
-   still to come).
+6. Feedback pass (done): the rubber band, compounding caps. Phone
+   feedback still welcome.
 
 ## The graphics arc: from stick figures to a stylized, polished look
 

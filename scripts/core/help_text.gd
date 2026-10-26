@@ -50,6 +50,10 @@ static func sections() -> Array:
 			"Every %d kills a vehicle earns a RANK (up to %d): harder hitting, tougher, healed up, a gold stripe. Once you own a vehicle, perk gates can offer PLATING and OVERDRIVE for the convoy. " % [int(Convoy.RANK_KILLS[0]), Convoy.RANK_KILLS.size()] +
 			"Vehicles have their own health bar: brutes, boss chews and lightning damage them, and a wrecked one is gone. " +
 			"But they stay with you from level to level while the soldiers reset, and each one still rolling at the boss pays %d points. Fewer bodies now, a convoy later." % Convoy.LEVEL_BONUS_PER_VEHICLE},
+		{"title": "THE ROAD WATCHES YOU", "body":
+			"Every level expects a squad of a certain size. Run bigger than that and the zombies come a little thicker and bite a little harder, up to half again as much. " +
+			"Run smaller and they ease off, up to a quarter. It is a nudge, not a wall: a strong player stays busy, a new one gets a chance. " +
+			"The convoy counts toward the read. A won bet pays at most %d soldiers, and a big squad finds flat gains at the fork instead of multipliers." % Difficulty.BET_WIN_CAP},
 		{"title": "ZOMBIES", "body":
 			"Walkers shamble at you. Runners are fast and thin and find you. Brutes are big, soak a lot of fire, and take a slice of the squad when they reach you. " +
 			"Tanks are bullet sponges that shield whatever is behind them. Thieves sprint for the next gate and knock its number down, so shoot them first. " +

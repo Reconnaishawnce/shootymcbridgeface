@@ -206,8 +206,9 @@ word on a sign, everything can be seen and counted.
    across levels while soldiers reset.
 3. The convoy, part two (done): helicopter and mech; veteran ranks from
    kills; convoy perks on perk gates.
-4. One game, one look: a single UI kit, icons, a results screen that
-   names the next goal, menus that unlock gradually, hit-stop and pops.
+4. One game, one look (done): a single UI kit, drawn icons, a results
+   screen and title that name the next goal, menus that unlock
+   gradually, hit-stop on the big moments.
 5. Come back tomorrow: daily quests feeding a free season track, a
    trophy road with checkpoints.
 6. Feedback pass from the phone.

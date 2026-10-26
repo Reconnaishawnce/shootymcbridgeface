@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.21 (polish turn 4: one game, one look)
+
+- One theme for every screen: rounded dark-glass buttons with a warm
+  pressed state, rounded panels behind every card, a styled scrollbar.
+  Drawn coin and star icons instead of words.
+- The title and the wipe screen name the next thing to do: play a run,
+  reach level 3, an upgrade you can afford, form a jeep, try hard mode,
+  the day's daily, save for the next upgrade, beat your best.
+- The title unlocks gradually: a new player sees PLAY, HOW TO PLAY and
+  SETTINGS. SHOP, RECORDS and ENDLESS arrive after the first run, DAILY
+  after the second, MODE once hard is open, LOCKER with characters on.
+- A frame of frozen time when a boss falls or a vehicle forms. The wipe
+  screen lists at most three new achievements and points to RECORDS for
+  the rest. The locker fits a phone screen edge to edge.
+
 ## 0.20 (polish turn 3: the convoy, part two)
 
 The convoy grows up: two more vehicles, veteran ranks, convoy perks.

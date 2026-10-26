@@ -219,6 +219,19 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## One look, one next thing
+
+`Hud.make_theme` is the whole UI kit: one button style (dark glass,
+rounded, accent when pressed), one panel style behind every card, one
+scrollbar. `Hud.Icon` draws the coin and the star so no font glyph is
+relied on. `Goals.next` is the single line on the title and the wipe
+screen that says what to do next, in a fixed priority order (play, reach
+the unlock level, an affordable upgrade, form a jeep, try hard, the
+daily, save up, beat your best), and `Goals.title_buttons` decides which
+buttons a player has earned, so the first screen is PLAY and little
+else. `Game._hitstop` freezes a frame on a boss kill and a vehicle
+forming; the auto-player skips it.
+
 ## The convoy
 
 `Convoy.SPECS` holds the vehicles: cost in soldiers, health, damage per

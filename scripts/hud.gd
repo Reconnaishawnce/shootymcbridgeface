@@ -55,6 +55,12 @@ var _title_card: Control
 var _title: Label
 var _records: Label
 var _coins_title: Label
+var _coins_row: HBoxContainer
+var _stars_row: HBoxContainer
+var _goal: Label
+var _daily_button: Button
+var _shop_button: Button
+var _records_button: Button
 var _endless_button: Button
 var _squad_button: Button
 var _locker_button: Button
@@ -125,11 +131,88 @@ var _banner_tween: Tween
 var _count_tween: Tween
 
 
+## One look for every button and card: rounded, dark glass, a warm
+## accent when pressed. Applied to the root so nothing escapes it.
+const ACCENT := Color(1.0, 0.8, 0.3)
+const GLASS := Color(0.07, 0.08, 0.12, 0.86)
+
+
+static func _flat(bg: Color, radius: int, border: Color = Color(1, 1, 1, 0.12), border_w: int = 2) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(radius)
+	sb.border_color = border
+	sb.set_border_width_all(border_w)
+	sb.content_margin_left = 20.0
+	sb.content_margin_right = 20.0
+	sb.content_margin_top = 8.0
+	sb.content_margin_bottom = 8.0
+	return sb
+
+
+static func make_theme() -> Theme:
+	var t := Theme.new()
+	t.set_stylebox("normal", "Button", _flat(GLASS, 14))
+	t.set_stylebox("hover", "Button", _flat(Color(0.12, 0.13, 0.18, 0.9), 14, Color(1, 1, 1, 0.25)))
+	t.set_stylebox("pressed", "Button", _flat(Color(0.25, 0.2, 0.08, 0.95), 14, ACCENT, 3))
+	t.set_stylebox("disabled", "Button", _flat(Color(0.07, 0.08, 0.12, 0.5), 14, Color(1, 1, 1, 0.06)))
+	t.set_stylebox("focus", "Button", _flat(Color(0, 0, 0, 0), 14, Color(0, 0, 0, 0), 0))
+	t.set_color("font_color", "Button", Color(0.97, 0.97, 1.0))
+	t.set_color("font_hover_color", "Button", Color(1.0, 1.0, 1.0))
+	t.set_color("font_pressed_color", "Button", ACCENT)
+	t.set_color("font_disabled_color", "Button", Color(0.6, 0.6, 0.66))
+	t.set_stylebox("panel", "PanelContainer", _flat(Color(0.05, 0.06, 0.09, 0.82), 24, Color(ACCENT, 0.35), 2))
+	var grabber := _flat(Color(1, 1, 1, 0.35), 6, Color(0, 0, 0, 0), 0)
+	t.set_stylebox("grabber", "VScrollBar", grabber)
+	t.set_stylebox("scroll", "VScrollBar", _flat(Color(1, 1, 1, 0.06), 6, Color(0, 0, 0, 0), 0))
+	return t
+
+
+## A small drawn icon: a coin or a star. No font glyph to depend on.
+class Icon extends Control:
+	var kind := "coin"
+	var size_px := 22.0
+	func _init(p_kind: String, p_size: float = 22.0) -> void:
+		kind = p_kind
+		size_px = p_size
+		custom_minimum_size = Vector2(size_px, size_px)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var c := Vector2(size_px * 0.5, size_px * 0.5)
+		if kind == "coin":
+			draw_circle(c, size_px * 0.46, Color(0.75, 0.55, 0.1))
+			draw_circle(c, size_px * 0.36, Color(1.0, 0.85, 0.3))
+			draw_circle(c + Vector2(-size_px * 0.1, -size_px * 0.1), size_px * 0.12, Color(1.0, 0.95, 0.7))
+		else:
+			var pts := PackedVector2Array()
+			for i in range(10):
+				var a := -PI * 0.5 + float(i) * PI / 5.0
+				var r := size_px * (0.48 if i % 2 == 0 else 0.2)
+				pts.append(c + Vector2(cos(a), sin(a)) * r)
+			draw_colored_polygon(pts, Color(1.0, 0.92, 0.45))
+
+
+## A row with an icon and a number, for coins and stars.
+func _currency(kind: String, size: int, color: Color) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	var icon := Icon.new(kind, float(size) * 0.9)
+	row.add_child(icon)
+	var l := _label(size, HORIZONTAL_ALIGNMENT_LEFT)
+	l.add_theme_color_override("font_color", color)
+	row.add_child(l)
+	row.set_meta("label", l)
+	return row
+
+
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var root := Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.theme = make_theme()
 	add_child(root)
 
 	_level = _label(34, HORIZONTAL_ALIGNMENT_LEFT)
@@ -315,9 +398,9 @@ func _build_title(root: Control) -> void:
 	_endless_button = _button("ENDLESS", 36)
 	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
 	box.add_child(_endless_button)
-	var daily := _button("DAILY", 36)
-	daily.pressed.connect(func() -> void: daily_opened.emit())
-	box.add_child(daily)
+	_daily_button = _button("DAILY", 36)
+	_daily_button.pressed.connect(func() -> void: daily_opened.emit())
+	box.add_child(_daily_button)
 	_mode_button = _button("MODE: NORMAL", 30)
 	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
 	box.add_child(_mode_button)
@@ -329,10 +412,10 @@ func _build_title(root: Control) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16)
 	box.add_child(row)
-	var shop := _button("SHOP", 36)
-	shop.custom_minimum_size.x = 200.0
-	shop.pressed.connect(func() -> void: shop_opened.emit())
-	row.add_child(shop)
+	_shop_button = _button("SHOP", 36)
+	_shop_button.custom_minimum_size.x = 200.0
+	_shop_button.pressed.connect(func() -> void: shop_opened.emit())
+	row.add_child(_shop_button)
 	_locker_button = _button("LOCKER", 36)
 	_locker_button.custom_minimum_size.x = 200.0
 	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
@@ -342,10 +425,10 @@ func _build_title(root: Control) -> void:
 	row2.alignment = BoxContainer.ALIGNMENT_CENTER
 	row2.add_theme_constant_override("separation", 16)
 	box.add_child(row2)
-	var records := _button("RECORDS", 30)
-	records.custom_minimum_size.x = 200.0
-	records.pressed.connect(func() -> void: records_opened.emit())
-	row2.add_child(records)
+	_records_button = _button("RECORDS", 30)
+	_records_button.custom_minimum_size.x = 200.0
+	_records_button.pressed.connect(func() -> void: records_opened.emit())
+	row2.add_child(_records_button)
 	var help := _button("HOW TO PLAY", 30)
 	help.custom_minimum_size.x = 200.0
 	help.pressed.connect(func() -> void: help_opened.emit())
@@ -353,12 +436,22 @@ func _build_title(root: Control) -> void:
 	var settings := _button("SETTINGS", 30)
 	settings.pressed.connect(func() -> void: settings_opened.emit())
 	box.add_child(settings)
-	_coins_title = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
-	_coins_title.add_theme_color_override("font_color", COIN)
-	box.add_child(_coins_title)
-	_stars_title = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
-	_stars_title.add_theme_color_override("font_color", STAR)
-	box.add_child(_stars_title)
+	var wallet := HBoxContainer.new()
+	wallet.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wallet.alignment = BoxContainer.ALIGNMENT_CENTER
+	wallet.add_theme_constant_override("separation", 30)
+	box.add_child(wallet)
+	_coins_row = _currency("coin", 28, COIN)
+	wallet.add_child(_coins_row)
+	_coins_title = _coins_row.get_meta("label")
+	_stars_row = _currency("star", 28, STAR)
+	wallet.add_child(_stars_row)
+	_stars_title = _stars_row.get_meta("label")
+	_goal = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_goal.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_goal.custom_minimum_size.x = 560.0
+	_goal.modulate = Color(0.9, 0.9, 0.95)
+	box.add_child(_goal)
 
 
 func _build_settings(root: Control) -> void:
@@ -394,6 +487,10 @@ func _build_locker(root: Control) -> void:
 	shade.color = Color(0.0, 0.0, 0.0, 0.3)
 	var center: CenterContainer = _locker_card.get_child(1)
 	center.anchor_top = 0.3
+	var panel: PanelContainer = _locker_card.get_meta("panel")
+	var margin: MarginContainer = panel.get_child(0)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
 	var box: VBoxContainer = _locker_card.get_meta("box")
 	box.add_theme_constant_override("separation", 10)
 	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
@@ -408,8 +505,8 @@ func _build_locker(root: Control) -> void:
 	tabs.add_theme_constant_override("separation", 6)
 	box.add_child(tabs)
 	for cat in Wardrobe.CATEGORIES:
-		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 18)
-		b.custom_minimum_size = Vector2(106.0, 48.0)
+		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 16)
+		b.custom_minimum_size = Vector2(98.0, 46.0)
 		b.toggle_mode = true
 		b.pressed.connect(func() -> void: locker_tab.emit(cat))
 		tabs.add_child(b)
@@ -417,7 +514,7 @@ func _build_locker(root: Control) -> void:
 	_locker_grid = GridContainer.new()
 	_locker_grid.columns = 3
 	_locker_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_locker_grid.add_theme_constant_override("h_separation", 8)
+	_locker_grid.add_theme_constant_override("h_separation", 6)
 	_locker_grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(_locker_grid)
 	_locker_line = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
@@ -610,7 +707,7 @@ func set_characters(on: bool) -> void:
 	_pause_characters.text = "CHARACTERS: ON" if on else "CHARACTERS: OFF"
 	_settings_characters.text = _pause_characters.text
 	_locker_button.visible = on
-	_stars_title.visible = on
+	_stars_row.visible = on
 
 
 ## TIGHT is a focused column, WIDE a fan: the button says so.
@@ -702,7 +799,16 @@ func show_title(t: Dictionary) -> void:
 	var hero_name: String = t.get("hero_name", "")
 	var modifier: String = t.get("modifier", "normal")
 	var mode_hint: String = t.get("mode_hint", "")
+	var buttons: Dictionary = t.get("buttons", {})
 	_hide_cards()
+	_shop_button.visible = bool(buttons.get("shop", true))
+	_daily_button.visible = bool(buttons.get("daily", true))
+	_records_button.visible = bool(buttons.get("records", true))
+	_mode_button.visible = bool(buttons.get("mode", true))
+	_endless_button.visible = bool(buttons.get("endless", true))
+	if not bool(buttons.get("hints", true)):
+		mode_hint = ""
+	_goal.text = str(t.get("goal", ""))
 	_title_card.visible = true
 	_pause_button.visible = false
 	_boss_box.visible = false
@@ -711,18 +817,19 @@ func show_title(t: Dictionary) -> void:
 		lines.append("Best %d   ·   Level %d" % [best, best_level])
 	if best_endless > 0:
 		lines.append("Endless best %d" % best_endless)
-	if lines.is_empty():
-		lines.append("Every level starts with one soldier." if modifier == "normal" else Modifiers.blurb(modifier))
+	if lines.is_empty() and modifier != "normal":
+		lines.append(Modifiers.blurb(modifier))
 	if mode_hint != "":
 		lines.append(mode_hint)
 	_records.text = "\n".join(lines)
+	_records.visible = not lines.is_empty()
 	_mode_button.text = "MODE: %s" % Modifiers.title(modifier)
 	_endless_button.disabled = not endless_unlocked
 	_endless_button.text = "ENDLESS" if endless_unlocked else "ENDLESS  (clear level %d)" % Meta.ENDLESS_UNLOCK_LEVEL
 	_squad_button.visible = shotgun_unlocked
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
-	_coins_title.text = "%d COINS" % coins
-	_stars_title.text = "%d STARS   ·   %s" % [stars, hero_name] if hero_name != "" else "%d STARS" % stars
+	_coins_title.text = str(coins)
+	_stars_title.text = "%d   ·   %s" % [stars, hero_name] if hero_name != "" else str(stars)
 
 
 ## Lifetime numbers and the achievement list.
@@ -792,8 +899,8 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 		_locker_grid.remove_child(child)
 		child.queue_free()
 	for id in Wardrobe.items_in(tab):
-		var b := _button("", 20)
-		b.custom_minimum_size = Vector2(196.0, 74.0)
+		var b := _button("", 19)
+		b.custom_minimum_size = Vector2(190.0, 72.0)
 		var state := ""
 		if w.is_equipped(id):
 			state = "WEARING"
@@ -921,10 +1028,15 @@ func show_game_over(r: Dictionary) -> void:
 	if locker_nudge:
 		coins_line += "\nSomething new is waiting in the locker!"
 	var unlocked: Array = r.get("achievements", [])
-	for id in unlocked:
-		var a := Achievements.find(str(id))
+	for i in range(mini(unlocked.size(), 3)):
+		var a := Achievements.find(str(unlocked[i]))
 		if not a.is_empty():
 			coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
+	if unlocked.size() > 3:
+		coins_line += "\n+%d more achievements, see RECORDS" % (unlocked.size() - 3)
+	var goal := str(r.get("goal", ""))
+	if goal != "":
+		coins_line += "\n\nNEXT: " + goal
 	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	_over_prompt.text = "TAP TO RETRY"
 	_pulse_prompt()
@@ -1054,12 +1166,23 @@ func _card(parent: Control) -> Control:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(center)
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right"]:
+		margin.add_theme_constant_override("margin_" + side, 26)
+	for side in ["top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 22)
+	panel.add_child(margin)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 18)
-	center.add_child(box)
+	box.add_theme_constant_override("separation", 14)
+	margin.add_child(box)
 	card.set_meta("box", box)
+	card.set_meta("panel", panel)
 	return card
 
 

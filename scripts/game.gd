@@ -301,13 +301,38 @@ func show_title() -> void:
 		hint = "Hard mode: %s" % Modifiers.unlock_text("hard")
 	elif modifier == "hard" and not Modifiers.unlocked("nightmare", normal_level, hard_level):
 		hint = "Nightmare: %s" % Modifiers.unlock_text("nightmare")
+	var runs := int(stats.get("runs", 0))
 	hud.show_title({
+		"goal": Goals.next(_goal_context()),
+		"buttons": Goals.title_buttons(runs, Modifiers.unlocked("hard", normal_level, hard_level), character_mode),
 		"best": best, "best_level": best_level, "best_endless": best_endless, "coins": coins,
 		"endless_unlocked": Meta.endless_unlocked(normal_level), "squad_type": squad_type,
 		"shotgun_unlocked": meta.shotgun_unlocked() or meta.squad_unlocked("medic"),
 		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"modifier": modifier, "mode_hint": hint,
 	})
+
+
+## What Goals needs to name the next thing to do.
+func _goal_context() -> Dictionary:
+	var cheapest := ""
+	var cheapest_cost := 0
+	for id in Meta.ORDER:
+		if meta.is_maxed(id):
+			continue
+		var c := meta.cost(id)
+		if cheapest == "" or c < cheapest_cost:
+			cheapest = Meta.title(id)
+			cheapest_cost = c
+	return {
+		"runs": int(stats.get("runs", 0)), "best_level": SaveData.load_best_level("normal"),
+		"hard_best_level": SaveData.load_best_level("hard"), "coins": coins,
+		"cheapest": cheapest, "cheapest_cost": cheapest_cost, "vehicles": int(stats.get("vehicles", 0)),
+		"modifier": modifier, "character_mode": character_mode,
+		"affordable_item": wardrobe.can_afford_something(),
+		"daily_played": daily_results.has(Daily.day_number(int(Time.get_unix_time_from_system()))),
+		"best_score": best,
+	}
 
 
 func _load_bests() -> void:
@@ -661,6 +686,7 @@ func end_run() -> void:
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
+		"goal": Goals.next(_goal_context()),
 	})
 	if character_mode:
 		squad.cheer()
@@ -990,6 +1016,7 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	bosses_killed += 1
 	if smoke:
 		print("SMOKE_BOSS_DOWN ", JSON.stringify({"level": level, "squad_left": squad_left, "frame": _frames}))
+	_hitstop(0.14)
 	var b := Difficulty.level_bonus(level, squad_left, squad.vehicles_alive())
 	var letter := Grades.grade(_level_perfect, _level_gates, _level_peak, squad_left, _run_time - _boss_start)
 	grades.append(letter)
@@ -1082,7 +1109,16 @@ func _on_fork_chosen(route: Dictionary, _side: int) -> void:
 	_punch(2.0)
 
 
+## A frame of frozen time on the big hits: the eye reads the moment.
+func _hitstop(seconds: float) -> void:
+	if smoke:
+		return
+	Engine.time_scale = 0.05
+	_slowmo_until = Time.get_ticks_msec() * 0.001 + seconds
+
+
 func _on_vehicle_formed(id: String) -> void:
+	_hitstop(0.08)
 	if smoke:
 		print("SMOKE_VEHICLE ", JSON.stringify({"id": id, "level": world.level, "squad": squad.count, "frame": _frames}))
 	hud.show_banner("%s JOINS THE CONVOY" % Convoy.title(id), 1.4)

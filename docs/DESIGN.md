@@ -399,6 +399,15 @@ curb and dirt differ by colour, scale and strength. `World._build_scenery`
 places a skyline, wrecks, rubble, trees and cracks from a fixed seed and
 wraps them with the road. A canvas vignette sits under the HUD.
 
+Pass 2 adds the ink line: `Mats.outline` is a cull-front, unshaded
+shader that pushes vertices out along their normals, attached as
+`next_pass` to a copy of a mesh's material by `Mats.ink`. It is on the
+detailed soldiers, every zombie, the bosses, vehicles and gate frames,
+and off the crowd so draw calls stay in budget. Zombies share the
+soldiers' round language (egg torso, big head) so the cast reads as one
+world; kinds differ by colour and one prop each. Panels are a frame, a
+glossy faintly emissive face and a glowing top strip.
+
 ## Art direction (original notes)
 
 Flat-shaded low-poly primitives on purpose, but assembled into characters:

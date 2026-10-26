@@ -223,9 +223,8 @@ polished stylized look of the best phone games, in three passes.
 
 1. Light and world (done): sky, shadows, fill light, filmic tonemap,
    glow, grain textures, skyline, wrecks, lamps, vignette.
-2. People and things: character outlines, better zombie and boss
-   models, hit flashes and squash on damage, gate panels with bevels
-   and emissive numbers, vehicle detail.
+2. People and things (done): ink outlines, round zombies by kind,
+   squash on hit, bevelled glowing panels, vehicle headlights.
 3. Effects and motion: particles for kills, shells, dust and muzzle
    smoke; bullet trails; camera sway and recoil; death animations;
    a display font for the HUD.

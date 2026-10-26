@@ -150,56 +150,107 @@ func _build() -> void:
 		Kind.LATCHER:
 			skin = LATCHER_SKIN
 			shirt = Color(0.3, 0.1, 0.25)
+	var ink := 0.03
 
+	# Shambling legs, bare feet.
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
 		hip.position = Vector3(side * 0.11, 0.5, 0.0)
-		var leg := Mats.capsule(0.09, 0.4, PANTS)
-		leg.position.y = -0.22
+		var leg := Mats.pill(0.085, 0.36, PANTS)
+		leg.position.y = -0.2
+		Mats.ink(leg, ink)
 		hip.add_child(leg)
+		var foot := Mats.ball(0.08, skin.darkened(0.2))
+		foot.position = Vector3(0.0, -0.42, -0.04)
+		foot.scale = Vector3(1.0, 0.6, 1.3)
+		hip.add_child(foot)
 		_body.add_child(hip)
 		_legs.append(hip)
 
-	var torso := Mats.capsule(0.21, 0.5, shirt)
-	torso.position = Vector3(0.0, 0.76, 0.04)
+	# A hunched torso, torn shirt, a rib of darker cloth.
+	var torso := Mats.ball(0.24, shirt)
+	torso.position = Vector3(0.0, 0.74, 0.06)
+	torso.scale = Vector3(1.0, 1.15, 0.85)
 	torso.rotation.x = 0.55 if is_runner() else 0.3
+	Mats.ink(torso, ink)
 	_body.add_child(torso)
+	var tear := Mats.ball(0.1, skin)
+	tear.position = Vector3(0.09, 0.62, -0.13)
+	tear.scale = Vector3(1.0, 1.4, 0.4)
+	_body.add_child(tear)
 
-	var head := Mats.sphere(0.17, skin)
-	head.position = Vector3(0.0, 1.16, 0.14)
+	# A big round head, sunken glowing eyes, a slack jaw.
+	var head := Mats.ball(0.2, skin)
+	head.position = Vector3(0.0, 1.14, 0.16)
+	Mats.ink(head, ink)
 	_body.add_child(head)
-	var eye_r := 0.05 if brute else 0.035
+	var eye_r := 0.055 if brute else 0.04
 	for side in [-1.0, 1.0]:
+		var socket := Mats.ball(eye_r + 0.02, skin.darkened(0.45))
+		socket.position = Vector3(side * 0.075, 1.17, 0.31)
+		socket.scale = Vector3(1.0, 1.0, 0.5)
+		_body.add_child(socket)
 		var eye := Mats.sphere(eye_r, EYE)
-		eye.material_override = Mats.flat(EYE, true)
-		eye.position = Vector3(side * 0.065, 1.18, 0.29)
+		eye.material_override = Mats.glow(EYE, 2.0)
+		eye.position = Vector3(side * 0.075, 1.17, 0.34)
 		_body.add_child(eye)
+	var jaw := Mats.ball(0.08, skin.darkened(0.3))
+	jaw.position = Vector3(0.0, 1.0, 0.3)
+	jaw.scale = Vector3(1.3, 0.5, 0.7)
+	_body.add_child(jaw)
+	var hair := Mats.ball(0.19, PANTS.darkened(0.2))
+	hair.position = Vector3(0.0, 1.24, 0.12)
+	hair.scale = Vector3(1.0, 0.45, 1.0)
+	_body.add_child(hair)
 
+	# Arms out front, hands open.
 	for side in [-1.0, 1.0]:
 		var shoulder := Node3D.new()
-		shoulder.position = Vector3(side * 0.26, 0.96, 0.1)
+		shoulder.position = Vector3(side * 0.27, 0.96, 0.12)
 		shoulder.rotation_degrees.x = -80.0
-		var arm := Mats.capsule(0.07, 0.44, skin)
+		var arm := Mats.pill(0.07, 0.4, skin)
 		arm.position.y = -0.2
+		Mats.ink(arm, ink)
 		shoulder.add_child(arm)
+		var hand := Mats.ball(0.075, skin.darkened(0.1))
+		hand.position.y = -0.42
+		shoulder.add_child(hand)
 		_body.add_child(shoulder)
 		_arms.append(shoulder)
 
 	if brute:
 		for side in [-1.0, 1.0]:
-			var pad := Mats.box(Vector3(0.3, 0.14, 0.3), PLATE)
-			pad.position = Vector3(side * 0.3, 1.06, 0.05)
+			var pad := Mats.box(Vector3(0.32, 0.16, 0.32), PLATE)
+			pad.position = Vector3(side * 0.3, 1.04, 0.06)
+			Mats.ink(pad, ink)
 			_body.add_child(pad)
+		var belt := Mats.torus(0.22, 0.27, PLATE.darkened(0.2))
+		belt.position = Vector3(0.0, 0.52, 0.04)
+		_body.add_child(belt)
 	elif is_tank():
 		# A slab of scrap held out front: the thing that eats your bullets.
-		var shield := Mats.box(Vector3(1.1, 0.9, 0.12), PLATE.lightened(0.15))
+		var shield := Mats.gbox(Vector3(1.1, 0.9, 0.12), PLATE.lightened(0.15), 0.8, 0.3, 6)
 		shield.position = Vector3(0.0, 0.8, 0.42)
+		Mats.ink(shield, ink)
 		_body.add_child(shield)
+		for i in range(3):
+			var rivet := Mats.ball(0.04, Color(0.7, 0.7, 0.72))
+			rivet.position = Vector3(-0.4 + 0.4 * float(i), 1.15, 0.49)
+			_body.add_child(rivet)
 	elif is_thief():
 		# A sack over the shoulder: it is here to take, not to bite.
-		var sack := Mats.sphere(0.16, Color(0.5, 0.38, 0.2))
+		var sack := Mats.ball(0.17, Color(0.5, 0.38, 0.2))
 		sack.position = Vector3(-0.22, 1.05, -0.1)
+		Mats.ink(sack, ink)
 		_body.add_child(sack)
+	elif is_latcher():
+		# Claws: it holds on.
+		for side in [-1.0, 1.0]:
+			for k in range(3):
+				var claw := Mats.cone(0.02, 0.12, Color(0.9, 0.85, 0.8))
+				claw.position = Vector3(side * 0.27 + (float(k) - 1.0) * 0.04, 0.55, 0.52)
+				claw.rotation_degrees.x = 90.0
+				_body.add_child(claw)
 
 	var bar_bg := Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
 	bar_bg.position.y = 1.6
@@ -268,5 +319,6 @@ func _process(delta: float) -> void:
 		_cling_ring.scale = Vector3.ONE * (1.0 + 0.18 * sin(t * 1.2))
 		_cling_ring.rotation.y = t * 0.3
 	if _hit_t > 0.0:
+		# Squash: wider and shorter for a moment, then back.
 		_hit_t = maxf(0.0, _hit_t - delta * 8.0)
-		_body.scale = Vector3.ONE * _base_scale * (1.0 + 0.18 * _hit_t)
+		_body.scale = Vector3(1.0 + 0.22 * _hit_t, 1.0 - 0.18 * _hit_t, 1.0 + 0.22 * _hit_t) * _base_scale

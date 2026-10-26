@@ -39,6 +39,62 @@ static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 	return m
 
 
+## The ink line round characters and things: an inverted hull drawn as a
+## second pass, front faces culled, pushed out along the normal. Cheap,
+## and it works on the Compatibility renderer.
+static func outline(width: float = 0.028) -> ShaderMaterial:
+	var cache := _cache()
+	var key := "outline|%.3f" % width
+	if cache.has(key):
+		return cache[key]
+	var sh := Shader.new()
+	sh.code = "shader_type spatial; render_mode cull_front, unshaded, depth_draw_opaque; uniform float width = 0.028; uniform vec4 ink : source_color = vec4(0.06, 0.05, 0.08, 1.0); void vertex() { VERTEX += NORMAL * width; } void fragment() { ALBEDO = ink.rgb; }"
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("width", width)
+	cache[key] = m
+	return m
+
+
+## A soft material with the ink line: characters and things that should
+## read as drawn.
+static func inked(color: Color, width: float = 0.028) -> StandardMaterial3D:
+	var cache := _cache()
+	var key := "inked|%s|%.3f" % [color.to_html(true), width]
+	if cache.has(key):
+		return cache[key]
+	var m := soft(color).duplicate()
+	m.next_pass = outline(width)
+	cache[key] = m
+	return m
+
+
+## A flat material with the ink line, for things built from boxes.
+static func inked_flat(color: Color, width: float = 0.028) -> StandardMaterial3D:
+	var cache := _cache()
+	var key := "inkedflat|%s|%.3f" % [color.to_html(true), width]
+	if cache.has(key):
+		return cache[key]
+	var m := flat(color).duplicate()
+	m.next_pass = outline(width)
+	cache[key] = m
+	return m
+
+
+## Give an existing mesh the ink line, whatever its material.
+static func ink(mi: MeshInstance3D, width: float = 0.028) -> MeshInstance3D:
+	var base := mi.material_override
+	if base is StandardMaterial3D:
+		var key := "ink|%s|%.3f" % [base.get_instance_id(), width]
+		var cache := _cache()
+		if not cache.has(key):
+			var dup: StandardMaterial3D = base.duplicate()
+			dup.next_pass = outline(width)
+			cache[key] = dup
+		mi.material_override = cache[key]
+	return mi
+
+
 ## Something that gives off light: bullets, the boss core, neon, lamps.
 ## Bright enough to bloom under the environment's glow.
 static func glow(color: Color, energy: float = 2.2) -> StandardMaterial3D:

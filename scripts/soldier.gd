@@ -97,6 +97,9 @@ func _build() -> void:
 	var weapon: String = str(look.get("weapon", "standard"))
 	var back: String = str(look.get("back", "pack"))
 
+	# The front ranks get the ink line; the crowd behind stays cheap.
+	var ink_w := 0.022 if detailed else 0.0
+
 	# Short legs with round shoes.
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
@@ -115,11 +118,15 @@ func _build() -> void:
 	var body := Mats.ball(0.235, top)
 	body.position.y = 0.64
 	body.scale = Vector3(1.0, 1.08, 0.92)
+	if ink_w > 0.0:
+		Mats.ink(body, ink_w)
 	add_child(body)
 
 	# A big round head.
 	var head := Mats.ball(HEAD_R, skin)
 	head.position.y = HEAD_Y
+	if ink_w > 0.0:
+		Mats.ink(head, ink_w)
 	add_child(head)
 	if detailed:
 		_add_face()

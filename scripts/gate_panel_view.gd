@@ -19,6 +19,7 @@ const DEAL := Color(0.95, 0.6, 0.15, 0.85)
 const CONVOY := Color(0.5, 0.56, 0.38, 0.9)
 
 var _mesh: MeshInstance3D
+var _strip: MeshInstance3D
 var _mat: StandardMaterial3D
 var _label: Label3D
 var _pop := 0.0
@@ -31,15 +32,27 @@ var width := WIDTH
 
 func _init(p_width: float = WIDTH) -> void:
 	width = p_width
+	# A dark bevelled frame behind a glossy coloured face, and a thin
+	# glowing strip along the top so the row of panels reads from far off.
+	var frame := Mats.box(Vector3(width + 0.16, HEIGHT + 0.16, 0.2), Color(0.09, 0.09, 0.12))
+	frame.position.z = 0.04
+	Mats.ink(frame, 0.02)
+	add_child(frame)
 	_mesh = MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(width, HEIGHT, 0.25)
 	_mesh.mesh = bm
 	_mat = StandardMaterial3D.new()
 	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_mat.roughness = 0.6
+	_mat.roughness = 0.35
+	_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	_mat.emission_enabled = true
+	_mat.emission_energy_multiplier = 0.25
 	_mesh.material_override = _mat
 	add_child(_mesh)
+	_strip = Mats.box(Vector3(width + 0.16, 0.08, 0.22), Color.WHITE)
+	_strip.position = Vector3(0.0, HEIGHT * 0.5 + 0.12, 0.04)
+	add_child(_strip)
 
 	_label = Label3D.new()
 	_label.font_size = 150
@@ -74,6 +87,8 @@ func refresh(panel: GateMath.GatePanel) -> void:
 	_base_color = color
 	if not _hot:
 		_mat.albedo_color = color
+	_mat.emission = Color(color.r, color.g, color.b)
+	_strip.material_override = Mats.glow(Color(color.r, color.g, color.b).lightened(0.3), 1.8)
 
 
 ## Little bounce when a shot steps the value up.

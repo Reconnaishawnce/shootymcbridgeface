@@ -3,6 +3,22 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.25 (graphics pass 2: people and things)
+
+- An ink line round characters and things: an inverted-hull outline
+  drawn as a second pass, on the front ranks of soldiers, every zombie,
+  the bosses, the vehicles and the gate frames. The crowd behind the
+  front ranks stays cheap.
+- Zombies rebuilt in the same round style as the soldiers: hunched egg
+  torsos with a torn patch, big heads with sunken glowing eyes, a slack
+  jaw and a cap of hair, open hands, bare feet. Brutes wear pads and a
+  belt, tanks carry a riveted scrap slab, thieves a sack, latchers
+  claws. Hits squash them wide and short for a moment; bosses too.
+- Gate panels have a dark bevelled frame, a glossy face that glows
+  faintly in its own colour, and a bright strip along the top so a row
+  of panels reads from far down the road.
+- Vehicles get headlights and the ink line.
+
 ## 0.24 (graphics pass 1: light and world)
 
 The first of three graphics passes. This one is the light and the world;

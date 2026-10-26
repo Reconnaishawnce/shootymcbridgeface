@@ -61,6 +61,7 @@ func _init() -> void:
 		_legs.append(hip)
 	var torso := Mats.capsule(1.0, 2.4, SKIN)
 	torso.position.y = 2.2
+	Mats.ink(torso, 0.05)
 	_body.add_child(torso)
 	for side in [-1.0, 1.0]:
 		var plate := Mats.box(Vector3(0.9, 0.35, 0.9), DARK)
@@ -76,6 +77,7 @@ func _init() -> void:
 		_body.add_child(fist)
 	var head := Mats.sphere(0.55, SKIN)
 	head.position = Vector3(0.0, 3.75, 0.2)
+	Mats.ink(head, 0.05)
 	_body.add_child(head)
 	var jaw := Mats.box(Vector3(0.7, 0.25, 0.5), DARK)
 	jaw.position = Vector3(0.0, 3.45, 0.5)
@@ -106,23 +108,28 @@ func setup(p_hp: float, p_kind: int = Kind.WALKER) -> void:
 	hp = p_hp
 	if kind == Kind.SPITTER:
 		# Sickly green, no fists, a wide maw: it does not need to reach you.
-		for c in _body.get_children():
-			if c is MeshInstance3D and c != _core and c != _ring and c.material_override == Mats.flat(SKIN):
-				c.material_override = Mats.flat(SPITTER_SKIN)
+		_recolour(SPITTER_SKIN)
 		var maw := Mats.sphere(0.42, Color(0.1, 0.05, 0.05))
 		maw.position = Vector3(0.0, 3.5, 0.62)
 		_body.add_child(maw)
 	elif kind == Kind.STORM:
 		# Slate blue, a crown of glowing rods: it calls the lightning.
-		for c in _body.get_children():
-			if c is MeshInstance3D and c != _core and c != _ring and c.material_override == Mats.flat(SKIN):
-				c.material_override = Mats.flat(STORM_SKIN)
+		_recolour(STORM_SKIN)
 		for i in range(5):
 			var a := float(i) * TAU / 5.0
 			var rod := Mats.box(Vector3(0.12, 1.1, 0.12), STORM_GLOW, true)
 			rod.position = Vector3(sin(a) * 0.5, 4.5, cos(a) * 0.5 + 0.2)
 			rod.rotation_degrees = Vector3(cos(a) * 25.0, 0.0, -sin(a) * 25.0)
 			_body.add_child(rod)
+
+
+## Swap every skin-coloured part (inked or not) for another skin.
+func _recolour(to: Color) -> void:
+	for c in _body.get_children():
+		if c is MeshInstance3D and c != _core and c != _ring and c.material_override is StandardMaterial3D:
+			var m: StandardMaterial3D = c.material_override
+			if m.albedo_color.is_equal_approx(SKIN):
+				c.material_override = Mats.inked_flat(to, 0.05) if m.next_pass != null else Mats.flat(to)
 
 
 func is_spitter() -> bool:
@@ -180,4 +187,4 @@ func _process(delta: float) -> void:
 		_legs[i].rotation.x = sin(t * 2.5 + PI * i) * 0.35
 	if _hit_t > 0.0:
 		_hit_t = maxf(0.0, _hit_t - delta * 10.0)
-		_body.scale = Vector3.ONE * (1.0 + 0.06 * _hit_t)
+		_body.scale = Vector3(1.0 + 0.07 * _hit_t, 1.0 - 0.05 * _hit_t, 1.0 + 0.07 * _hit_t)

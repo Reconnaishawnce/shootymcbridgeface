@@ -62,7 +62,13 @@ func _init(p_id: String) -> void:
 func _build_jeep() -> void:
 	var body := Mats.box(Vector3(0.9, 0.4, 1.5), BODY)
 	body.position.y = 0.5
+	Mats.ink(body, 0.03)
 	add_child(body)
+	for x in [-0.3, 0.3]:
+		var lamp := Mats.box(Vector3(0.14, 0.12, 0.06), Color(1.0, 0.95, 0.8))
+		lamp.material_override = Mats.glow(Color(1.0, 0.95, 0.8), 2.0)
+		lamp.position = Vector3(x, 0.55, -0.76)
+		add_child(lamp)
 	var hood := Mats.box(Vector3(0.8, 0.2, 0.5), BODY.darkened(0.15))
 	hood.position = Vector3(0.0, 0.72, -0.45)
 	add_child(hood)
@@ -95,7 +101,12 @@ func _build_jeep() -> void:
 func _build_tank() -> void:
 	var hull := Mats.box(Vector3(1.5, 0.55, 2.3), BODY)
 	hull.position.y = 0.55
+	Mats.ink(hull, 0.035)
 	add_child(hull)
+	var lamp := Mats.box(Vector3(0.3, 0.1, 0.06), Color(1.0, 0.95, 0.8))
+	lamp.material_override = Mats.glow(Color(1.0, 0.95, 0.8), 2.0)
+	lamp.position = Vector3(0.45, 0.7, -1.17)
+	add_child(lamp)
 	for x in [-0.8, 0.8]:
 		var track := Mats.box(Vector3(0.35, 0.5, 2.4), DARK)
 		track.position = Vector3(x, 0.35, 0.0)
@@ -121,6 +132,7 @@ func _build_heli() -> void:
 	var body := Mats.pill(0.42, 1.4, BODY)
 	body.rotation_degrees.x = 90.0
 	body.position.y = 0.6
+	Mats.ink(body, 0.03)
 	add_child(body)
 	var glass := Mats.ball(0.34, Color(0.5, 0.75, 0.9))
 	glass.position = Vector3(0.0, 0.7, -0.75)
@@ -168,6 +180,7 @@ func _build_mech() -> void:
 		_legs.append(hip)
 	var torso := Mats.box(Vector3(1.4, 1.0, 1.0), BODY)
 	torso.position.y = 2.0
+	Mats.ink(torso, 0.04)
 	add_child(torso)
 	var head := Mats.ball(0.32, STEEL)
 	head.position = Vector3(0.0, 2.75, -0.1)

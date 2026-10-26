@@ -13,11 +13,13 @@ var radius_mult := 1.0
 var hits_left := 1
 var world: World
 var prev_z := 0.0
+## The vehicle that fired it, if any: kills count toward its rank.
+var source: Node = null
 var _age := 0.0
 
 
-func _init(size: float = 1.0) -> void:
-	var m := Mats.box(Vector3(0.09 * size, 0.09 * size, 0.7), COLOR, true)
+func _init(size: float = 1.0, color: Color = COLOR, length: float = 0.7) -> void:
+	var m := Mats.box(Vector3(0.09 * size, 0.09 * size, length), color, true)
 	add_child(m)
 
 

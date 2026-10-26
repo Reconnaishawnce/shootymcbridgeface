@@ -3,6 +3,24 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.20 (polish turn 3: the convoy, part two)
+
+The convoy grows up: two more vehicles, veteran ranks, convoy perks.
+
+- HELICOPTER (120 soldiers, from level 3): hovers above the squad, picks
+  its own targets (thieves first, then runners and latchers), chews on
+  clingers from above, and nothing on the ground can touch it. Lightning
+  can.
+- MECH (250 soldiers, from level 4): walks out front burning a laser
+  through three zombies at a time.
+- Veteran ranks: 25, 75 and 150 kills earn a vehicle a rank, each one
+  +15% fire and +20% health, healed to full, with a gold stripe and a
+  banner. Kills by a vehicle's own bullets and shells count.
+- Convoy perks on perk gates once you own a vehicle: PLATING (vehicles
+  take 40% less) and OVERDRIVE (vehicles fire 30% faster, twice).
+- Fixed in passing: a shell from a tank wrecked while the shell was in
+  the air could not burst.
+
 ## 0.19 (polish turn 2: the convoy, part one)
 
 Soldiers can become vehicles.

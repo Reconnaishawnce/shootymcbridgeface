@@ -41,10 +41,10 @@ the same key (see below).
 - **Lanes.** The road starts at two lanes and widens to five as you go,
   one panel per lane. More lanes means more to read: one of the extras is
   worth weighing and the rest are traps.
-- **The convoy.** Big enough squads get offered olive panels: JEEP -20
-  or TANK -60. Soldiers climb aboard and the vehicle rides with you from
-  level to level with its own gun and health bar, until something heavy
-  wrecks it.
+- **The convoy.** Big enough squads get offered olive panels: JEEP -20,
+  TANK -60, HELICOPTER -120, MECH -250. Soldiers climb aboard and the
+  vehicle rides with you from level to level with its own gun and health
+  bar, earning ranks from its kills, until something heavy wrecks it.
 - **How to play.** The HOW TO PLAY button on the title (and in pause)
   explains everything below in plain words, with the real numbers.
 - **Records.** Lifetime stats and achievements that pay stars once each.

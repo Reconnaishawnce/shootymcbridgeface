@@ -68,6 +68,7 @@ var crew_look: Dictionary = {}
 ## reset and die with the run.
 var vehicles: Array[Vehicle] = []
 signal vehicle_lost(id: String)
+signal vehicle_ranked(id: String, rank: int)
 var _fire_accum := 0.0
 var _fire_index := 0
 var _revive_timer := 0.0
@@ -139,6 +140,7 @@ func add_vehicle(id: String) -> bool:
 		return false
 	var v := Vehicle.new(id)
 	v.destroyed.connect(_on_vehicle_destroyed)
+	v.ranked.connect(func(vid: String, r: int) -> void: vehicle_ranked.emit(vid, r))
 	add_child(v)
 	vehicles.append(v)
 	_layout()
@@ -173,14 +175,17 @@ func vehicles_alive() -> int:
 
 
 ## Something heavy hit the squad: a random vehicle takes [param amount].
-func damage_vehicle(amount: float) -> void:
+## Ground hits (brutes, chews, the horde) cannot reach what flies;
+## lightning can.
+func damage_vehicle(amount: float, ground_only: bool = true) -> void:
 	var live: Array[Vehicle] = []
 	for v in vehicles:
-		if v.alive:
+		if v.alive and not (ground_only and Convoy.flies(v.id)):
 			live.append(v)
 	if live.is_empty():
 		return
-	live[randi() % live.size()].take_damage(amount)
+	var mult := perks.vehicle_damage_mult() if perks != null else 1.0
+	live[randi() % live.size()].take_damage(amount * mult)
 
 
 func _on_vehicle_destroyed(id: String) -> void:
@@ -457,11 +462,16 @@ func _layout() -> void:
 	for v in vehicles:
 		if not v.alive:
 			continue
-		if v.id == "tank":
-			v.target_offset = Vector3(0.0, 0.0, -(hw * 0.8 + 1.6))
-		else:
-			v.target_offset = Vector3(jeep_side * (hw + 1.0), 0.0, -0.6)
-			jeep_side = -jeep_side
+		match v.id:
+			"tank":
+				v.target_offset = Vector3(0.0, 0.0, -(hw * 0.8 + 1.6))
+			"mech":
+				v.target_offset = Vector3(0.0, 0.0, -(hw * 0.8 + 3.4))
+			"heli":
+				v.target_offset = Vector3(0.0, 3.2, -0.4)
+			_:
+				v.target_offset = Vector3(jeep_side * (hw + 1.0), 0.0, -0.6)
+				jeep_side = -jeep_side
 	for i in range(_flags.size()):
 		var slot: Vector3 = FLAG_SLOTS[i]
 		_flags[i].position = Vector3(slot.x * spread, 0.0, slot.z / sqrt(spread))
@@ -530,7 +540,7 @@ func _process(delta: float) -> void:
 		return
 	_fire(delta)
 	for v in vehicles:
-		v.tick(delta, world, focus_on, focus_point)
+		v.tick(delta, world, focus_on, focus_point, perks.vehicle_fire_mult() if perks != null else 1.0)
 	if is_medic():
 		_revive_timer += delta
 		if _revive_timer >= MEDIC_REVIVE_SECONDS:

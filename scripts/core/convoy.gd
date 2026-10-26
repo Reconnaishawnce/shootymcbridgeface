@@ -16,8 +16,23 @@ const SPECS := {
 		"dps": 90.0, "shots": 0.8, "splash": 2.0,
 		"blurb": "Shells that burst. Slow, heavy, hits a crowd at once.",
 	},
+	"heli": {
+		"name": "HELICOPTER", "cost": 120, "hp": 160.0, "max": 1, "level": 3,
+		"dps": 110.0, "shots": 10.0, "pierce": 1, "flies": true, "cling_dps": 40.0,
+		"blurb": "Hovers above the ground. Hunts thieves, runners and clingers. Nothing on the ground can touch it.",
+	},
+	"mech": {
+		"name": "MECH", "cost": 250, "hp": 400.0, "max": 1, "level": 4,
+		"dps": 220.0, "shots": 10.0, "pierce": 3, "beam": true,
+		"blurb": "A walking laser. Burns straight through a column of zombies.",
+	},
 }
-const ORDER := ["jeep", "tank"]
+const ORDER := ["jeep", "tank", "heli", "mech"]
+## Veteran ranks: kills a vehicle needs for each rank, and what a rank
+## adds to its fire and its health.
+const RANK_KILLS := [25, 75, 150]
+const RANK_DPS := 0.15
+const RANK_HP := 0.2
 ## A vehicle is offered once the squad has this many times its cost, so
 ## forming one never leaves you bare.
 const OFFER_MARGIN := 1.6
@@ -50,6 +65,27 @@ static func offer(count: int, owned: Dictionary, level: int) -> String:
 		if can_offer(id, count, int(owned.get(id, 0)), level):
 			return id
 	return ""
+
+
+static func flies(id: String) -> bool:
+	return bool(spec(id).get("flies", false))
+
+
+## Rank reached with [param kills]: 0 to RANK_KILLS.size().
+static func rank_for(kills: int) -> int:
+	var r := 0
+	for need in RANK_KILLS:
+		if kills >= int(need):
+			r += 1
+	return r
+
+
+static func rank_dps_mult(rank: int) -> float:
+	return 1.0 + RANK_DPS * float(rank)
+
+
+static func rank_hp_mult(rank: int) -> float:
+	return 1.0 + RANK_HP * float(rank)
 
 
 ## Damage per shot from the spec's DPS and rate.

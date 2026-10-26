@@ -45,6 +45,9 @@ static func sections() -> Array:
 			"Soldiers can become vehicles. Once your squad is big enough, a gate offers an olive panel like JEEP -%d: walk through it and that many soldiers climb aboard. " % Convoy.cost("jeep") +
 			"A JEEP (%d soldiers, up to %d) rides on your flank with a mounted gun: fast, straight, through two zombies at a time. " % [Convoy.cost("jeep"), int(Convoy.spec("jeep").max)] +
 			"A TANK (%d soldiers, from level %d) leads up the middle firing shells that burst on a crowd. " % [Convoy.cost("tank"), int(Convoy.spec("tank").level)] +
+			"A HELICOPTER (%d soldiers, from level %d) hovers above the squad, hunts thieves, runners and clingers on its own, and nothing on the ground can touch it; only lightning can. " % [Convoy.cost("heli"), int(Convoy.spec("heli").level)] +
+			"A MECH (%d soldiers, from level %d) walks out front and burns a laser through a column of zombies. " % [Convoy.cost("mech"), int(Convoy.spec("mech").level)] +
+			"Every %d kills a vehicle earns a RANK (up to %d): harder hitting, tougher, healed up, a gold stripe. Once you own a vehicle, perk gates can offer PLATING and OVERDRIVE for the convoy. " % [int(Convoy.RANK_KILLS[0]), Convoy.RANK_KILLS.size()] +
 			"Vehicles have their own health bar: brutes, boss chews and lightning damage them, and a wrecked one is gone. " +
 			"But they stay with you from level to level while the soldiers reset, and each one still rolling at the boss pays %d points. Fewer bodies now, a convoy later." % Convoy.LEVEL_BONUS_PER_VEHICLE},
 		{"title": "ZOMBIES", "body":

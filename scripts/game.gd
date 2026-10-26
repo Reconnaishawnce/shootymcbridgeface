@@ -248,6 +248,11 @@ func _build_scene() -> void:
 	squad.wiped_out.connect(_on_wiped_out)
 	squad.dashed.connect(func() -> void: world.shake_off())
 	squad.vehicle_lost.connect(_on_vehicle_lost)
+	squad.vehicle_ranked.connect(func(id: String, r: int) -> void:
+		hud.show_banner("%s  RANK %d" % [Convoy.title(id), r], 1.2)
+		sfx.play("level_clear", -8.0, 1.3)
+		if smoke:
+			print("SMOKE_RANK ", JSON.stringify({"id": id, "rank": r, "level": world.level, "frame": _frames})))
 	squad.reset()
 
 	hud = Hud.new()
@@ -1419,6 +1424,8 @@ func _shots_walkthrough() -> void:
 	await _capture("5c_army.png", 40)
 	squad.add_vehicle("jeep")
 	squad.add_vehicle("tank")
+	squad.add_vehicle("heli")
+	squad.add_vehicle("mech")
 	await _capture("5c2_convoy.png", 90)
 	_bot_spread = true
 	for i in range(3000):

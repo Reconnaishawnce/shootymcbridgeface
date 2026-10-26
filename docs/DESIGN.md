@@ -237,6 +237,16 @@ damage from the heavy hits (`Difficulty.VEHICLE_HIT_*`). They survive
 A jeep's 50 DPS equals twenty capped soldiers, so the trade is even on
 fire and ahead on accuracy, persistence and the level bonus.
 
+The helicopter flies (`Convoy.flies`): ground hits skip it, lightning
+does not. It aims itself at `World.pest_target` (thieves, then runners
+and latchers) and pours `cling_dps` into the first clinger through
+`World.heli_hit_latched`. The mech's laser is a stream of long red
+bullets with pierce 3. Bullets and shells carry a `source`, and every
+kill they make calls `Vehicle.note_kill`; `Convoy.rank_for` turns kills
+into ranks (`RANK_KILLS`), each adding `RANK_DPS` and `RANK_HP` and a
+full heal. Perks flagged `vehicle` are only offered when the squad owns
+one.
+
 ## Honest road: the fork, formation width, the shop
 
 The fork carries no words. `Difficulty.make_fork` builds two routes with

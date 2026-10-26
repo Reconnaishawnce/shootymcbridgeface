@@ -11,6 +11,7 @@ const TRAIL := Color(1.0, 0.7, 0.3)
 var damage := 50.0
 var splash := 1.9
 var world: World
+var source: Node = null
 var _travelled := 0.0
 
 
@@ -31,5 +32,6 @@ func _process(delta: float) -> void:
 	if world == null:
 		return
 	if world.shell_should_burst(self) or _travelled >= RANGE:
-		world.explode_at(Vector3(position.x, 0.0, position.z), splash, damage)
+		# The tank may have been wrecked while the shell was in the air.
+		world.explode_at(Vector3(position.x, 0.0, position.z), splash, damage, source if is_instance_valid(source) else null)
 		queue_free()

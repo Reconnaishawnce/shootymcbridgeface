@@ -485,6 +485,8 @@ func try_hit(b: Bullet) -> bool:
 			zombie_killed.emit(z)
 			_note_wave_death(z)
 			z.die()
+			if b.source != null and is_instance_valid(b.source):
+				b.source.note_kill()
 			if b.hits_left > 1:
 				# Piercing: keep flying, but never count the same kill twice.
 				b.hits_left -= 1
@@ -537,7 +539,8 @@ func _spawn() -> void:
 	var limit := 1 << 30 if endless else Difficulty.GATES_PER_LEVEL
 	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
 		var z := -(Difficulty.gate_distance(_next_gate) - level_distance)
-		var offer: Array = perks.offer(gen.rng) if (perks != null and Perks.is_pick_gate(_gate_index(_next_gate))) else []
+		var has_vehicles: bool = squad != null and squad.vehicles_alive() > 0
+		var offer: Array = perks.offer(gen.rng, has_vehicles) if (perks != null and Perks.is_pick_gate(_gate_index(_next_gate))) else []
 		if Difficulty.is_fork_gate(_gate_index(_next_gate)) and not _fork_routes.is_empty():
 			var k := _gate_index(_next_gate) - Difficulty.FORK_INDEX
 			if k == 0:
@@ -1161,12 +1164,49 @@ func _move_strikes(delta: float, p_squad: Squad) -> void:
 			elif hit:
 				var bite := _bite(Difficulty.strike_bite(p_squad.count))
 				p_squad.add(-bite)
-				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_STRIKE)
+				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_STRIKE, false)
 				squad_bitten.emit(bite, true)
 			strike_landed.emit(st.position, hit)
 		if st.done:
 			_strikes.erase(st)
 			st.queue_free()
+
+
+## The nearest pest ahead for the helicopter: thieves first, then
+## runners and latchers, within [param max_range]. Null when none.
+func pest_target(max_range: float) -> Zombie:
+	var best: Zombie = null
+	var best_score := INF
+	for z in zombies:
+		if z.latched or z.position.z > 0.5 or z.position.z < -max_range:
+			continue
+		var score := -z.position.z
+		if z.is_thief():
+			score -= 40.0
+		elif z.is_runner() or z.is_latcher():
+			score -= 15.0
+		else:
+			continue
+		if score < best_score:
+			best_score = score
+			best = z
+	return best
+
+
+## The helicopter's gun can reach the flank: [param dps] into the first
+## clinger for [param delta] seconds. Returns the kill, if any.
+func heli_hit_latched(dps: float, delta: float, source: Node) -> void:
+	if _latched.is_empty():
+		return
+	var z: Zombie = _latched[0]
+	if z.take_damage(dps * delta):
+		_latched.erase(z)
+		zombies.erase(z)
+		zombie_killed.emit(z)
+		_note_wave_death(z)
+		z.die()
+		if source != null and is_instance_valid(source):
+			source.note_kill()
 
 
 ## A tank shell asks: is there something to burst on right here?
@@ -1183,7 +1223,7 @@ func shell_should_burst(sh: Shell) -> bool:
 
 ## A burst of [param damage] on everything within [param radius] of
 ## [param at]: zombies, the boss (at half), gate panels untouched.
-func explode_at(at: Vector3, radius: float, damage: float) -> int:
+func explode_at(at: Vector3, radius: float, damage: float, source: Node = null) -> int:
 	var kills := 0
 	for z in zombies.duplicate():
 		if z.latched or z.position.distance_to(at) > radius + z.radius * 0.5:
@@ -1194,6 +1234,8 @@ func explode_at(at: Vector3, radius: float, damage: float) -> int:
 			_note_wave_death(z)
 			z.die()
 			kills += 1
+			if source != null and is_instance_valid(source):
+				source.note_kill()
 	if boss != null and boss.alive and boss.position.distance_to(at) <= radius + Boss.BODY_RADIUS:
 		var core := boss.is_core_hit(at.x)
 		var dead := boss.take_damage(damage * 0.5, core)

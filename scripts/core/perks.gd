@@ -14,6 +14,9 @@ const CATALOG := {
 	"sight": {"name": "LONG SIGHT", "desc": "Hidden gates show from farther", "max": 2},
 	"core": {"name": "CORE SIGHT", "desc": "Boss core takes +1x damage", "max": 3},
 	"greed": {"name": "GREED", "desc": "+30% coins", "max": 3},
+	# Convoy perks: only offered once you have a vehicle.
+	"plating": {"name": "PLATING", "desc": "Vehicles take 40% less", "max": 1, "vehicle": true},
+	"overdrive": {"name": "OVERDRIVE", "desc": "Vehicles fire 30% faster", "max": 2, "vehicle": true},
 }
 ## A pick is offered after every PICK_EVERY-th gate of a level.
 const PICK_EVERY := 3
@@ -38,10 +41,10 @@ func can_offer(id: String) -> bool:
 
 
 ## Up to CARDS distinct perk ids, shuffled with [param rng] so runs replay.
-func offer(rng: RandomNumberGenerator) -> Array:
+func offer(rng: RandomNumberGenerator, has_vehicles: bool = false) -> Array:
 	var pool: Array = []
 	for id in CATALOG:
-		if can_offer(id):
+		if can_offer(id) and (has_vehicles or not bool(CATALOG[id].get("vehicle", false))):
 			pool.append(id)
 	for i in range(pool.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
@@ -72,6 +75,14 @@ static func description(id: String) -> String:
 
 
 # --- effects ---------------------------------------------------------------
+
+func vehicle_fire_mult() -> float:
+	return 1.0 + 0.3 * float(stacks.get("overdrive", 0))
+
+
+func vehicle_damage_mult() -> float:
+	return 0.6 if int(stacks.get("plating", 0)) > 0 else 1.0
+
 
 func fire_rate_mult() -> float:
 	return 1.0 + 0.25 * stack("rapid")

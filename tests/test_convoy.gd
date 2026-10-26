@@ -49,3 +49,40 @@ func test_gates_offer_vehicles() -> void:
 				none += 1
 	check_eq(none, 0, "a small squad is never offered one")
 	check_eq(Difficulty.level_bonus(2, 10, 2), 300 + 50 + 2 * Convoy.LEVEL_BONUS_PER_VEHICLE, "vehicles pay at the boss")
+
+
+func test_ranks_and_flying() -> void:
+	check_eq(Convoy.rank_for(0), 0, "no kills, no rank")
+	check_eq(Convoy.rank_for(25), 1, "first rank")
+	check_eq(Convoy.rank_for(149), 2, "second")
+	check_eq(Convoy.rank_for(150), 3, "third")
+	check_eq(Convoy.rank_for(9999), Convoy.RANK_KILLS.size(), "capped")
+	check_near(Convoy.rank_dps_mult(2), 1.3, 0.0001, "rank fire")
+	check_near(Convoy.rank_hp_mult(1), 1.2, 0.0001, "rank health")
+	check(Convoy.flies("heli") and not Convoy.flies("tank"), "only the helicopter flies")
+	check_eq(Convoy.offer(200, {}, 3), "heli", "a helicopter at 200 on level 3")
+	check_eq(Convoy.offer(200, {}, 2), "tank", "not before level 3")
+	check_eq(Convoy.offer(400, {}, 4), "mech", "a mech at 400 on level 4")
+	check_eq(Convoy.offer(400, {"mech": 1, "heli": 1, "tank": 1}, 4), "jeep", "what is left")
+
+
+func test_vehicle_perks() -> void:
+	var perks := Perks.new()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var seen_vehicle := false
+	for i in range(30):
+		for id in perks.offer(rng, false):
+			if bool(Perks.CATALOG[id].get("vehicle", false)):
+				seen_vehicle = true
+	check(not seen_vehicle, "no convoy perks without a convoy")
+	for i in range(30):
+		for id in perks.offer(rng, true):
+			if bool(Perks.CATALOG[id].get("vehicle", false)):
+				seen_vehicle = true
+	check(seen_vehicle, "convoy perks show up once you have one")
+	check_near(perks.vehicle_fire_mult(), 1.0, 0.0001, "no overdrive yet")
+	perks.take("overdrive")
+	perks.take("plating")
+	check_near(perks.vehicle_fire_mult(), 1.3, 0.0001, "overdrive")
+	check_near(perks.vehicle_damage_mult(), 0.6, 0.0001, "plating")

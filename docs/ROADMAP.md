@@ -187,15 +187,24 @@ bosses were too easy.
 - Hero lines at run start and on level clear; locker preview turns by
   touch.
 
-## Run 13: feedback and polish
+## Run 13: how to play, records, the storm (done)
 
-- Phone feedback pass on modes, deals, the horde and the weekly.
-- Achievements board with star rewards; a stats page.
-- Boss variety: a third boss kind.
+- HOW TO PLAY page, built from the game's constants and tested.
+- RECORDS page: lifetime stats and 26 star-paying achievements.
+- The storm: a third boss with lightning lines and a gap to find.
+
+## Run 14: come back tomorrow
+
+- A season pass with a free track, advanced by daily quests.
+- Trophy road with checkpoints; mission sets that raise a multiplier.
+- Phone feedback pass on everything since run 10.
 
 ## Always
 
 - Keep `scripts/core/` pure and tested.
+- Any change to game mechanics updates the in-game HOW TO PLAY page
+  (`scripts/core/help_text.gd`) in the same commit. Its test fails if a
+  mode, power-up or panel colour goes unmentioned.
 - Any balance change is checked against the auto-player at 900, 3600 and
   7200 frames before it ships.
 - Never commit a change that makes CI red on `main`.

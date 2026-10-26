@@ -54,16 +54,15 @@ func test_curves_are_bounded_and_increasing() -> void:
 
 
 func test_boss_curve() -> void:
-	var last := 0.0
-	for level in range(1, 20, 2):
-		var hp := Difficulty.boss_hp(level)
-		check(hp > last, "walker hp grows at level %d" % level)
-		last = hp
-	last = 0.0
-	for level in range(2, 20, 2):
-		var hp := Difficulty.boss_hp(level)
-		check(hp > last, "spitter hp grows at level %d" % level)
-		last = hp
+	# Three kinds cycle by level; each kind's health grows with the level.
+	for kind in [Boss.Kind.WALKER, Boss.Kind.SPITTER, Boss.Kind.STORM]:
+		var last := 0.0
+		for level in range(1, 20):
+			if Difficulty.boss_kind(level) != kind:
+				continue
+			var hp := Difficulty.boss_hp(level)
+			check(hp > last, "boss kind %d hp grows at level %d" % [kind, level])
+			last = hp
 	check(Difficulty.boss_hp(2) < Difficulty.boss_hp(3), "spitters carry less than the next walker")
 	check(Difficulty.boss_hp(3, 5) > Difficulty.boss_hp(3, 0), "perks make bosses tougher")
 	check_near(Difficulty.boss_hp(3, 5) / Difficulty.boss_hp(3, 0), 1.3, 0.001, "6% per perk")

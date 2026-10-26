@@ -41,6 +41,9 @@ the same key (see below).
 - **Lanes.** The road starts at two lanes and widens to five as you go,
   one panel per lane. More lanes means more to read: one of the extras is
   worth weighing and the rest are traps.
+- **How to play.** The HOW TO PLAY button on the title (and in pause)
+  explains everything below in plain words, with the real numbers.
+- **Records.** Lifetime stats and achievements that pay stars once each.
 - **Modes.** MODE on the title cycles NORMAL, HARD (reach level 3) and
   NIGHTMARE (reach level 4 on hard). Harder modes throw more at you and
   pay more score, coins and stars. Each keeps its own bests.
@@ -127,10 +130,10 @@ the same key (see below).
   rifles only. Your best of the day is kept for a week on the Daily card.
   Copy the one-line result to paste anywhere; the game-over card has a
   copy button too.
-- **Bosses** alternate: odd levels get the walker that chews you once it
-  arrives, even levels get the spitter that holds back and lobs globs at
-  where you are heading. A red ring marks where each glob lands: step out
-  of it.
+- **Bosses** cycle: the walker that chews you once it arrives, the
+  spitter that holds back and lobs globs at where you are heading (a red
+  ring marks where each lands: step out of it), and the storm that calls
+  lightning in lines across the road with one gap to find.
 - **Thieves** sprint away from you toward the next gate and knock its
   better panel down if they get there. **Tanks** are slow bullet sponges
   that shield the gate behind them.

@@ -23,6 +23,9 @@ signal formation_pressed
 signal bomb_pressed
 signal quit_pressed
 signal settings_opened
+signal records_opened
+signal help_opened
+signal help_closed
 signal settings_closed
 signal characters_toggled(on: bool)
 signal locker_opened
@@ -63,6 +66,12 @@ var _settings_sound: Button
 var _settings_music: Button
 var _settings_characters: Button
 var _pause_characters: Button
+
+var _records_card: Control
+var _records_box: VBoxContainer
+var _help_card: Control
+var _help_box: VBoxContainer
+var _help_built := false
 
 var _locker_card: Control
 var _locker_stars: Label
@@ -281,6 +290,10 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
+	_records_card = _scroll_card(root, "RECORDS", func() -> void: shop_closed.emit())
+	_records_box = _records_card.get_meta("box")
+	_help_card = _scroll_card(root, "HOW TO PLAY", func() -> void: help_closed.emit())
+	_help_box = _help_card.get_meta("box")
 	_build_shop(root)
 	_build_daily(root)
 	_build_combo(root)
@@ -324,6 +337,19 @@ func _build_title(root: Control) -> void:
 	_locker_button.custom_minimum_size.x = 200.0
 	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
 	row.add_child(_locker_button)
+	var row2 := HBoxContainer.new()
+	row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row2.alignment = BoxContainer.ALIGNMENT_CENTER
+	row2.add_theme_constant_override("separation", 16)
+	box.add_child(row2)
+	var records := _button("RECORDS", 30)
+	records.custom_minimum_size.x = 200.0
+	records.pressed.connect(func() -> void: records_opened.emit())
+	row2.add_child(records)
+	var help := _button("HOW TO PLAY", 30)
+	help.custom_minimum_size.x = 200.0
+	help.pressed.connect(func() -> void: help_opened.emit())
+	row2.add_child(help)
 	var settings := _button("SETTINGS", 30)
 	settings.pressed.connect(func() -> void: settings_opened.emit())
 	box.add_child(settings)
@@ -549,6 +575,9 @@ func _build_pause(root: Control) -> void:
 	_pause_characters = _button("CHARACTERS: OFF", 34)
 	_pause_characters.pressed.connect(_on_characters_pressed)
 	box.add_child(_pause_characters)
+	var help := _button("HOW TO PLAY", 34)
+	help.pressed.connect(func() -> void: help_opened.emit())
+	box.add_child(help)
 	var quit := _button("QUIT TO TITLE", 34)
 	quit.pressed.connect(func() -> void: quit_pressed.emit())
 	box.add_child(quit)
@@ -648,6 +677,8 @@ func _hide_cards() -> void:
 	_pause_card.visible = false
 	_settings_card.visible = false
 	_locker_card.visible = false
+	_records_card.visible = false
+	_help_card.visible = false
 
 
 ## [param t] keys: best, best_level, best_endless, coins, endless_unlocked,
@@ -685,6 +716,54 @@ func show_title(t: Dictionary) -> void:
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
 	_coins_title.text = "%d COINS" % coins
 	_stars_title.text = "%d STARS   ·   %s" % [stars, hero_name] if hero_name != "" else "%d STARS" % stars
+
+
+## Lifetime numbers and the achievement list.
+func show_records(stats: Dictionary, rows: Array) -> void:
+	_hide_cards()
+	_records_card.visible = true
+	for child in _records_box.get_children():
+		_records_box.remove_child(child)
+		child.queue_free()
+	var head := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	head.text = "LIFETIME"
+	head.add_theme_color_override("font_color", COIN)
+	_records_box.add_child(head)
+	for line in Stats.lines(stats):
+		var l := _label(24, HORIZONTAL_ALIGNMENT_LEFT)
+		l.text = line
+		_records_box.add_child(l)
+	var head2 := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	head2.text = "\nACHIEVEMENTS"
+	head2.add_theme_color_override("font_color", COIN)
+	_records_box.add_child(head2)
+	for r in rows:
+		var l := _label(22, HORIZONTAL_ALIGNMENT_LEFT)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD
+		l.custom_minimum_size.x = 620.0
+		var mark := "DONE" if r.done else "%d / %d" % [int(r.progress), int(r.at)]
+		l.text = "%s   ·   %s   ·   %d %s   ·   %s" % [r.title, r.desc, int(r.stars), "star" if int(r.stars) == 1 else "stars", mark]
+		l.modulate = Color(1.0, 1.0, 1.0) if r.done else Color(0.75, 0.75, 0.8)
+		_records_box.add_child(l)
+
+
+## The explainer. Built once from HelpText.
+func show_help() -> void:
+	_hide_cards()
+	_help_card.visible = true
+	if _help_built:
+		return
+	_help_built = true
+	for sec in HelpText.sections():
+		var head := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+		head.text = str(sec.title)
+		head.add_theme_color_override("font_color", COIN)
+		_help_box.add_child(head)
+		var body := _label(23, HORIZONTAL_ALIGNMENT_LEFT)
+		body.text = str(sec.body) + "\n"
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD
+		body.custom_minimum_size.x = 620.0
+		_help_box.add_child(body)
 
 
 func show_settings() -> void:
@@ -828,6 +907,11 @@ func show_game_over(r: Dictionary) -> void:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
 	if locker_nudge:
 		coins_line += "\nSomething new is waiting in the locker!"
+	var unlocked: Array = r.get("achievements", [])
+	for id in unlocked:
+		var a := Achievements.find(str(id))
+		if not a.is_empty():
+			coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
 	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	_over_prompt.text = "TAP TO RETRY"
 	_pulse_prompt()
@@ -962,6 +1046,51 @@ func _card(parent: Control) -> Control:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 18)
 	center.add_child(box)
+	card.set_meta("box", box)
+	return card
+
+
+## A full-screen card with a title, a scrolling column of content and a
+## BACK button pinned at the bottom. The column is in meta "box".
+func _scroll_card(parent: Control, title: String, on_back: Callable) -> Control:
+	var card := Control.new()
+	card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.visible = false
+	parent.add_child(card)
+	var shade := ColorRect.new()
+	shade.color = Color(0.0, 0.0, 0.0, 0.7)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(shade)
+	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = title
+	_place(card, head, 0.0, 1.0, 30.0)
+	var scroll := ScrollContainer.new()
+	scroll.anchor_left = 0.0
+	scroll.anchor_right = 1.0
+	scroll.anchor_top = 0.0
+	scroll.anchor_bottom = 1.0
+	scroll.offset_left = 30.0
+	scroll.offset_right = -30.0
+	scroll.offset_top = 110.0
+	scroll.offset_bottom = -110.0
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	card.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 6)
+	scroll.add_child(box)
+	var back := _button("BACK", 34)
+	back.anchor_left = 0.2
+	back.anchor_right = 0.8
+	back.anchor_top = 1.0
+	back.anchor_bottom = 1.0
+	back.offset_top = -96.0
+	back.offset_bottom = -26.0
+	back.pressed.connect(on_back)
+	card.add_child(back)
 	card.set_meta("box", box)
 	return card
 

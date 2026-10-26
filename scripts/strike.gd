@@ -26,9 +26,18 @@ func setup(p_x: float) -> void:
 	add_child(_bolt)
 
 
+## Hold the ring back for [param seconds] before the warning starts.
+func delay(seconds: float) -> void:
+	_age = -seconds
+	_ring.visible = seconds <= 0.0
+
+
 ## True on the single frame the bolt lands.
 func tick(delta: float) -> bool:
 	_age += delta
+	if _age < 0.0:
+		return false
+	_ring.visible = not fired
 	if not fired:
 		var u := clampf(_age / Difficulty.STRIKE_WARNING, 0.0, 1.0)
 		var pulse := 1.0 + 0.3 * sin(_age * 18.0 * (0.5 + u))

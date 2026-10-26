@@ -3,6 +3,27 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.17 (run 13)
+
+How to play, records, achievements, and the storm.
+
+- HOW TO PLAY on the title and in the pause menu: a plain-words page on
+  controls, panels and their colours, shooting panels, levels, zombies,
+  bosses, power-ups, combos and grades, coins and the shop, stars and
+  the locker, modes, squads and records. Its numbers are read from the
+  game's own constants, and a test checks it names every power-up, mode
+  and panel colour, so it cannot quietly go stale.
+- RECORDS: lifetime numbers (runs, kills, bosses, gates, perfect gates,
+  distance, best combo, best levels, S grades, bets, dailies, weeklies,
+  coins and stars) and 26 achievements that each pay stars once. New
+  ones show on the wipe screen.
+- A third boss, THE STORM, on every third level: it hangs back and calls
+  lightning in lines across the whole road with one gap. Enraged, a
+  second line follows with a different gap. Walker, spitter, storm,
+  round and round.
+- The auto-player now looks for the safe spot in a volley instead of
+  dashing blindly sideways.
+
 ## 0.16 (cleanup and QA)
 
 No new features. A review pass over the whole game, and the bugs it found.

@@ -59,6 +59,12 @@ var run_meta := Meta.new()
 var daily_day := 0
 var daily_results: Dictionary = {}
 var week_number := 0
+## Lifetime numbers and the achievements already paid.
+var stats: Dictionary = Stats.blank()
+var achievements_done: Array = []
+var _bets_won := 0
+var _bets_lost := 0
+var _help_from_pause := false
 var weekly_results: Dictionary = {}
 ## While a finger is dragging the locker preview round, the idle turn waits.
 var _preview_drag_until := 0.0
@@ -134,6 +140,8 @@ func _ready() -> void:
 	week_number = Daily.week_number(int(Time.get_unix_time_from_system()))
 	weekly_results = Daily.prune_weeks(SaveData.load_weekly(), week_number)
 	wardrobe.from_dict(SaveData.load_wardrobe())
+	stats = SaveData.load_stats()
+	achievements_done = SaveData.load_achievements()
 	# The auto-player dresses up so the character code runs in CI too.
 	character_mode = SaveData.load_character_mode() or smoke
 	# Headless CI has no audio device; the dummy driver releases playbacks
@@ -249,6 +257,9 @@ func _build_scene() -> void:
 	hud.formation_pressed.connect(cycle_formation)
 	hud.bomb_pressed.connect(throw_bomb)
 	hud.settings_opened.connect(open_settings)
+	hud.records_opened.connect(open_records)
+	hud.help_opened.connect(open_help)
+	hud.help_closed.connect(close_help)
 	hud.settings_closed.connect(show_title)
 	hud.characters_toggled.connect(_on_characters_toggled)
 	hud.locker_opened.connect(open_locker)
@@ -296,6 +307,25 @@ func cycle_mode() -> void:
 	show_title()
 	if modifier != "normal":
 		hud.toast(Modifiers.blurb(modifier))
+
+
+func open_records() -> void:
+	sfx.play("click")
+	hud.show_records(stats, Achievements.rows(stats, achievements_done))
+
+
+func open_help() -> void:
+	sfx.play("click")
+	_help_from_pause = state == State.RUNNING and get_tree().paused
+	hud.show_help()
+
+
+func close_help() -> void:
+	sfx.play("click")
+	if _help_from_pause:
+		hud.show_paused(true)
+	else:
+		show_title()
 
 
 func open_settings() -> void:
@@ -494,6 +524,8 @@ func start_run(p_mode: String = "levels") -> void:
 	world.endless = mode == "endless"
 	world.modifier = "normal" if mode == "daily" else (Daily.WEEKLY_MODIFIER if mode == "weekly" else modifier)
 	grades = []
+	_bets_won = 0
+	_bets_lost = 0
 	_level_gates = 0
 	_level_perfect = 0
 	_boss_start = 0.0
@@ -571,6 +603,33 @@ func end_run() -> void:
 		stars_earned += int(world.mod("stars"))
 	if mode == "weekly" and stars_earned > 0:
 		stars_earned += 2
+	# Lifetime numbers, then any achievement they complete. Achievements
+	# pay stars once. The auto-player keeps its hands off the save.
+	var s_count := 0
+	for g in grades:
+		if g == "S":
+			s_count += 1
+	var run_stats := {
+		"runs": 1, "kills": kills, "bosses": bosses_killed, "gates": gates_passed, "perfect": perfect_gates,
+		"distance": int(total_distance), "best_combo": combo.best, "bets_won": _bets_won, "bets_lost": _bets_lost,
+		"dailies": 1 if mode == "daily" else 0, "weeklies": 1 if mode == "weekly" else 0,
+		"hard_bosses": bosses_killed if world.modifier == "hard" else 0,
+		"nightmare_bosses": bosses_killed if world.modifier == "nightmare" else 0,
+		"s_grades": s_count, "stars_earned": stars_earned, "coins_earned": earned,
+		"best_level": 0 if world.endless else world.level, "endless_level": world.level if world.endless else 0,
+		"escapes": 1 if character_mode else 0,
+	}
+	var new_achievements: Array = []
+	if not smoke:
+		stats = Stats.merge(stats, run_stats)
+		new_achievements = Achievements.newly_done(stats, achievements_done)
+		if not new_achievements.is_empty():
+			achievements_done.append_array(new_achievements)
+			stars_earned += Achievements.stars_for(new_achievements)
+			SaveData.save_achievements(achievements_done)
+			sfx.play("level_clear", -4.0, 1.2)
+		stats.stars_earned = int(stats.stars_earned) + Achievements.stars_for(new_achievements)
+		SaveData.save_stats(stats)
 	if not smoke and stars_earned > 0:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
@@ -580,7 +639,7 @@ func end_run() -> void:
 		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned,
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
-		"grades": " ".join(grades), "modifier": world.modifier,
+		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
 	})
 	if character_mode:
 		squad.cheer()
@@ -1015,6 +1074,10 @@ func _on_bet_resolved(won: bool, before: int, after: int) -> void:
 	if smoke:
 		print("SMOKE_BET ", JSON.stringify({"won": won, "before": before, "after": after, "level": world.level, "frame": _frames}))
 	if won:
+		_bets_won += 1
+	else:
+		_bets_lost += 1
+	if won:
 		hud.show_banner("BET WON   x2\n%d > %d" % [before, after], 1.6)
 		squad.rally()
 		sfx.play("rally")
@@ -1170,11 +1233,18 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
-	# Lightning ring on top of us: dash out of it.
-	if Progression.dash_enabled(world.level) and world.strike_threat_at(squad.position.x, squad.reach() + 0.6) and squad.can_dash():
-		var away := -1.0 if squad.position.x > 0.0 else 1.0
-		if squad.dash(away):
-			_on_dash()
+	# Lightning ring on top of us: head for the nearest safe spot, and dash
+	# there if it is far.
+	if world.strike_threat_at(squad.position.x, squad.reach() + 0.6):
+		var safe := world.safe_x_near(squad.position.x, squad.reach() + 0.6)
+		if Progression.dash_enabled(world.level) and absf(safe - squad.position.x) > 1.5 and squad.can_dash():
+			if squad.dash(signf(safe - squad.position.x)):
+				_on_dash()
+		if world.phase == World.Phase.BOSS:
+			squad.target_x = clampf(safe, -squad.road_half, squad.road_half)
+			if _bot_spread:
+				squad.set_spread(0.6)
+			return
 	var focus := world.focus_target(24.0)
 	if focus != null:
 		squad.set_focus(focus.position)
@@ -1232,6 +1302,12 @@ func _shots_walkthrough() -> void:
 	await _capture("2b_daily.png", 5)
 	open_settings()
 	await _capture("2c_settings.png", 5)
+	stats = Stats.merge(stats, {"runs": 12, "kills": 2400, "bosses": 11, "gates": 130, "perfect": 31, "distance": 9000, "best_combo": 140, "best_level": 6})
+	open_records()
+	await _capture("2h_records.png", 5)
+	open_help()
+	await _capture("2i_help.png", 5)
+	close_help()
 	show_title()
 	modifier = "hard"
 	show_title()

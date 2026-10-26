@@ -5,7 +5,7 @@ extends Node3D
 ## through the core deal [member core_mult] damage, so tracking it with your
 ## steering is the skill.
 
-enum Kind { WALKER, SPITTER }
+enum Kind { WALKER, SPITTER, STORM }
 
 const BODY_RADIUS := 1.7
 ## The spitter holds this far away and lobs at you instead of walking in.
@@ -24,6 +24,11 @@ const DARK := Color(0.3, 0.16, 0.15)
 const CORE_COLOR := Color(1.0, 0.85, 0.2)
 const EYE := Color(1.0, 0.15, 0.1)
 const SPITTER_SKIN := Color(0.4, 0.55, 0.3)
+const STORM_SKIN := Color(0.3, 0.35, 0.55)
+const STORM_GLOW := Color(0.7, 0.85, 1.0)
+const STORM_HOLD_Z := -22.0
+const STORM_SWAY := 2.6
+const STORM_SWAY_SPEED := 0.7
 
 var hp := 100.0
 var max_hp := 100.0
@@ -107,10 +112,34 @@ func setup(p_hp: float, p_kind: int = Kind.WALKER) -> void:
 		var maw := Mats.sphere(0.42, Color(0.1, 0.05, 0.05))
 		maw.position = Vector3(0.0, 3.5, 0.62)
 		_body.add_child(maw)
+	elif kind == Kind.STORM:
+		# Slate blue, a crown of glowing rods: it calls the lightning.
+		for c in _body.get_children():
+			if c is MeshInstance3D and c != _core and c != _ring and c.material_override == Mats.flat(SKIN):
+				c.material_override = Mats.flat(STORM_SKIN)
+		for i in range(5):
+			var a := float(i) * TAU / 5.0
+			var rod := Mats.box(Vector3(0.12, 1.1, 0.12), STORM_GLOW, true)
+			rod.position = Vector3(sin(a) * 0.5, 4.5, cos(a) * 0.5 + 0.2)
+			rod.rotation_degrees = Vector3(cos(a) * 25.0, 0.0, -sin(a) * 25.0)
+			_body.add_child(rod)
 
 
 func is_spitter() -> bool:
 	return kind == Kind.SPITTER
+
+
+func is_storm() -> bool:
+	return kind == Kind.STORM
+
+
+## Bosses that never walk up to you, and hold a distance instead.
+func holds_back() -> bool:
+	return is_spitter() or is_storm()
+
+
+func hold_z() -> float:
+	return STORM_HOLD_Z if is_storm() else SPITTER_HOLD_Z
 
 
 func is_core_hit(x: float) -> bool:
@@ -140,6 +169,8 @@ func _process(delta: float) -> void:
 	core_x = sin(t * CORE_SPEED + _phase) * CORE_SWAY
 	if is_spitter():
 		sway_x = sin(t * SPITTER_SWAY_SPEED + _phase * 0.5) * SPITTER_SWAY
+	elif is_storm():
+		sway_x = sin(t * STORM_SWAY_SPEED + _phase * 0.5) * STORM_SWAY
 	_core.position.x = core_x
 	_ring.position.x = core_x
 	_core.scale = Vector3.ONE * (1.0 + 0.15 * sin(t * 9.0))

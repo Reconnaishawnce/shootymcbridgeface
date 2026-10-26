@@ -154,6 +154,24 @@ static func record_run(score: int, level: int, endless: bool = false, modifier: 
 	return result
 
 
+static func load_stats() -> Dictionary:
+	var v = _read(STATS, "lifetime", {})
+	return Stats.merge(Stats.blank(), v) if v is Dictionary else Stats.blank()
+
+
+static func save_stats(d: Dictionary) -> void:
+	_write(STATS, "lifetime", d)
+
+
+static func load_achievements() -> Array:
+	var v = _read(STATS, "achievements", [])
+	return v if v is Array else []
+
+
+static func save_achievements(ids: Array) -> void:
+	_write(STATS, "achievements", ids)
+
+
 ## A daily or weekly counts as a run without touching any best.
 static func count_run() -> void:
 	var cfg := _load()

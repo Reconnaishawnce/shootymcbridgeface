@@ -486,7 +486,7 @@ func try_hit(b: Bullet) -> bool:
 				continue
 		return true
 	if boss != null and boss.alive and boss.position.z >= z_lo - 0.6 and boss.position.z <= z_hi + 0.6:
-		if absf(boss.position.x - b.position.x) <= (Boss.BODY_RADIUS * 0.75 if boss.is_spitter() else Boss.BODY_RADIUS):
+		if absf(boss.position.x - b.position.x) <= (Boss.BODY_RADIUS * 0.75 if boss.holds_back() else Boss.BODY_RADIUS):
 			var core := boss.is_core_hit(b.position.x)
 			var dead := boss.take_damage(b.damage, core)
 			boss_hit.emit(boss, core)
@@ -1016,8 +1016,8 @@ func _move_boss(delta: float) -> void:
 				boss_engaged.emit()
 		Phase.BOSS:
 			var walk := BOSS_WALK_SPEED * _pace() * (1.6 if boss_enraged() else 1.0)
-			if boss.is_spitter():
-				boss.position.z = minf(boss.position.z + walk * delta, Boss.SPITTER_HOLD_Z)
+			if boss.holds_back():
+				boss.position.z = minf(boss.position.z + walk * delta, boss.hold_z())
 				boss.position.x = boss.sway_x
 			else:
 				boss.position.z = minf(boss.position.z + walk * delta, BOSS_CHEW_Z)
@@ -1044,9 +1044,16 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	if boss == null or not boss.alive:
 		return
 	var enraged := boss_enraged()
-	# Lightning: rings near the squad, then bolts. Move or dash out.
+	# Lightning: rings near the squad, then bolts. Move or dash out. The
+	# storm calls lines across the road instead: find the gap.
 	_strike_timer -= delta * _pace()
-	if _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
+	if boss.is_storm():
+		if _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
+			_strike_timer = Difficulty.STORM_INTERVAL_ENRAGED if enraged else Difficulty.STORM_INTERVAL
+			_storm_line(0.0)
+			if enraged:
+				_storm_line(Difficulty.STORM_SECOND_LINE_DELAY)
+	elif _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
 		_strike_timer = Difficulty.STRIKE_INTERVAL_ENRAGED if enraged else Difficulty.STRIKE_INTERVAL
 		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0) + int(mod("strikes"))
 		for i in range(n):
@@ -1069,6 +1076,8 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			zb.position = Vector3(gen.rng.randf_range(-road_half + 0.6, road_half - 0.6), 0.0, boss.position.z + 1.0)
 			add_child(zb)
 			zombies.append(zb)
+	if boss.is_storm():
+		return
 	if boss.is_spitter():
 		if boss.position.z < Boss.SPITTER_HOLD_Z - 0.5:
 			return
@@ -1142,6 +1151,37 @@ func _move_strikes(delta: float, p_squad: Squad) -> void:
 		if st.done:
 			_strikes.erase(st)
 			st.queue_free()
+
+
+## A storm line: bolts across the whole road with one gap, placed
+## [param delay] seconds from now. The gap never sits where the squad is
+## already standing still, so there is always a move to make.
+func _storm_line(delay: float) -> void:
+	var gap := gen.rng.randf_range(-road_half + Difficulty.STORM_GAP * 0.5, road_half - Difficulty.STORM_GAP * 0.5)
+	if squad != null and absf(gap - squad.position.x) < Difficulty.STORM_GAP * 0.5:
+		gap = clampf(squad.position.x + (Difficulty.STORM_GAP if squad.position.x < 0.0 else -Difficulty.STORM_GAP), -road_half + Difficulty.STORM_GAP * 0.5, road_half - Difficulty.STORM_GAP * 0.5)
+	for x in Difficulty.storm_line(road_half, gap):
+		var st := Strike.new()
+		st.setup(x)
+		st.delay(delay)
+		add_child(st)
+		_strikes.append(st)
+
+
+## The nearest x to [param x] that no warning ring threatens within
+## [param dx], scanning the road both ways. Returns x itself when safe.
+func safe_x_near(x: float, dx: float) -> float:
+	if not strike_threat_at(x, dx):
+		return x
+	var step := 0.5
+	var d := step
+	while d <= road_half * 2.0:
+		for side in [-1.0, 1.0]:
+			var cand: float = x + float(side) * d
+			if absf(cand) <= road_half and not strike_threat_at(cand, dx):
+				return cand
+		d += step
+	return x
 
 
 ## True when a warning ring is about to fire within [param dx] of x.

@@ -219,6 +219,24 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## The help page, records and the storm
+
+`HelpText.sections()` is the in-game HOW TO PLAY page: short sections a
+teenager can read, with every number pulled from the real constants.
+Any mechanic change updates it in the same commit (see CLAUDE.md and the
+test in tests/test_run13.gd).
+
+`Stats` keeps lifetime numbers (sums, with best-of keys for combos and
+levels) and `Achievements` watches them against thresholds, paying stars
+once each. Both show on the RECORDS page; new achievements show on the
+wipe screen.
+
+The storm is the third boss. It holds back like the spitter and, instead
+of rings near the squad, calls a line of bolts across the whole road
+with one gap of `Difficulty.STORM_GAP`, every few seconds, two lines
+when enraged. The squad has to find the gap and fit through it, so a
+tight formation matters.
+
 ## Character mode
 
 Off by default: the squad wears the classic military kit. On (Settings,

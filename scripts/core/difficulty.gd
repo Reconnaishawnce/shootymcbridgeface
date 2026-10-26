@@ -241,6 +241,8 @@ static func boss_hp(level: int, perk_count: int = 0) -> float:
 	var base := float(expected_squad(level)) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
 	if boss_kind(level) == Boss.Kind.SPITTER:
 		base *= SPITTER_HP_MULT
+	elif boss_kind(level) == Boss.Kind.STORM:
+		base *= STORM_HP_MULT
 	return base * (1.0 + BOSS_HP_PER_PERK * float(perk_count))
 
 
@@ -280,8 +282,37 @@ static func spit_bite(squad_count: int) -> int:
 
 
 ## Bosses alternate: odd levels get the walker, even levels the spitter.
+## Walker, spitter, storm, round and round.
 static func boss_kind(level: int) -> int:
-	return Boss.Kind.SPITTER if level % 2 == 0 else Boss.Kind.WALKER
+	match level % 3:
+		2:
+			return Boss.Kind.SPITTER
+		0:
+			return Boss.Kind.STORM
+	return Boss.Kind.WALKER
+
+
+## The storm's lightning lines: a bolt every STORM_SPACING across the
+## road, with one gap of STORM_GAP, every STORM_INTERVAL seconds. Enraged,
+## a second line follows with a different gap.
+const STORM_INTERVAL := 3.4
+const STORM_INTERVAL_ENRAGED := 2.4
+const STORM_SPACING := 2.0
+const STORM_GAP := 4.2
+const STORM_SECOND_LINE_DELAY := 0.9
+const STORM_HP_MULT := 0.85
+
+
+## Bolt x positions for a line across a road of half-width [param half]
+## with the gap centred on [param gap_x].
+static func storm_line(half: float, gap_x: float) -> Array:
+	var out := []
+	var x := -half + STORM_SPACING * 0.5
+	while x <= half - STORM_SPACING * 0.25:
+		if absf(x - gap_x) > STORM_GAP * 0.5:
+			out.append(x)
+		x += STORM_SPACING
+	return out
 
 
 ## Soldiers a tank takes when it reaches the squad.

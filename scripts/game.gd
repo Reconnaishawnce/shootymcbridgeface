@@ -69,6 +69,7 @@ var _bets_lost := 0
 var _help_from_pause := false
 ## Second wind: one comeback per run from the shop.
 var _second_wind_used := false
+var _second_wind_pending := false
 var _vehicles_formed := 0
 var weekly_results: Dictionary = {}
 ## While a finger is dragging the locker preview round, the idle turn waits.
@@ -152,6 +153,8 @@ func _ready() -> void:
 	weekly_results = Daily.prune_weeks(SaveData.load_weekly(), week_number)
 	wardrobe.from_dict(SaveData.load_wardrobe())
 	stats = SaveData.load_stats()
+	# Saves older than the lifetime stats still know how many runs they played.
+	stats.runs = maxi(int(stats.get("runs", 0)), SaveData.load_runs())
 	achievements_done = SaveData.load_achievements()
 	quest_state = SaveData.load_quests()
 	season_state = SaveData.load_season()
@@ -574,6 +577,7 @@ func start_run(p_mode: String = "levels") -> void:
 		powerups.grant("bomb", 0.0)
 	hud.set_bombs(powerups.bombs)
 	_second_wind_used = false
+	_second_wind_pending = false
 	_vehicles_formed = 0
 	waves_cleared = 0
 	perfect_gates = 0
@@ -709,8 +713,15 @@ func end_run() -> void:
 					"stars":
 						stars_earned += int(rw.amount)
 					"item":
-						wardrobe.owned[str(rw.id)] = true
-						SaveData.save_wardrobe(wardrobe.to_dict())
+						if wardrobe.is_owned(str(rw.id)):
+							# Already in the locker: its price in stars instead.
+							rw.owned = true
+							stars_earned += maxi(1, Wardrobe.cost(str(rw.id)))
+						else:
+							wardrobe.owned[str(rw.id)] = true
+							SaveData.save_wardrobe(wardrobe.to_dict())
+	# Stars from the season count in the lifetime numbers too.
+	run_stats.stars_earned = stars_earned
 	if not smoke:
 		quest_state = qa.state
 		SaveData.save_quests(quest_state)
@@ -1306,14 +1317,18 @@ func _on_count_changed(new_count: int) -> void:
 func _on_wiped_out() -> void:
 	# Second wind: the shop's one comeback. Deferred either way, since the
 	# wipe can fire from inside the world's update loop.
+	if _second_wind_pending:
+		return
 	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
 		_second_wind_used = true
+		_second_wind_pending = true
 		call_deferred("_second_wind")
 		return
 	call_deferred("end_run")
 
 
 func _second_wind() -> void:
+	_second_wind_pending = false
 	if state != State.RUNNING:
 		return
 	if smoke:

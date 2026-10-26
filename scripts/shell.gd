@@ -29,7 +29,8 @@ func _process(delta: float) -> void:
 	position.z -= step
 	_travelled += step
 	position.y = 0.6 + sin(minf(_travelled / RANGE, 1.0) * PI) * 1.2
-	if world == null:
+	if world == null or world.frozen:
+		queue_free()
 		return
 	if world.shell_should_burst(self) or _travelled >= RANGE:
 		# The tank may have been wrecked while the shell was in the air.

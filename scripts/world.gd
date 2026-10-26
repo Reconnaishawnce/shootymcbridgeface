@@ -1226,6 +1226,8 @@ func shell_should_burst(sh: Shell) -> bool:
 ## A burst of [param damage] on everything within [param radius] of
 ## [param at]: zombies, the boss (at half), gate panels untouched.
 func explode_at(at: Vector3, radius: float, damage: float, source: Node = null) -> int:
+	if frozen:
+		return 0
 	var kills := 0
 	for z in zombies.duplicate():
 		if z.latched or z.position.distance_to(at) > radius + z.radius * 0.5:

@@ -165,7 +165,13 @@ static func make_theme() -> Theme:
 	t.set_color("font_hover_color", "Button", Color(1.0, 1.0, 1.0))
 	t.set_color("font_pressed_color", "Button", ACCENT)
 	t.set_color("font_disabled_color", "Button", Color(0.6, 0.6, 0.66))
-	t.set_stylebox("panel", "PanelContainer", _flat(Color(0.05, 0.06, 0.09, 0.82), 24, Color(ACCENT, 0.35), 2))
+	var panel := _flat(Color(0.05, 0.06, 0.09, 0.82), 24, Color(ACCENT, 0.35), 2)
+	# The card's own margin container does the padding.
+	panel.content_margin_left = 0.0
+	panel.content_margin_right = 0.0
+	panel.content_margin_top = 0.0
+	panel.content_margin_bottom = 0.0
+	t.set_stylebox("panel", "PanelContainer", panel)
 	var grabber := _flat(Color(1, 1, 1, 0.35), 6, Color(0, 0, 0, 0), 0)
 	t.set_stylebox("grabber", "VScrollBar", grabber)
 	t.set_stylebox("scroll", "VScrollBar", _flat(Color(1, 1, 1, 0.06), 6, Color(0, 0, 0, 0), 0))
@@ -522,7 +528,12 @@ func _build_locker(root: Control) -> void:
 	box.add_child(tabs)
 	for cat in Wardrobe.CATEGORIES:
 		var b := _button(Wardrobe.CATEGORY_TITLES[cat], 16)
-		b.custom_minimum_size = Vector2(98.0, 46.0)
+		b.custom_minimum_size = Vector2(0.0, 46.0)
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			var sb: StyleBoxFlat = b.get_theme_stylebox(state).duplicate()
+			sb.content_margin_left = 8.0
+			sb.content_margin_right = 8.0
+			b.add_theme_stylebox_override(state, sb)
 		b.toggle_mode = true
 		b.pressed.connect(func() -> void: locker_tab.emit(cat))
 		tabs.add_child(b)
@@ -542,13 +553,9 @@ func _build_locker(root: Control) -> void:
 
 
 func _build_shop(root: Control) -> void:
-	_shop_card = _card(root)
-	_shop_card.visible = false
+	_shop_card = _scroll_card(root, "SHOP", func() -> void: shop_closed.emit())
 	var box: VBoxContainer = _shop_card.get_meta("box")
-	box.add_theme_constant_override("separation", 4)
-	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
-	head.text = "SHOP"
-	box.add_child(head)
+	box.add_theme_constant_override("separation", 6)
 	_shop_coins = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
 	_shop_coins.add_theme_color_override("font_color", COIN)
 	box.add_child(_shop_coins)
@@ -577,9 +584,6 @@ func _build_shop(root: Control) -> void:
 		row.add_child(buy)
 		box.add_child(row)
 		_shop_rows[id] = {"name": name, "buy": buy, "desc": desc}
-	var back := _button("BACK", 34)
-	back.pressed.connect(func() -> void: shop_closed.emit())
-	box.add_child(back)
 
 
 func _build_daily(root: Control) -> void:
@@ -659,7 +663,7 @@ func _build_over(root: Control) -> void:
 	_over_title = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_title)
 	_over_lines = _label(34, HORIZONTAL_ALIGNMENT_CENTER)
-	_over_lines.custom_minimum_size.x = 660.0
+	_over_lines.custom_minimum_size.x = 560.0
 	_over_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(_over_lines)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1085,17 +1089,33 @@ func show_game_over(r: Dictionary) -> void:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
 	if locker_nudge:
 		coins_line += "\nSomething new is waiting in the locker!"
+	# Extras: achievements, quests, season tiers. Few: list them. Many:
+	# one summary line each, so the card stays on the screen.
 	var unlocked: Array = r.get("achievements", [])
-	for i in range(mini(unlocked.size(), 3)):
-		var a := Achievements.find(str(unlocked[i]))
-		if not a.is_empty():
-			coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
-	if unlocked.size() > 3:
-		coins_line += "\n+%d more achievements, see RECORDS" % (unlocked.size() - 3)
-	for q in r.get("quests_done", []):
-		coins_line += "\nQUEST DONE: %s  +%d pts" % [q.title, int(q.points)]
-	for rw in r.get("season_rewards", []):
-		coins_line += "\nSEASON TIER %d: %s" % [int(rw.tier), Season.reward_text(rw)]
+	var quests: Array = r.get("quests_done", [])
+	var rewards: Array = r.get("season_rewards", [])
+	var extras := unlocked.size() + quests.size() + rewards.size()
+	if extras <= 4:
+		for id in unlocked:
+			var a := Achievements.find(str(id))
+			if not a.is_empty():
+				coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
+		for q in quests:
+			coins_line += "\nQUEST DONE: %s  +%d pts" % [q.title, int(q.points)]
+		for rw in rewards:
+			var text := Season.reward_text(rw)
+			if bool(rw.get("owned", false)):
+				text = "%s, owned: +%d stars" % [Wardrobe.title(str(rw.id)), maxi(1, Wardrobe.cost(str(rw.id)))]
+			coins_line += "\nSEASON TIER %d: %s" % [int(rw.tier), text]
+	else:
+		var bits := []
+		if unlocked.size() > 0:
+			bits.append("%d %s" % [unlocked.size(), "achievement" if unlocked.size() == 1 else "achievements"])
+		if quests.size() > 0:
+			bits.append("%d %s done" % [quests.size(), "quest" if quests.size() == 1 else "quests"])
+		if rewards.size() > 0:
+			bits.append("%d season %s" % [rewards.size(), "tier" if rewards.size() == 1 else "tiers"])
+		coins_line += "\n" + ", ".join(bits) + ": see RECORDS and QUESTS"
 	var goal := str(r.get("goal", ""))
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal

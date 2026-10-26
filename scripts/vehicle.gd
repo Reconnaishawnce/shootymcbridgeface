@@ -31,6 +31,7 @@ var _legs: Array[Node3D] = []
 var _beam: MeshInstance3D
 var _stripes: Array[Node3D] = []
 var _recoil := 0.0
+var _turret_rest_z := 0.1
 const STRIPE := Color(1.0, 0.85, 0.3)
 
 
@@ -48,6 +49,7 @@ func _init(p_id: String) -> void:
 			_build_mech()
 		_:
 			_build_jeep()
+	_turret_rest_z = _turret.position.z
 	_bar = Mats.box(Vector3(1.0, 0.08, 0.08), BAR_FG, true)
 	_bar.position.y = {"tank": 1.9, "heli": 1.6, "mech": 3.2}.get(id, 1.5)
 	add_child(_bar)
@@ -306,4 +308,4 @@ func _process(delta: float) -> void:
 		position.y = absf(sin(t * 7.0)) * 0.02
 	if _recoil > 0.0:
 		_recoil = maxf(0.0, _recoil - delta * 8.0)
-		_turret.position.z = (0.1 if id != "tank" else 0.1) + _recoil * (0.25 if id == "tank" else 0.08)
+		_turret.position.z = _turret_rest_z + _recoil * (0.25 if id == "tank" else 0.08)

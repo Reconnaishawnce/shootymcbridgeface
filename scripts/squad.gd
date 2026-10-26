@@ -343,10 +343,12 @@ func redeploy(start_count: int) -> void:
 
 
 func set_count(n: int) -> void:
+	var was := count
 	count = maxi(0, n)
 	_sync_visuals()
 	count_changed.emit(count)
-	if count == 0:
+	# Only on the way down to zero: two bites in one frame are one wipe.
+	if count == 0 and was > 0:
 		wiped_out.emit()
 
 

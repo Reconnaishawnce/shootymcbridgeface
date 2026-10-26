@@ -9,7 +9,16 @@ Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
   waves are sized and adds 12% to boss health, so a convoy is a trade,
   not a free win. Bot with no upgrades now wipes on levels 5, 5, 9 and
   10 across four seeds instead of riding out six minutes.
-- Fixes from a review of turns 1 to 5 (see below).
+- Fixes from a review of turns 1 to 5: a second wind could be spent and
+  the run end anyway when two bites landed in one frame (a wipe now
+  fires once, on the way down); tank shells in the air after a wipe no
+  longer burst, score or freeze the wipe screen in slow motion; players
+  with saves older than the lifetime stats keep their title buttons;
+  helicopter and mech turrets no longer jump on the first shot; season
+  stars count in the records, and a season item you already own pays
+  its price in stars instead of nothing; the wipe card fits the screen
+  and collapses a long list of extras into one line; the shop scrolls;
+  the locker tabs fit.
 
 ## 0.22 (polish turn 5: come back tomorrow)
 

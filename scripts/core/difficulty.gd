@@ -509,6 +509,10 @@ const SCOUT_LEVEL := 2
 const SCOUT_CHANCE := 0.12
 const BET_CHANCE := 0.1
 const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
+## The road answers the convoy: each vehicle counts as this many soldiers
+## when waves are sized, and adds this fraction to boss health.
+const CONVOY_SOLDIER_EQUIV := 20
+const CONVOY_BOSS_HP_PER_VEHICLE := 0.12
 ## How often an affordable vehicle is actually offered at a gate.
 const VEHICLE_OFFER_CHANCE := 0.55
 ## Damage a brute, a boss chew or a lightning bolt does to a vehicle.

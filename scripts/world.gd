@@ -596,7 +596,8 @@ func _spawn() -> void:
 	if not endless and not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
 		_boss_spawned = true
 		boss = Boss.new()
-		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss"), Difficulty.boss_kind(level))
+		var convoy := squad.vehicles_alive() if squad != null else 0
+		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)), Difficulty.boss_kind(level))
 		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
 		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
 		add_child(boss)
@@ -653,7 +654,8 @@ func _note_wave_id(n: int, wave: int) -> void:
 
 ## A wave spec with the modifier applied: more bodies, more health.
 func _spec(p_level: int, index: int, count: int) -> Dictionary:
-	var spec := Difficulty.wave_for(p_level, index, count)
+	var convoy := squad.vehicles_alive() if squad != null else 0
+	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV)
 	var w := mod("wave")
 	var h := mod("hp")
 	spec.count = mini(int(ceil(float(spec.count) * w)), Difficulty.MAX_WAVE + 12)

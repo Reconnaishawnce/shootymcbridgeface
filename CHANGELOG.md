@@ -3,6 +3,14 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.23 (polish turn 6: balance and QA)
+
+- The road answers the convoy: each vehicle counts as 20 soldiers when
+  waves are sized and adds 12% to boss health, so a convoy is a trade,
+  not a free win. Bot with no upgrades now wipes on levels 5, 5, 9 and
+  10 across four seeds instead of riding out six minutes.
+- Fixes from a review of turns 1 to 5 (see below).
+
 ## 0.22 (polish turn 5: come back tomorrow)
 
 - Three QUESTS a day, the same for everyone, progress kept across the

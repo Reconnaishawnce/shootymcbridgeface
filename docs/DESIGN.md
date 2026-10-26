@@ -259,7 +259,10 @@ jeeps on the flanks), fire through the same world hit-test as soldiers
 damage from the heavy hits (`Difficulty.VEHICLE_HIT_*`). They survive
 `Squad.redeploy` (a new level) and die with `Squad.reset` (a new run).
 A jeep's 50 DPS equals twenty capped soldiers, so the trade is even on
-fire and ahead on accuracy, persistence and the level bonus.
+fire and ahead on accuracy, persistence and the level bonus. The road
+answers: `World._spec` sizes waves as if each vehicle were
+`CONVOY_SOLDIER_EQUIV` soldiers, and boss health grows by
+`CONVOY_BOSS_HP_PER_VEHICLE` per vehicle.
 
 The helicopter flies (`Convoy.flies`): ground hits skip it, lightning
 does not. It aims itself at `World.pest_target` (thieves, then runners

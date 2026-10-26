@@ -445,6 +445,8 @@ func _sync_visuals() -> void:
 		_soldiers.append(s)
 	while _soldiers.size() > want:
 		var s: Soldier = _soldiers.pop_back()
+		if active and is_inside_tree() and world != null:
+			Fx.dust(world, s.global_position + Vector3(0.0, 0.3, 0.0), 5, 0.18)
 		s.queue_free()
 	# A bigger squad may need a narrower spread to stay in the lane.
 	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, lane_half() - 0.1))

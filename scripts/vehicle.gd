@@ -50,6 +50,8 @@ func _init(p_id: String) -> void:
 		_:
 			_build_jeep()
 	_turret_rest_z = _turret.position.z
+	if id in ["jeep", "tank"]:
+		Fx.trail(self, Vector3(0.0, 0.15, 0.9 if id == "jeep" else 1.3), 0.2 if id == "jeep" else 0.3)
 	_bar = Mats.box(Vector3(1.0, 0.08, 0.08), BAR_FG, true)
 	_bar.position.y = {"tank": 1.9, "heli": 1.6, "mech": 3.2}.get(id, 1.5)
 	add_child(_bar)
@@ -229,6 +231,7 @@ func note_kill() -> void:
 		stripe.position = Vector3(-0.5 + 0.18 * float(rank), _bar.position.y - 0.25, 0.3)
 		add_child(stripe)
 		_stripes.append(stripe)
+		Fx.sparks(get_parent(), global_position + Vector3(0.0, 1.0, 0.0), 16)
 		ranked.emit(id, rank)
 
 

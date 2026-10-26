@@ -3,6 +3,19 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.26 (graphics pass 3: effects and motion)
+
+- Particles on the Compatibility renderer: a splash when a zombie dies,
+  dust when a soldier falls, sparks, dust and smoke when a shell bursts,
+  smoke and sparks when a vehicle is wrecked, sparks on a boss core hit
+  and a vehicle rank, and dust trailing behind jeeps and tanks.
+- Zombies go over backwards when shot instead of sinking into the road.
+- Tracers have a fainter tail behind the bright head.
+- The camera rides a rig that drifts toward the squad and leans into a
+  turn.
+- A display font for every label and button: Lilita One, under the SIL
+  Open Font License (assets/fonts/OFL.txt).
+
 ## 0.25 (graphics pass 2: people and things)
 
 - An ink line round characters and things: an inverted-hull outline

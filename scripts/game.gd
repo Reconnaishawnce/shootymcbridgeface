@@ -41,6 +41,7 @@ var smoke := false
 var squad_type := "rifle"
 
 var camera: Camera3D
+var _cam_rig: Node3D
 var _sun: DirectionalLight3D
 var world: World
 var squad: Squad
@@ -238,10 +239,14 @@ func _build_scene() -> void:
 	fill.light_energy = 0.35
 	add_child(fill)
 
+	# The camera rides a rig: the rig sways with the steering and leans
+	# into it, the camera keeps its framing.
+	_cam_rig = Node3D.new()
+	add_child(_cam_rig)
 	camera = Camera3D.new()
 	camera.position = Vector3(0.0, 11.0, 9.0)
 	camera.fov = 55.0
-	add_child(camera)
+	_cam_rig.add_child(camera)
 	camera.look_at(Vector3(0.0, 0.0, -7.0))
 	camera.current = true
 
@@ -882,6 +887,10 @@ func _tick_run(delta: float) -> void:
 	_run_time += delta
 	squad.now = _run_time
 	world.now = _run_time
+	# Sway: the rig drifts a little toward the squad and leans into a turn.
+	var k := 1.0 - exp(-4.0 * delta)
+	_cam_rig.position.x = lerpf(_cam_rig.position.x, squad.position.x * 0.12, k)
+	_cam_rig.rotation.z = lerpf(_cam_rig.rotation.z, clampf(-squad.velocity_x * 0.006, -0.05, 0.05), k)
 	# A held touch follows its clinger; once it dies, the hold is over.
 	for idx in _cling_touch.keys():
 		var z: Zombie = _cling_touch[idx]
@@ -1097,7 +1106,9 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 		sfx.play("step", -6.0, 1.0 + 0.08 * float(chain / Combo.STEP))
 		hud.show_float("%d COMBO" % chain, true)
 	var color := Zombie.BRUTE_SKIN if zombie.brute else Zombie.SKIN
-	Burst.spawn(world, zombie.position + Vector3(0.0, 0.8, 0.0), color, 10 if zombie.brute else 5, 0.16 if zombie.brute else 0.12)
+	Burst.spawn(world, zombie.position + Vector3(0.0, 0.8, 0.0), color, 6 if zombie.brute else 3, 0.16 if zombie.brute else 0.12)
+	if not smoke:
+		Fx.blood(world, zombie.position + Vector3(0.0, 0.9, 0.0), zombie.brute or zombie.is_tank())
 
 
 func _on_squad_bitten(bite: int, heavy: bool) -> void:
@@ -1127,6 +1138,8 @@ func _on_boss_hit(boss: Boss, is_core: bool) -> void:
 	if is_core:
 		sfx.play("boss_hit", -4.0, 1.4)
 		Burst.spawn(world, boss.position + Vector3(boss.core_x, 1.9, 1.2), Boss.CORE_COLOR, 3, 0.1, 3.0, 0.3)
+		if not smoke and randf() < 0.3:
+			Fx.sparks(world, boss.position + Vector3(boss.core_x, 1.9, 1.2), 6)
 
 
 func _on_boss_killed(level: int, squad_left: int) -> void:
@@ -1247,13 +1260,20 @@ func _on_vehicle_formed(id: String) -> void:
 
 func _on_vehicle_lost(id: String) -> void:
 	hud.show_float("%s LOST" % Convoy.title(id), false)
+	if not smoke:
+		Fx.smoke(world, squad.position + Vector3(0.0, 0.8, -0.5), 10)
+		Fx.sparks(world, squad.position + Vector3(0.0, 0.8, -0.5), 14)
 	sfx.play("wipe", -6.0, 1.4)
 	_shake = minf(1.0, _shake + 0.6)
 	Burst.spawn(world, squad.position + Vector3(0.0, 0.8, -0.5), Color(1.0, 0.55, 0.2), 24, 0.2, 6.0, 0.7)
 
 
 func _on_shell_exploded(at: Vector3, kills: int) -> void:
-	Burst.spawn(world, at + Vector3(0.0, 0.5, 0.0), Color(1.0, 0.65, 0.25), 10 + kills * 2, 0.16, 5.0, 0.45)
+	Burst.spawn(world, at + Vector3(0.0, 0.5, 0.0), Color(1.0, 0.65, 0.25), 6 + kills, 0.16, 5.0, 0.45)
+	if not smoke:
+		Fx.sparks(world, at + Vector3(0.0, 0.4, 0.0), 10)
+		Fx.dust(world, at + Vector3(0.0, 0.2, 0.0), 8, 0.3)
+		Fx.smoke(world, at + Vector3(0.0, 0.6, 0.0), 4)
 	if kills >= 3:
 		_punch(1.5)
 

@@ -22,6 +22,11 @@ func _init(size: float = 1.0, color: Color = COLOR, length: float = 0.7) -> void
 	var m := Mats.box(Vector3(0.09 * size, 0.09 * size, length), color, true)
 	m.material_override = Mats.glow(color, 2.6)
 	add_child(m)
+	# A fainter, thinner tail behind the head: the streak of a tracer.
+	var tail := Mats.box(Vector3(0.05 * size, 0.05 * size, length * 1.6), Color(color.r, color.g, color.b, 0.35), true)
+	tail.material_override = Mats.glow(Color(color.r, color.g, color.b, 0.35), 1.6)
+	tail.position.z = length * 1.1
+	add_child(tail)
 
 
 func _ready() -> void:

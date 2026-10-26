@@ -408,6 +408,13 @@ soldiers' round language (egg torso, big head) so the cast reads as one
 world; kinds differ by colour and one prop each. Panels are a frame, a
 glossy faintly emissive face and a glowing top strip.
 
+Pass 3 is `Fx`: one-shot `CPUParticles3D` emitters (blood, dust,
+sparks, smoke) that free themselves, and a continuous dust trail under
+ground vehicles. The auto-player skips the one-shots. Zombies die by
+falling over (a tween on the body), tracers carry a translucent tail,
+and the camera sits on a rig that sways with the steering so the framing
+code is untouched. The HUD theme's default font is Lilita One (OFL).
+
 ## Art direction (original notes)
 
 Flat-shaded low-poly primitives on purpose, but assembled into characters:

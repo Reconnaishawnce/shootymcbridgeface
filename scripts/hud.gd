@@ -156,8 +156,20 @@ static func _flat(bg: Color, radius: int, border: Color = Color(1, 1, 1, 0.12), 
 	return sb
 
 
+## The display face: Lilita One (SIL Open Font License, see
+## assets/fonts/OFL.txt). Chunky and friendly, reads at a glance.
+static func display_font() -> Font:
+	if ResourceLoader.exists("res://assets/fonts/LilitaOne-Regular.ttf"):
+		return load("res://assets/fonts/LilitaOne-Regular.ttf")
+	return ThemeDB.fallback_font
+
+
 static func make_theme() -> Theme:
 	var t := Theme.new()
+	var font := display_font()
+	t.default_font = font
+	t.set_font("font", "Button", font)
+	t.set_font("font", "Label", font)
 	t.set_stylebox("normal", "Button", _flat(GLASS, 14))
 	t.set_stylebox("hover", "Button", _flat(Color(0.12, 0.13, 0.18, 0.9), 14, Color(1, 1, 1, 0.25)))
 	t.set_stylebox("pressed", "Button", _flat(Color(0.25, 0.2, 0.08, 0.95), 14, ACCENT, 3))

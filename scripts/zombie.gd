@@ -282,7 +282,17 @@ func take_damage(amount: float) -> bool:
 
 
 func die() -> void:
-	_vanish()
+	# Shot: it goes over backwards, bounces once, and is gone.
+	alive = false
+	if _cling_ring != null:
+		_cling_ring.visible = false
+	_bar.visible = false
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_body, "rotation:x", -1.45, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(_body, "position:z", _body.position.z + 0.6, 0.22)
+	tw.chain().tween_property(self, "scale", Vector3(1.1, 0.25, 1.1), 0.18).set_delay(0.25)
+	tw.chain().tween_callback(queue_free)
 
 
 ## Reached the squad and was consumed.

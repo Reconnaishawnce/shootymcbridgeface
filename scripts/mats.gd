@@ -29,13 +29,81 @@ static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 		return cache[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
-	m.roughness = 0.9
+	m.roughness = 0.78
+	m.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
 	if unshaded:
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	if color.a < 0.999:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	cache[key] = m
 	return m
+
+
+## Something that gives off light: bullets, the boss core, neon, lamps.
+## Bright enough to bloom under the environment's glow.
+static func glow(color: Color, energy: float = 2.2) -> StandardMaterial3D:
+	var cache := _cache()
+	var key := "glow|%s|%.1f" % [color.to_html(true), energy]
+	if cache.has(key):
+		return cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.emission_enabled = true
+	m.emission = color
+	m.emission_energy_multiplier = energy
+	if color.a < 0.999:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cache[key] = m
+	return m
+
+
+## A grainy surface: colour with a noise texture laid on in world units,
+## so asphalt reads as asphalt and dirt as dirt, with no art files.
+static func grainy(color: Color, scale: float = 0.25, strength: float = 0.35, seed_value: int = 1, roughness: float = 0.9) -> StandardMaterial3D:
+	var cache := _cache()
+	var key := "grainy|%s|%.2f|%.2f|%d" % [color.to_html(true), scale, strength, seed_value]
+	if cache.has(key):
+		return cache[key]
+	var tex_key := "noise|%d|%.2f" % [seed_value, strength]
+	var tex: ImageTexture
+	if cache.has(tex_key):
+		tex = cache[tex_key]
+	else:
+		var noise := FastNoiseLite.new()
+		noise.seed = seed_value
+		noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		noise.frequency = 0.06
+		noise.fractal_octaves = 4
+		var img := noise.get_image(128, 128, false, false, true)
+		# Remap the noise into [1 - strength, 1]: the texture only takes a
+		# little off the colour, it never halves it.
+		for y in range(img.get_height()):
+			for x in range(img.get_width()):
+				var v := 1.0 - strength * img.get_pixel(x, y).r
+				img.set_pixel(x, y, Color(v, v, v))
+		img.generate_mipmaps()
+		tex = ImageTexture.create_from_image(img)
+		cache[tex_key] = tex
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.albedo_texture = tex
+	m.uv1_triplanar = true
+	m.uv1_scale = Vector3.ONE * scale
+	m.roughness = roughness
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	cache[key] = m
+	return m
+
+
+## A box with a grainy material.
+static func gbox(size: Vector3, color: Color, scale: float = 0.25, strength: float = 0.35, seed_value: int = 1) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mi.mesh = mesh
+	mi.material_override = grainy(color, scale, strength, seed_value)
+	return mi
 
 
 ## Character material: wrapped lighting so curves shade softly instead of

@@ -59,6 +59,14 @@ static func save_sound_on(on: bool) -> void:
 	_write(SETTINGS, "sound_on", on)
 
 
+static func load_shadows_on() -> bool:
+	return bool(_read(SETTINGS, "shadows_on", true))
+
+
+static func save_shadows_on(on: bool) -> void:
+	_write(SETTINGS, "shadows_on", on)
+
+
 static func load_music_on() -> bool:
 	return bool(_read(SETTINGS, "music_on", true))
 

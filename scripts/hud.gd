@@ -29,6 +29,7 @@ signal help_opened
 signal help_closed
 signal settings_closed
 signal characters_toggled(on: bool)
+signal shadows_toggled(on: bool)
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -72,6 +73,7 @@ var _settings_card: Control
 var _settings_sound: Button
 var _settings_music: Button
 var _settings_characters: Button
+var _settings_shadows: Button
 var _pause_characters: Button
 
 var _quests_card: Control
@@ -492,6 +494,12 @@ func _build_settings(root: Control) -> void:
 	_settings_characters = _button("CHARACTERS: OFF", 34)
 	_settings_characters.pressed.connect(_on_characters_pressed)
 	box.add_child(_settings_characters)
+	_settings_shadows = _button("SHADOWS: ON", 34)
+	_settings_shadows.pressed.connect(func() -> void:
+		var on := not _settings_shadows.text.ends_with("ON")
+		set_shadows(on)
+		shadows_toggled.emit(on))
+	box.add_child(_settings_shadows)
 	var blurb := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
 	blurb.text = "Characters on: pick a hero, outfits, hats,\nweapons and more in the LOCKER. Stars pay for them."
 	blurb.modulate = Color(0.85, 0.85, 0.9)
@@ -721,6 +729,10 @@ func set_sound(on: bool) -> void:
 func set_music(on: bool) -> void:
 	_music_button.text = "MUSIC: ON" if on else "MUSIC: OFF"
 	_settings_music.text = _music_button.text
+
+
+func set_shadows(on: bool) -> void:
+	_settings_shadows.text = "SHADOWS: ON" if on else "SHADOWS: OFF"
 
 
 func set_characters(on: bool) -> void:

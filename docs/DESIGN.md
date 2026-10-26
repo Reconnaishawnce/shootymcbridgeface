@@ -385,7 +385,21 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
-## Art direction
+## Art direction (graphics pass 1)
+
+Everything is still primitives built in code, so the look comes from
+light and surface rather than models. `Game._build_scene` sets a
+`ProceduralSkyMaterial` sky, a warm `DirectionalLight3D` key with
+orthogonal shadows (toggle in Settings), a cool fill, filmic tonemapping
+with slight contrast and saturation, glow with a threshold of 1.0 so
+only `Mats.glow` materials (emission above 1) bloom, and thin fog.
+`Mats.grainy` builds a noise texture once (FastNoiseLite, remapped into
+[1 - strength, 1]) and lays it on triplanar in world units, so asphalt,
+curb and dirt differ by colour, scale and strength. `World._build_scenery`
+places a skyline, wrecks, rubble, trees and cracks from a fixed seed and
+wraps them with the road. A canvas vignette sits under the HUD.
+
+## Art direction (original notes)
 
 Flat-shaded low-poly primitives on purpose, but assembled into characters:
 soldiers have running legs, a vest and chest plate, helmet and visor,

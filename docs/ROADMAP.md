@@ -211,7 +211,24 @@ word on a sign, everything can be seen and counted.
    gradually, hit-stop on the big moments.
 5. Come back tomorrow (done): daily quests feeding a free season track.
    (A trophy road with checkpoints stays on the list for later.)
-6. Feedback pass from the phone.
+6. Feedback pass from the phone (balance and QA done; phone feedback
+   still to come).
+
+## The graphics arc: from stick figures to a stylized, polished look
+
+An Epic-style look needs modelled, textured, rigged characters and a
+renderer with heavy post-processing; this is a primitives-in-code game
+on the mobile Compatibility renderer. The reachable target is the
+polished stylized look of the best phone games, in three passes.
+
+1. Light and world (done): sky, shadows, fill light, filmic tonemap,
+   glow, grain textures, skyline, wrecks, lamps, vignette.
+2. People and things: character outlines, better zombie and boss
+   models, hit flashes and squash on damage, gate panels with bevels
+   and emissive numbers, vehicle detail.
+3. Effects and motion: particles for kills, shells, dust and muzzle
+   smoke; bullet trails; camera sway and recoil; death animations;
+   a display font for the HUD.
 
 ## Always
 

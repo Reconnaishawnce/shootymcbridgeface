@@ -41,6 +41,7 @@ var smoke := false
 var squad_type := "rifle"
 
 var camera: Camera3D
+var _sun: DirectionalLight3D
 var world: World
 var squad: Squad
 var hud: Hud
@@ -170,6 +171,7 @@ func _ready() -> void:
 	hud.set_sound(Sfx.enabled)
 	hud.set_music(Sfx.music_on)
 	hud.set_characters(character_mode)
+	hud.set_shadows(SaveData.load_shadows_on())
 	_apply_looks()
 	show_title()
 	if smoke:
@@ -178,24 +180,63 @@ func _ready() -> void:
 		_shots_walkthrough()
 
 
+## The look: a late-afternoon sky, a warm key light with shadows, a cool
+## fill, filmic tonemapping, a little glow on the things that give off
+## light, and fog that eats the horizon. All of it runs on the mobile
+## Compatibility renderer.
 func _build_scene() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.36, 0.42, 0.5)
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.75, 0.78, 0.85)
-	e.ambient_light_energy = 0.7
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color(0.18, 0.28, 0.48)
+	sky_mat.sky_horizon_color = Color(0.72, 0.62, 0.58)
+	sky_mat.sky_curve = 0.18
+	sky_mat.ground_bottom_color = Color(0.12, 0.11, 0.1)
+	sky_mat.ground_horizon_color = Color(0.5, 0.42, 0.36)
+	sky_mat.sun_angle_max = 20.0
+	sky_mat.sun_curve = 0.12
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	e.background_mode = Environment.BG_SKY
+	e.sky = sky
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_energy = 0.9
+	e.ambient_light_sky_contribution = 0.8
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_exposure = 1.05
+	e.tonemap_white = 6.0
+	e.glow_enabled = true
+	e.glow_intensity = 0.45
+	e.glow_bloom = 0.04
+	e.glow_hdr_threshold = 1.0
+	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	e.adjustment_enabled = true
+	e.adjustment_contrast = 1.05
+	e.adjustment_saturation = 1.08
+	# Fog only takes the far distance, in the sky's own haze colour.
 	e.fog_enabled = true
-	e.fog_light_color = Color(0.36, 0.42, 0.5)
-	e.fog_density = 0.012
+	e.fog_light_color = Color(0.66, 0.6, 0.6)
+	e.fog_density = 0.0055
+	e.fog_sky_affect = 0.15
 	env.environment = e
 	add_child(env)
 
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-58.0, 28.0, 0.0)
-	sun.light_energy = 1.1
-	add_child(sun)
+	_sun = DirectionalLight3D.new()
+	_sun.rotation_degrees = Vector3(-52.0, 34.0, 0.0)
+	_sun.light_color = Color(1.0, 0.92, 0.8)
+	_sun.light_energy = 1.35
+	_sun.shadow_enabled = SaveData.load_shadows_on() and not smoke
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	_sun.directional_shadow_max_distance = 70.0
+	_sun.shadow_bias = 0.06
+	_sun.shadow_normal_bias = 2.0
+	_sun.shadow_opacity = 0.7
+	add_child(_sun)
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(-30.0, -140.0, 0.0)
+	fill.light_color = Color(0.55, 0.65, 0.9)
+	fill.light_energy = 0.35
+	add_child(fill)
 
 	camera = Camera3D.new()
 	camera.position = Vector3(0.0, 11.0, 9.0)
@@ -262,6 +303,20 @@ func _build_scene() -> void:
 			print("SMOKE_RANK ", JSON.stringify({"id": id, "rank": r, "level": world.level, "frame": _frames})))
 	squad.reset()
 
+	# A soft vignette under the HUD: the eye goes to the middle of the road.
+	var vignette_layer := CanvasLayer.new()
+	vignette_layer.layer = 0
+	add_child(vignette_layer)
+	var vignette := ColorRect.new()
+	vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item; void fragment() { vec2 d = UV - vec2(0.5); float v = smoothstep(0.42, 0.95, length(d * vec2(1.0, 1.25))); COLOR = vec4(0.02, 0.02, 0.05, v * 0.55); }"
+	var sm := ShaderMaterial.new()
+	sm.shader = sh
+	vignette.material = sm
+	vignette_layer.add_child(vignette)
+
 	hud = Hud.new()
 	add_child(hud)
 	hud.play_pressed.connect(start_run)
@@ -287,6 +342,10 @@ func _build_scene() -> void:
 	hud.help_closed.connect(close_help)
 	hud.settings_closed.connect(show_title)
 	hud.characters_toggled.connect(_on_characters_toggled)
+	hud.shadows_toggled.connect(func(on: bool) -> void:
+		_sun.shadow_enabled = on
+		SaveData.save_shadows_on(on)
+		sfx.play("click"))
 	hud.locker_opened.connect(open_locker)
 	hud.locker_closed.connect(close_locker)
 	hud.locker_tab.connect(_on_locker_tab)

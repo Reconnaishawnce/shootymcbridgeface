@@ -95,7 +95,7 @@ func _init() -> void:
 	_ring.rotation_degrees.x = 90.0
 	_body.add_child(_ring)
 	_core = Mats.sphere(0.4, CORE_COLOR)
-	_core.material_override = Mats.flat(CORE_COLOR, true)
+	_core.material_override = Mats.glow(CORE_COLOR, 3.0)
 	_core.position = Vector3(0.0, 1.9, 1.05)
 	_body.add_child(_core)
 

@@ -401,6 +401,7 @@ func _add_gun(weapon: String) -> void:
 	receiver.position.z = 0.06
 	_gun.add_child(receiver)
 	_muzzle = Mats.box(Vector3(0.16, 0.16, 0.22), MUZZLE, true)
+	_muzzle.material_override = Mats.glow(MUZZLE, 3.0)
 	_muzzle.position.z = -0.52
 	_muzzle.visible = false
 	_gun.add_child(_muzzle)

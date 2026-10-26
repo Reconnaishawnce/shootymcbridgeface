@@ -3,6 +3,26 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.24 (graphics pass 1: light and world)
+
+The first of three graphics passes. This one is the light and the world;
+the next two are the people and the effects.
+
+- A real sky (late afternoon, warm horizon, blue overhead) lights the
+  scene; a warm key light casts shadows, a cool fill lifts the dark
+  side. Filmic tonemapping, a touch of contrast and saturation, and
+  glow on the things that give off light: bullets, muzzle flashes, the
+  boss core, lamp heads, lit windows. Fog only takes the far distance.
+- Surfaces have grain: asphalt, curbs and dirt are textured with noise
+  laid on in world units, no art files. Asphalt is dark and cool, dirt
+  is dirt.
+- The world beyond the curbs: a ruined skyline far out with a few lit
+  windows, wrecked cars, rubble and dead trees on the shoulders, cracks
+  on the road, lamp posts with arms and glowing heads. All of it scrolls
+  with the road.
+- A soft vignette under the HUD. SHADOWS: ON/OFF in Settings for weaker
+  phones.
+
 ## 0.23 (polish turn 6: balance and QA)
 
 - The road answers the convoy: each vehicle counts as 20 soldiers when

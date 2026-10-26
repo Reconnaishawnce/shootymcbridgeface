@@ -20,6 +20,7 @@ var _age := 0.0
 
 func _init(size: float = 1.0, color: Color = COLOR, length: float = 0.7) -> void:
 	var m := Mats.box(Vector3(0.09 * size, 0.09 * size, length), color, true)
+	m.material_override = Mats.glow(color, 2.6)
 	add_child(m)
 
 

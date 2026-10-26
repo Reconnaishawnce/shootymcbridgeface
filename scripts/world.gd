@@ -85,8 +85,8 @@ const BOSS_CHEW_Z := -2.4
 const BOSS_WALK_SPEED := 2.2
 const CLEAR_SECONDS := 2.2
 
-const ROAD := Color(0.2, 0.2, 0.22)
-const CURB := Color(0.55, 0.52, 0.45)
+const ROAD := Color(0.19, 0.2, 0.23)
+const CURB := Color(0.6, 0.58, 0.52)
 const DASH := Color(0.8, 0.78, 0.6)
 const POST := Color(0.35, 0.3, 0.26)
 
@@ -1365,16 +1365,29 @@ func _build_horde() -> void:
 	add_child(_horde)
 
 
+const GROUND := Color(0.27, 0.25, 0.2)
+const BUILDING := Color(0.16, 0.17, 0.21)
+const WINDOW := Color(1.0, 0.75, 0.4)
+const WRECK_COLORS := [Color(0.45, 0.2, 0.18), Color(0.25, 0.3, 0.38), Color(0.5, 0.45, 0.3), Color(0.2, 0.22, 0.2)]
+var _scenery: Array[Node3D] = []
+const SCENERY_SPAN := 240.0
+
+
 func _build_dressing() -> void:
 	_build_horde()
-	_road = Mats.box(Vector3(7.2, 0.2, 260.0), ROAD)
+	_road = Mats.gbox(Vector3(7.2, 0.2, 260.0), ROAD, 1.1, 0.18, 1)
 	_road.position = Vector3(0.0, -0.1, -100.0)
 	add_child(_road)
+	# Dirt either side of the road, out to the horizon.
+	var ground := Mats.gbox(Vector3(140.0, 0.2, 300.0), GROUND, 0.18, 0.4, 2)
+	ground.position = Vector3(0.0, -0.22, -110.0)
+	add_child(ground)
 	for side in [-1.0, 1.0]:
-		var curb := Mats.box(Vector3(0.7, 0.45, 260.0), CURB)
+		var curb := Mats.gbox(Vector3(0.7, 0.45, 260.0), CURB, 0.5, 0.25, 3)
 		curb.position = Vector3(side * (road_half + 0.65), 0.1, -100.0)
 		add_child(curb)
 		_curbs.append(curb)
+	_build_scenery()
 	# Enough dashed lines for the widest road; unused ones hide under the road.
 	for line in range(Progression.MAX_LANES - 1):
 		for i in range(26):
@@ -1385,10 +1398,89 @@ func _build_dressing() -> void:
 	_place_dashes(lanes)
 	for i in range(16):
 		for side in [-1.0, 1.0]:
-			var p := Mats.box(Vector3(0.3, 1.4, 0.3), POST)
-			p.position = Vector3(side * (road_half + 0.65), 0.9, 8.0 - i * 12.0)
+			# Lamp posts: a pole, an arm over the road, a glowing head.
+			var p := Node3D.new()
+			p.position = Vector3(side * (road_half + 0.65), 0.0, 8.0 - i * 12.0)
+			var pole := Mats.box(Vector3(0.22, 4.2, 0.22), POST)
+			pole.position.y = 2.1
+			p.add_child(pole)
+			var arm := Mats.box(Vector3(1.1, 0.14, 0.14), POST)
+			arm.position = Vector3(-side * 0.5, 4.15, 0.0)
+			p.add_child(arm)
+			var head := Mats.box(Vector3(0.5, 0.14, 0.3), WINDOW)
+			head.material_override = Mats.glow(WINDOW, 1.6)
+			head.position = Vector3(-side * 1.0, 4.05, 0.0)
+			p.add_child(head)
 			add_child(p)
 			_posts.append(p)
+
+
+## The world beyond the curbs: a ruined skyline far out, wrecked cars and
+## rubble on the shoulders, cracks on the road. Everything scrolls and
+## wraps, placed by a fixed seed so every run looks the same.
+func _build_scenery() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 404
+	for side in [-1.0, 1.0]:
+		# Skyline: two rows of dark blocks with a few lit windows.
+		for i in range(14):
+			var h := rng.randf_range(6.0, 22.0)
+			var w := rng.randf_range(5.0, 11.0)
+			var b := Mats.gbox(Vector3(w, h, rng.randf_range(6.0, 12.0)), BUILDING.lightened(rng.randf() * 0.08), 0.08, 0.2, 4)
+			b.position = Vector3(side * rng.randf_range(24.0, 48.0), h * 0.5 - 0.2, 10.0 - float(i) * (SCENERY_SPAN / 14.0) - rng.randf_range(0.0, 6.0))
+			add_child(b)
+			_scenery.append(b)
+			for k in range(rng.randi_range(1, 4)):
+				var win := Mats.box(Vector3(0.6, 0.8, 0.1), WINDOW)
+				win.material_override = Mats.glow(WINDOW.lerp(Color(0.6, 0.9, 1.0), rng.randf()), 1.4)
+				win.position = Vector3(-side * (w * 0.5 + 0.02) + 0.0, rng.randf_range(1.0, h - 1.0) - h * 0.5, rng.randf_range(-2.0, 2.0))
+				b.add_child(win)
+		# Shoulders: wrecked cars, rubble, dead trees.
+		for i in range(10):
+			var z := 6.0 - float(i) * (SCENERY_SPAN / 10.0) - rng.randf_range(0.0, 10.0)
+			var x: float = float(side) * rng.randf_range(road_half + 2.5, road_half + 9.0)
+			var kind := rng.randi_range(0, 2)
+			var piece := Node3D.new()
+			piece.position = Vector3(x, 0.0, z)
+			piece.rotation.y = rng.randf_range(-0.6, 0.6)
+			match kind:
+				0:
+					var body := Mats.gbox(Vector3(1.9, 0.8, 4.0), WRECK_COLORS[rng.randi_range(0, WRECK_COLORS.size() - 1)], 0.6, 0.3, 5)
+					body.position.y = 0.6
+					piece.add_child(body)
+					var cab := Mats.box(Vector3(1.6, 0.6, 1.8), Color(0.1, 0.1, 0.12))
+					cab.position = Vector3(0.0, 1.25, 0.2)
+					piece.add_child(cab)
+					for wx in [-0.95, 0.95]:
+						for wz in [-1.3, 1.3]:
+							var wheel := Mats.torus(0.14, 0.34, Color(0.08, 0.08, 0.08))
+							wheel.rotation_degrees.z = 90.0
+							wheel.position = Vector3(wx, 0.34, wz)
+							piece.add_child(wheel)
+				1:
+					for k in range(rng.randi_range(3, 6)):
+						var rock := Mats.gbox(Vector3(rng.randf_range(0.4, 1.2), rng.randf_range(0.3, 0.9), rng.randf_range(0.4, 1.2)), CURB.darkened(0.3), 0.5, 0.4, 3)
+						rock.position = Vector3(rng.randf_range(-1.2, 1.2), 0.2, rng.randf_range(-1.2, 1.2))
+						rock.rotation_degrees = Vector3(rng.randf_range(-20.0, 20.0), rng.randf_range(0.0, 90.0), rng.randf_range(-20.0, 20.0))
+						piece.add_child(rock)
+				_:
+					var trunk := Mats.capsule(0.18, rng.randf_range(2.5, 4.5), Color(0.22, 0.17, 0.12))
+					trunk.position.y = 1.8
+					piece.add_child(trunk)
+					for k in range(3):
+						var branch := Mats.capsule(0.07, 1.4, Color(0.22, 0.17, 0.12))
+						branch.position = Vector3(0.0, 2.6 + k * 0.5, 0.0)
+						branch.rotation_degrees = Vector3(rng.randf_range(-60.0, 60.0), k * 120.0, rng.randf_range(30.0, 70.0))
+						piece.add_child(branch)
+			add_child(piece)
+			_scenery.append(piece)
+	# Cracks and patches on the asphalt.
+	for i in range(18):
+		var crack := Mats.box(Vector3(rng.randf_range(0.12, 0.3), 0.015, rng.randf_range(1.0, 3.5)), ROAD.darkened(0.45))
+		crack.position = Vector3(rng.randf_range(-7.5, 7.5), 0.012, 4.0 - float(i) * (SCENERY_SPAN / 18.0))
+		crack.rotation.y = rng.randf_range(-0.5, 0.5)
+		add_child(crack)
+		_scenery.append(crack)
 
 
 ## Lane dividers sit on the boundaries between [param n] lanes; spare
@@ -1416,3 +1508,7 @@ func _scroll_dressing(delta: float) -> void:
 		p.position.z += world_speed * delta
 		if p.position.z > 12.0:
 			p.position.z -= 16.0 * 12.0
+	for sc in _scenery:
+		sc.position.z += world_speed * delta
+		if sc.position.z > 14.0:
+			sc.position.z -= SCENERY_SPAN

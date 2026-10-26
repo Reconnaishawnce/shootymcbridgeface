@@ -611,7 +611,14 @@ func _build_revive(root: Control) -> void:
 
 
 func show_revive(price: int, stars: int, soldiers: int, seconds: float) -> void:
+	# Over everything the run draws: the combo, the banner, the floats.
+	_revive_card.move_to_front()
 	_revive_card.visible = true
+	_combo.modulate.a = 0.0
+	_combo_bar.modulate.a = 0.0
+	if _banner_tween != null:
+		_banner_tween.kill()
+	_banner.modulate.a = 0.0
 	_revive_lines.text = "%d soldiers back, a shield, the clingers shaken off.\n%d %s. You have %d." % [soldiers, price, "star" if price == 1 else "stars", stars]
 	if _revive_tween != null:
 		_revive_tween.kill()

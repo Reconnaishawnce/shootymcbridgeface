@@ -336,8 +336,8 @@ const PERFECT_BONUS := 50
 
 
 ## Score bonus for clearing a level with [param squad_left] soldiers.
-static func level_bonus(level: int, squad_left: int) -> int:
-	return level * 150 + squad_left * 5
+static func level_bonus(level: int, squad_left: int, vehicles: int = 0) -> int:
+	return level * 150 + squad_left * 5 + vehicles * Convoy.LEVEL_BONUS_PER_VEHICLE
 
 
 ## Returns [left_panel, right_panel] for gate [param index] on [param level].
@@ -509,6 +509,12 @@ const SCOUT_LEVEL := 2
 const SCOUT_CHANCE := 0.12
 const BET_CHANCE := 0.1
 const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
+## How often an affordable vehicle is actually offered at a gate.
+const VEHICLE_OFFER_CHANCE := 0.55
+## Damage a brute, a boss chew or a lightning bolt does to a vehicle.
+const VEHICLE_HIT_BRUTE := 15.0
+const VEHICLE_HIT_BOSS := 12.0
+const VEHICLE_HIT_STRIKE := 25.0
 ## Flankers come over the curbs on wide roads from this level.
 const FLANKER_LEVEL := 4
 const MAX_FLANKERS := 4
@@ -562,7 +568,7 @@ func make_rival_expr(level: int, rival: GateMath.GatePanel, count: int) -> GateM
 ## All the panels of a gate, one per lane. The first two come from
 ## make_gate_pair; a sum may replace one of them from EXPR_LEVEL; extra
 ## lanes get a mix of small gains, traps, sums and power-ups. Shuffled.
-func make_gate(level: int, index: int, count: int, lanes: int) -> Array:
+func make_gate(level: int, index: int, count: int, lanes: int, owned: Dictionary = {}) -> Array:
 	var t := tier_for_level(level)
 	var panels: Array = make_gate_pair(level, index, count)
 	if index > 0 and level >= Progression.EXPR_LEVEL and rng.randf() < EXPR_CHANCE[t]:
@@ -610,6 +616,18 @@ func make_gate(level: int, index: int, count: int, lanes: int) -> Array:
 			panels.append(trap)
 		else:
 			panels.append(GateMath.add(-rng.randi_range(3, 8) - lv))
+	# The convoy: once the squad can afford a vehicle, a gate offers one in
+	# place of its worst panel. Not the opener, never both sides.
+	var vehicle := Convoy.offer(count, owned, level) if index > 0 else ""
+	if vehicle != "" and rng.randf() < VEHICLE_OFFER_CHANCE:
+		var worst := 1
+		var worst_value := GateMath.worth(panels[1], count)
+		for i in range(panels.size()):
+			var v := GateMath.worth(panels[i], count)
+			if v < worst_value:
+				worst = i
+				worst_value = v
+		panels[worst] = GateMath.vehicle(vehicle)
 	for i in range(panels.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
 		var tmp = panels[i]

@@ -3,7 +3,7 @@ extends RefCounted
 ## Lifetime numbers, kept across runs. Pure: a dictionary with known keys
 ## and a merge. The game adds a run's numbers at the end of the run.
 
-const KEYS := ["runs", "kills", "bosses", "gates", "perfect", "distance", "best_combo", "bets_won", "bets_lost", "dailies", "weeklies", "hard_bosses", "nightmare_bosses", "s_grades", "stars_earned", "coins_earned", "best_level", "endless_level", "escapes"]
+const KEYS := ["runs", "kills", "bosses", "gates", "perfect", "distance", "best_combo", "bets_won", "bets_lost", "dailies", "weeklies", "hard_bosses", "nightmare_bosses", "s_grades", "stars_earned", "coins_earned", "best_level", "endless_level", "escapes", "vehicles"]
 ## Keys that keep the larger value instead of adding.
 const MAX_KEYS := ["best_combo", "best_level", "endless_level"]
 
@@ -39,4 +39,5 @@ static func lines(d: Dictionary) -> Array:
 		"Bets won  %d   ·   lost  %d" % [int(d.get("bets_won", 0)), int(d.get("bets_lost", 0))],
 		"Dailies  %d   ·   weeklies  %d" % [int(d.get("dailies", 0)), int(d.get("weeklies", 0))],
 		"Coins earned  %d   ·   stars earned  %d" % [int(d.get("coins_earned", 0)), int(d.get("stars_earned", 0))],
+		"Vehicles formed  %d" % int(d.get("vehicles", 0)),
 	]

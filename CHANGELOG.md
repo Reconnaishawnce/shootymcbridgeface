@@ -3,6 +3,27 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.19 (polish turn 2: the convoy, part one)
+
+Soldiers can become vehicles.
+
+- Once the squad is big enough (1.6 times the price), a gate may offer
+  an olive panel in place of its worst one: JEEP -20 or TANK -60. Walk
+  through and that many soldiers climb aboard. Never on a level's
+  opener, at most one per gate, and only while there is room: two jeeps,
+  one tank (from level 2).
+- A JEEP rides the flank with a mounted gun: fast, straight, through two
+  zombies at a time, leaning toward whatever you are aiming at. A TANK
+  leads up the middle firing shells that burst on the first thing in
+  their path, hitting a crowd at once and the boss at half.
+- Vehicles have health bars. Brutes, tanks, boss chews, the horde and
+  lightning damage them; a wrecked one is gone with a bang. They ride on
+  from level to level while the soldiers reset, and each one still
+  rolling at the boss pays 100 points.
+- RECORDS counts vehicles formed; two new achievements. The help page
+  has a CONVOY section. The auto-player takes a vehicle when it can
+  afford to keep enough bodies.
+
 ## 0.18 (polish turn 1: honest road)
 
 The first of six turns taking the game from pieced-together to one

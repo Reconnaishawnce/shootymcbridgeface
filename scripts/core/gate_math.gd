@@ -7,7 +7,7 @@ extends RefCounted
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.
 
-enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET, SCOUT }
+enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET, SCOUT, VEHICLE }
 ## Gates a scout party reveals ahead.
 const SCOUT_GATES := 3
 
@@ -61,6 +61,17 @@ static func trade(cost: int, id: String) -> GatePanel:
 	var p := GatePanel.new(Kind.TRADE, float(-absi(cost)), false)
 	p.power = id
 	return p
+
+
+## A convoy vehicle: [param cost] soldiers climb aboard a [param id].
+static func vehicle(id: String) -> GatePanel:
+	var p := GatePanel.new(Kind.VEHICLE, float(-Convoy.cost(id)), false)
+	p.power = id
+	return p
+
+
+static func is_vehicle(panel: GatePanel) -> bool:
+	return panel.kind == Kind.VEHICLE
 
 
 ## Scouts: send [param cost] soldiers ahead and the next SCOUT_GATES gates
@@ -123,7 +134,7 @@ static func apply(count: int, panel: GatePanel) -> int:
 			for op in panel.ops:
 				c = _apply_op(c, int(op[0]), float(op[1]))
 			return c
-		Kind.TRADE, Kind.SCOUT:
+		Kind.TRADE, Kind.SCOUT, Kind.VEHICLE:
 			return maxi(0, count + int(round(panel.value)))
 	return count
 
@@ -194,6 +205,8 @@ static func label(panel: GatePanel) -> String:
 			return "BET x2"
 		Kind.SCOUT:
 			return "SCOUT %d" % int(round(panel.value))
+		Kind.VEHICLE:
+			return "%s %d" % [Convoy.title(panel.power), int(round(panel.value))]
 	return "?"
 
 
@@ -213,7 +226,7 @@ static func _first_add(panel: GatePanel) -> int:
 ## gate yields about one step per second of committed fire at any squad size.
 static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> int:
 	panel.revealed = true
-	if step_cost <= 0.0 or panel.kind == Kind.POWER or panel.kind == Kind.BET:
+	if step_cost <= 0.0 or panel.kind in [Kind.POWER, Kind.BET, Kind.VEHICLE]:
 		return 0
 	var cost := step_cost
 	if panel.kind == Kind.MUL:

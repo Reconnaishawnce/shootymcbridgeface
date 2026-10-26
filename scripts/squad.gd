@@ -64,6 +64,10 @@ var _soldiers: Array[Soldier] = []
 ## crew look dresses everyone else. Empty means the classic military kit.
 var hero_look: Dictionary = {}
 var crew_look: Dictionary = {}
+## The convoy: vehicles riding with the squad. They survive a level
+## reset and die with the run.
+var vehicles: Array[Vehicle] = []
+signal vehicle_lost(id: String)
 var _fire_accum := 0.0
 var _fire_index := 0
 var _revive_timer := 0.0
@@ -123,7 +127,68 @@ func reset(start_count: int = 1) -> void:
 	for s in _soldiers:
 		s.queue_free()
 	_soldiers.clear()
+	for v in vehicles:
+		v.queue_free()
+	vehicles.clear()
 	set_count(start_count)
+
+
+## A vehicle joins. Returns false when there is no room for that kind.
+func add_vehicle(id: String) -> bool:
+	if not has_room(id):
+		return false
+	var v := Vehicle.new(id)
+	v.destroyed.connect(_on_vehicle_destroyed)
+	add_child(v)
+	vehicles.append(v)
+	_layout()
+	return true
+
+
+func has_room(id: String) -> bool:
+	return vehicle_count(id) < int(Convoy.spec(id).max)
+
+
+func vehicle_count(id: String) -> int:
+	var n := 0
+	for v in vehicles:
+		if v.alive and v.id == id:
+			n += 1
+	return n
+
+
+func vehicle_counts() -> Dictionary:
+	var out := {}
+	for id in Convoy.ORDER:
+		out[id] = vehicle_count(id)
+	return out
+
+
+func vehicles_alive() -> int:
+	var n := 0
+	for v in vehicles:
+		if v.alive:
+			n += 1
+	return n
+
+
+## Something heavy hit the squad: a random vehicle takes [param amount].
+func damage_vehicle(amount: float) -> void:
+	var live: Array[Vehicle] = []
+	for v in vehicles:
+		if v.alive:
+			live.append(v)
+	if live.is_empty():
+		return
+	live[randi() % live.size()].take_damage(amount)
+
+
+func _on_vehicle_destroyed(id: String) -> void:
+	for v in vehicles.duplicate():
+		if not v.alive:
+			vehicles.erase(v)
+	vehicle_lost.emit(id)
+	_layout()
 
 
 ## The road widened or narrowed: keep the squad inside it.
@@ -387,6 +452,16 @@ func _layout() -> void:
 		_soldiers[i].target_offset = Vector3(pos[i].x, 0.0, pos[i].y)
 	var hw := Formation.half_width(want, spread) + 0.7
 	_ring.scale = Vector3(hw, 1.0, hw * 0.8)
+	# Vehicles: the tank leads up the middle, jeeps ride the flanks.
+	var jeep_side := -1.0
+	for v in vehicles:
+		if not v.alive:
+			continue
+		if v.id == "tank":
+			v.target_offset = Vector3(0.0, 0.0, -(hw * 0.8 + 1.6))
+		else:
+			v.target_offset = Vector3(jeep_side * (hw + 1.0), 0.0, -0.6)
+			jeep_side = -jeep_side
 	for i in range(_flags.size()):
 		var slot: Vector3 = FLAG_SLOTS[i]
 		_flags[i].position = Vector3(slot.x * spread, 0.0, slot.z / sqrt(spread))
@@ -454,6 +529,8 @@ func _process(delta: float) -> void:
 	if not active or count == 0 or world == null:
 		return
 	_fire(delta)
+	for v in vehicles:
+		v.tick(delta, world, focus_on, focus_point)
 	if is_medic():
 		_revive_timer += delta
 		if _revive_timer >= MEDIC_REVIVE_SECONDS:

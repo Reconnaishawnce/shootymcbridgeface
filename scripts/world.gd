@@ -29,6 +29,9 @@ signal bet_resolved(won: bool, before: int, after: int)
 signal bet_placed
 ## Scouts went ahead: the next few gates are open books.
 signal scouts_sent(gates: int)
+## Soldiers climbed into a vehicle at a gate.
+signal vehicle_formed(id: String)
+signal shell_exploded(at: Vector3, kills: int)
 ## The boss fight proper has started: the road slows, the clock runs.
 signal boss_engaged
 ## The horde behind caught up and ate.
@@ -331,6 +334,7 @@ func _tick_horde(delta: float, p_squad: Squad) -> void:
 			if not p_squad.is_shielded():
 				var bite := _bite(Difficulty.horde_bite(p_squad.count))
 				p_squad.add(-bite)
+				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BOSS)
 				squad_bitten.emit(bite, true)
 				horde_bit.emit(bite)
 	else:
@@ -562,7 +566,8 @@ func _spawn() -> void:
 			if want_lanes != lanes:
 				set_lanes(want_lanes)
 			var g := Gate.new()
-			g.setup(gen.make_gate(_gate_level(_next_gate), _gate_index(_next_gate), count, lanes), Progression.LANE_W)
+			var owned: Dictionary = squad.vehicle_counts() if squad != null else {}
+			g.setup(gen.make_gate(_gate_level(_next_gate), _gate_index(_next_gate), count, lanes, owned), Progression.LANE_W)
 			g.index = _gate_index(_next_gate)
 			if _scout_left > 0:
 				g.reveal_all()
@@ -797,6 +802,12 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 					powerup_granted.emit(Powerups.resolve(panel.power, gen.rng), false)
 				elif GateMath.is_trade(panel):
 					powerup_granted.emit(panel.power, false)
+				elif GateMath.is_vehicle(panel):
+					if p_squad.add_vehicle(panel.power):
+						vehicle_formed.emit(panel.power)
+					else:
+						# No room after all: the soldiers stay soldiers.
+						after = before
 				elif GateMath.is_scout(panel):
 					_scout_left = GateMath.SCOUT_GATES
 					for other in gates:
@@ -956,6 +967,8 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 					fraction *= perks.brute_bite_mult()
 				bite = _bite(maxi(1, int(Difficulty.brute_bite(p_squad.count, fraction) * p_squad.bite_mult())))
 			p_squad.add(-bite)
+			if z.brute or z.is_tank():
+				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BRUTE)
 			squad_bitten.emit(bite, z.brute or z.is_tank())
 		elif z.position.z > DESPAWN_Z:
 			zombies.erase(z)
@@ -1110,6 +1123,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			shield_blocked.emit()
 			return
 		var bite := _bite(Difficulty.boss_bite(p_squad.count))
+		p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BOSS)
 		p_squad.add(-bite)
 		squad_bitten.emit(bite, true)
 
@@ -1147,11 +1161,47 @@ func _move_strikes(delta: float, p_squad: Squad) -> void:
 			elif hit:
 				var bite := _bite(Difficulty.strike_bite(p_squad.count))
 				p_squad.add(-bite)
+				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_STRIKE)
 				squad_bitten.emit(bite, true)
 			strike_landed.emit(st.position, hit)
 		if st.done:
 			_strikes.erase(st)
 			st.queue_free()
+
+
+## A tank shell asks: is there something to burst on right here?
+func shell_should_burst(sh: Shell) -> bool:
+	for z in zombies:
+		if z.latched:
+			continue
+		if absf(z.position.z - sh.position.z) < 1.0 and absf(z.position.x - sh.position.x) < z.radius + 0.5:
+			return true
+	if boss != null and boss.alive and absf(boss.position.z - sh.position.z) < 1.5 and absf(boss.position.x - sh.position.x) < Boss.BODY_RADIUS:
+		return true
+	return false
+
+
+## A burst of [param damage] on everything within [param radius] of
+## [param at]: zombies, the boss (at half), gate panels untouched.
+func explode_at(at: Vector3, radius: float, damage: float) -> int:
+	var kills := 0
+	for z in zombies.duplicate():
+		if z.latched or z.position.distance_to(at) > radius + z.radius * 0.5:
+			continue
+		if z.take_damage(damage):
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			z.die()
+			kills += 1
+	if boss != null and boss.alive and boss.position.distance_to(at) <= radius + Boss.BODY_RADIUS:
+		var core := boss.is_core_hit(at.x)
+		var dead := boss.take_damage(damage * 0.5, core)
+		boss_hit.emit(boss, core)
+		if dead:
+			_on_boss_dead()
+	shell_exploded.emit(at, kills)
+	return kills
 
 
 ## A storm line: bolts across the whole road with one gap, placed

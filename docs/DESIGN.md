@@ -219,6 +219,24 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## The convoy
+
+`Convoy.SPECS` holds the vehicles: cost in soldiers, health, damage per
+second, fire rate, the per-kind trick (pierce for the jeep, splash for
+the tank), how many you may own and from which level. `Convoy.offer`
+names the biggest affordable one for a squad of a given size and owned
+set; `Difficulty.make_gate` swaps it for the gate's worst panel just over
+half the time, never on the opener. Forming is a gate choice, so it is a
+bet: fewer bodies now, a gun that stays.
+
+`Vehicle` nodes ride in the squad's layout (tank ahead up the middle,
+jeeps on the flanks), fire through the same world hit-test as soldiers
+(jeep bullets, `Shell` bursts resolved by `World.explode_at`), and take
+damage from the heavy hits (`Difficulty.VEHICLE_HIT_*`). They survive
+`Squad.redeploy` (a new level) and die with `Squad.reset` (a new run).
+A jeep's 50 DPS equals twenty capped soldiers, so the trade is even on
+fire and ahead on accuracy, persistence and the level bonus.
+
 ## Honest road: the fork, formation width, the shop
 
 The fork carries no words. `Difficulty.make_fork` builds two routes with

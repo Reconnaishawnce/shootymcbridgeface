@@ -201,9 +201,9 @@ word on a sign, everything can be seen and counted.
 
 1. Honest road (done): fork without words, formation width that matters,
    a shop you can feel.
-2. The convoy, part one: jeep at 20 soldiers, tank at 60, formed at a
-   gate choice; vehicles have health, their own fire, and persist across
-   levels while soldiers reset.
+2. The convoy, part one (done): jeep at 20 soldiers, tank at 60, formed
+   at a gate choice; vehicles have health, their own fire, and persist
+   across levels while soldiers reset.
 3. The convoy, part two: helicopter and mech; veteran ranks from kills;
    brutes and bosses hurt vehicles; perk gates upgrade them.
 4. One game, one look: a single UI kit, icons, a results screen that

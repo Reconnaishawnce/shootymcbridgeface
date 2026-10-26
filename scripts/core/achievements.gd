@@ -30,6 +30,8 @@ const CATALOG := [
 	{"id": "hard_5", "title": "HARD CASE", "desc": "Kill 5 bosses on hard", "key": "hard_bosses", "at": 5, "stars": 3},
 	{"id": "nightmare_3", "title": "SLEEPLESS", "desc": "Kill 3 bosses on nightmare", "key": "nightmare_bosses", "at": 3, "stars": 5},
 	{"id": "escape_10", "title": "SURVIVOR", "desc": "Escape 10 times with a hero", "key": "escapes", "at": 10, "stars": 2},
+	{"id": "vehicle_1", "title": "WHEELS", "desc": "Form a vehicle", "key": "vehicles", "at": 1, "stars": 1},
+	{"id": "vehicle_20", "title": "MOTOR POOL", "desc": "Form 20 vehicles", "key": "vehicles", "at": 20, "stars": 3},
 ]
 
 

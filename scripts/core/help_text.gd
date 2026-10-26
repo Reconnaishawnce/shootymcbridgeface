@@ -27,6 +27,7 @@ static func sections() -> Array:
 			"TEAL panels are sums like +3 x2, worked out left to right. +3 x2 is not the same as x2 +3. Do the maths, then pick.\n" +
 			"PURPLE panels hand you a power-up.\n" +
 			"AMBER panels are deals: a trade (pay soldiers now for a power-up now), a bet (double your squad if you clear the next wave with no bites, half if you do not), or scouts (pay a few soldiers and the next %d gates show every panel).\n" % GateMath.SCOUT_GATES +
+			"OLIVE panels turn soldiers into a vehicle (see THE CONVOY).\n" +
 			"GREY panels with a ? are hidden until you get close or shoot them."},
 		{"title": "SHOOT THE PANELS", "body":
 			"Your bullets hit the panels too. Every bit of fire steps a panel up: a +2 becomes a +3, a x2 becomes x2.5, a trade gets cheaper. " +
@@ -40,6 +41,12 @@ static func sections() -> Array:
 			"The heavier side pays better panels. Read both and pick. " +
 			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
 				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
+		{"title": "THE CONVOY", "body":
+			"Soldiers can become vehicles. Once your squad is big enough, a gate offers an olive panel like JEEP -%d: walk through it and that many soldiers climb aboard. " % Convoy.cost("jeep") +
+			"A JEEP (%d soldiers, up to %d) rides on your flank with a mounted gun: fast, straight, through two zombies at a time. " % [Convoy.cost("jeep"), int(Convoy.spec("jeep").max)] +
+			"A TANK (%d soldiers, from level %d) leads up the middle firing shells that burst on a crowd. " % [Convoy.cost("tank"), int(Convoy.spec("tank").level)] +
+			"Vehicles have their own health bar: brutes, boss chews and lightning damage them, and a wrecked one is gone. " +
+			"But they stay with you from level to level while the soldiers reset, and each one still rolling at the boss pays %d points. Fewer bodies now, a convoy later." % Convoy.LEVEL_BONUS_PER_VEHICLE},
 		{"title": "ZOMBIES", "body":
 			"Walkers shamble at you. Runners are fast and thin and find you. Brutes are big, soak a lot of fire, and take a slice of the squad when they reach you. " +
 			"Tanks are bullet sponges that shield whatever is behind them. Thieves sprint for the next gate and knock its number down, so shoot them first. " +

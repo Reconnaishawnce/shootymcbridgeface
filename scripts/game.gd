@@ -67,6 +67,7 @@ var _bets_lost := 0
 var _help_from_pause := false
 ## Second wind: one comeback per run from the shop.
 var _second_wind_used := false
+var _vehicles_formed := 0
 var weekly_results: Dictionary = {}
 ## While a finger is dragging the locker preview round, the idle turn waits.
 var _preview_drag_until := 0.0
@@ -227,6 +228,8 @@ func _build_scene() -> void:
 	world.shaken_off.connect(_on_shaken_off)
 	world.lanes_changed.connect(_on_lanes_changed)
 	world.bet_placed.connect(_on_bet_placed)
+	world.vehicle_formed.connect(_on_vehicle_formed)
+	world.shell_exploded.connect(_on_shell_exploded)
 	world.scouts_sent.connect(func(n: int) -> void:
 		hud.show_banner("SCOUTS OUT\nNEXT %d GATES REVEALED" % n, 1.4)
 		sfx.play("powerup", -4.0, 1.4))
@@ -244,6 +247,7 @@ func _build_scene() -> void:
 	squad.count_changed.connect(_on_count_changed)
 	squad.wiped_out.connect(_on_wiped_out)
 	squad.dashed.connect(func() -> void: world.shake_off())
+	squad.vehicle_lost.connect(_on_vehicle_lost)
 	squad.reset()
 
 	hud = Hud.new()
@@ -519,6 +523,7 @@ func start_run(p_mode: String = "levels") -> void:
 		powerups.grant("bomb", 0.0)
 	hud.set_bombs(powerups.bombs)
 	_second_wind_used = false
+	_vehicles_formed = 0
 	waves_cleared = 0
 	perfect_gates = 0
 	_run_time = 0.0
@@ -628,7 +633,7 @@ func end_run() -> void:
 		"nightmare_bosses": bosses_killed if world.modifier == "nightmare" else 0,
 		"s_grades": s_count, "stars_earned": stars_earned, "coins_earned": earned,
 		"best_level": 0 if world.endless else world.level, "endless_level": world.level if world.endless else 0,
-		"escapes": 1 if character_mode else 0,
+		"escapes": 1 if character_mode else 0, "vehicles": _vehicles_formed,
 	}
 	var new_achievements: Array = []
 	if not smoke:
@@ -980,7 +985,7 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	bosses_killed += 1
 	if smoke:
 		print("SMOKE_BOSS_DOWN ", JSON.stringify({"level": level, "squad_left": squad_left, "frame": _frames}))
-	var b := Difficulty.level_bonus(level, squad_left)
+	var b := Difficulty.level_bonus(level, squad_left, squad.vehicles_alive())
 	var letter := Grades.grade(_level_perfect, _level_gates, _level_peak, squad_left, _run_time - _boss_start)
 	grades.append(letter)
 	b += Grades.bonus(letter)
@@ -1072,12 +1077,38 @@ func _on_fork_chosen(route: Dictionary, _side: int) -> void:
 	_punch(2.0)
 
 
+func _on_vehicle_formed(id: String) -> void:
+	if smoke:
+		print("SMOKE_VEHICLE ", JSON.stringify({"id": id, "level": world.level, "squad": squad.count, "frame": _frames}))
+	hud.show_banner("%s JOINS THE CONVOY" % Convoy.title(id), 1.4)
+	sfx.play("rally")
+	squad.rally()
+	_punch(5.0)
+	_vehicles_formed += 1
+
+
+func _on_vehicle_lost(id: String) -> void:
+	hud.show_float("%s LOST" % Convoy.title(id), false)
+	sfx.play("wipe", -6.0, 1.4)
+	_shake = minf(1.0, _shake + 0.6)
+	Burst.spawn(world, squad.position + Vector3(0.0, 0.8, -0.5), Color(1.0, 0.55, 0.2), 24, 0.2, 6.0, 0.7)
+
+
+func _on_shell_exploded(at: Vector3, kills: int) -> void:
+	Burst.spawn(world, at + Vector3(0.0, 0.5, 0.0), Color(1.0, 0.65, 0.25), 10 + kills * 2, 0.16, 5.0, 0.45)
+	if kills >= 3:
+		_punch(1.5)
+
+
 func _on_bet_placed() -> void:
 	hud.show_banner("BET ON!\nCLEAR THE WAVE, NO BITES", 1.4)
 	sfx.play("powerup", -4.0, 1.2)
 
 
 func _bot_panel(g: Gate) -> int:
+	for i in range(g.panels.size()):
+		if GateMath.is_vehicle(g.panels[i]) and squad.count >= Convoy.cost(g.panels[i].power) * 2:
+			return i
 	if squad.count >= 24:
 		for i in range(g.panels.size()):
 			if GateMath.is_bet(g.panels[i]):
@@ -1386,6 +1417,9 @@ func _shots_walkthrough() -> void:
 	squad.set_count(maxi(squad.count, 160))
 	squad.set_spread(1.0)
 	await _capture("5c_army.png", 40)
+	squad.add_vehicle("jeep")
+	squad.add_vehicle("tank")
+	await _capture("5c2_convoy.png", 90)
 	_bot_spread = true
 	for i in range(3000):
 		if world.fork != null and world.fork.position.z > -30.0 and not world.fork.chosen:

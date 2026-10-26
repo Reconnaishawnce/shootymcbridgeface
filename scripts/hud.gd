@@ -24,6 +24,9 @@ signal bomb_pressed
 signal quit_pressed
 signal settings_opened
 signal records_opened
+signal road_opened
+signal revive_accepted
+signal revive_declined
 signal quests_opened
 signal help_opened
 signal help_closed
@@ -57,6 +60,19 @@ var _title_card: Control
 var _title: Label
 var _records: Label
 var _coins_title: Label
+var _weekly_button: Button
+var _plus_button: Button
+var _more_button: Button
+var _more_card: Control
+var _road_button: Button
+var _road_line: Label
+var _road_card: Control
+var _road_box: VBoxContainer
+var _revive_card: Control
+var _revive_title: Label
+var _revive_lines: Label
+var _revive_timer: Label
+var _revive_tween: Tween
 var _coins_row: HBoxContainer
 var _stars_row: HBoxContainer
 var _goal: Label
@@ -397,6 +413,9 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
+	_road_card = _scroll_card(root, "TROPHY ROAD", func() -> void: shop_closed.emit())
+	_road_box = _road_card.get_meta("box")
+	_build_revive(root)
 	_quests_card = _scroll_card(root, "QUESTS", func() -> void: shop_closed.emit())
 	_quests_box = _quests_card.get_meta("box")
 	_records_card = _scroll_card(root, "RECORDS", func() -> void: shop_closed.emit())
@@ -410,84 +429,247 @@ func _init() -> void:
 	_build_pause(root)
 
 
+## Pin [param c] at a point of the screen given by anchors, with its own
+## size and which corner of it sits on the point.
+func _pin(parent: Control, c: Control, ax: float, ay: float, size: Vector2, corner: Vector2 = Vector2(0.5, 0.5), offset: Vector2 = Vector2.ZERO) -> void:
+	c.anchor_left = ax
+	c.anchor_right = ax
+	c.anchor_top = ay
+	c.anchor_bottom = ay
+	c.offset_left = -size.x * corner.x + offset.x
+	c.offset_right = size.x * (1.0 - corner.x) + offset.x
+	c.offset_top = -size.y * corner.y + offset.y
+	c.offset_bottom = size.y * (1.0 - corner.y) + offset.y
+	parent.add_child(c)
+
+
+## A small chip: a button with tight padding, for the corners.
+func _chip(text: String, size: int) -> Button:
+	var b := _button(text, size)
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var sb: StyleBoxFlat = b.get_theme_stylebox(state).duplicate()
+		sb.content_margin_left = 12.0
+		sb.content_margin_right = 12.0
+		sb.content_margin_top = 4.0
+		sb.content_margin_bottom = 4.0
+		b.add_theme_stylebox_override(state, sb)
+	return b
+
+
+## The home screen: no box. The title and PLAY in the middle, modes of
+## play in a row under it, the wallet top left, the shop and locker top
+## right, the mode chip bottom left, help and settings bottom right, and
+## the next thing to do along the bottom. Everything else is one tap away
+## behind MORE.
 func _build_title(root: Control) -> void:
-	_title_card = _card(root)
-	var box: VBoxContainer = _title_card.get_meta("box")
-	_title = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
+	_title_card = Control.new()
+	_title_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_title_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_title_card)
+	var t := _title_card
+
+	_title = _label(72, HORIZONTAL_ALIGNMENT_CENTER)
 	_title.text = "SHOOTY\nMcBRIDGEFACE"
-	box.add_child(_title)
-	_records = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
-	box.add_child(_records)
-	var play := _button("PLAY", 44)
+	_pin(t, _title, 0.5, 0.22, Vector2(680.0, 190.0))
+	_records = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_records.modulate = Color(0.9, 0.9, 0.95)
+	_pin(t, _records, 0.5, 0.32, Vector2(620.0, 70.0))
+
+	var play := _button("PLAY", 52)
 	play.pressed.connect(func() -> void: play_pressed.emit("levels"))
-	box.add_child(play)
-	_endless_button = _button("ENDLESS", 36)
+	_pin(t, play, 0.5, 0.47, Vector2(440.0, 104.0))
+	var modes := HBoxContainer.new()
+	modes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	modes.alignment = BoxContainer.ALIGNMENT_CENTER
+	modes.add_theme_constant_override("separation", 14)
+	_pin(t, modes, 0.5, 0.56, Vector2(520.0, 70.0))
+	_endless_button = _button("ENDLESS", 26)
+	_endless_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
-	box.add_child(_endless_button)
-	var row0 := HBoxContainer.new()
-	row0.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row0.alignment = BoxContainer.ALIGNMENT_CENTER
-	row0.add_theme_constant_override("separation", 16)
-	box.add_child(row0)
-	_daily_button = _button("DAILY", 36)
-	_daily_button.custom_minimum_size.x = 200.0
+	modes.add_child(_endless_button)
+	_daily_button = _button("DAILY", 26)
+	_daily_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_daily_button.pressed.connect(func() -> void: daily_opened.emit())
-	row0.add_child(_daily_button)
-	_quests_button = _button("QUESTS", 36)
-	_quests_button.custom_minimum_size.x = 200.0
-	_quests_button.pressed.connect(func() -> void: quests_opened.emit())
-	row0.add_child(_quests_button)
-	_mode_button = _button("MODE: NORMAL", 30)
-	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
-	box.add_child(_mode_button)
-	_squad_button = _button("SQUAD: RIFLES", 30)
-	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
-	box.add_child(_squad_button)
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	box.add_child(row)
-	_shop_button = _button("SHOP", 36)
-	_shop_button.custom_minimum_size.x = 200.0
-	_shop_button.pressed.connect(func() -> void: shop_opened.emit())
-	row.add_child(_shop_button)
-	_locker_button = _button("LOCKER", 36)
-	_locker_button.custom_minimum_size.x = 200.0
-	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
-	row.add_child(_locker_button)
-	var row2 := HBoxContainer.new()
-	row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row2.alignment = BoxContainer.ALIGNMENT_CENTER
-	row2.add_theme_constant_override("separation", 16)
-	box.add_child(row2)
-	_records_button = _button("RECORDS", 30)
-	_records_button.custom_minimum_size.x = 200.0
-	_records_button.pressed.connect(func() -> void: records_opened.emit())
-	row2.add_child(_records_button)
-	var help := _button("HOW TO PLAY", 30)
-	help.custom_minimum_size.x = 200.0
-	help.pressed.connect(func() -> void: help_opened.emit())
-	row2.add_child(help)
-	var settings := _button("SETTINGS", 30)
-	settings.pressed.connect(func() -> void: settings_opened.emit())
-	box.add_child(settings)
-	var wallet := HBoxContainer.new()
+	modes.add_child(_daily_button)
+	_weekly_button = _button("WEEKLY", 26)
+	_weekly_button.custom_minimum_size = Vector2(160.0, 66.0)
+	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
+	modes.add_child(_weekly_button)
+
+	# Top left: the wallet, and a + that opens the shop.
+	var wallet := VBoxContainer.new()
 	wallet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wallet.alignment = BoxContainer.ALIGNMENT_CENTER
-	wallet.add_theme_constant_override("separation", 30)
-	box.add_child(wallet)
-	_coins_row = _currency("coin", 28, COIN)
+	wallet.add_theme_constant_override("separation", 2)
+	_pin(t, wallet, 0.0, 0.0, Vector2(240.0, 90.0), Vector2(0.0, 0.0), Vector2(22.0, 24.0))
+	_coins_row = _currency("coin", 26, COIN)
+	_coins_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	wallet.add_child(_coins_row)
 	_coins_title = _coins_row.get_meta("label")
-	_stars_row = _currency("star", 28, STAR)
+	_stars_row = _currency("star", 26, STAR)
+	_stars_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	wallet.add_child(_stars_row)
 	_stars_title = _stars_row.get_meta("label")
+	_plus_button = _chip("+", 26)
+	_plus_button.pressed.connect(func() -> void: shop_opened.emit())
+	_pin(t, _plus_button, 0.0, 0.0, Vector2(52.0, 46.0), Vector2(0.0, 0.0), Vector2(180.0, 26.0))
+
+	# Top right: shop and locker.
+	var shops := VBoxContainer.new()
+	shops.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shops.add_theme_constant_override("separation", 8)
+	shops.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_pin(t, shops, 1.0, 0.0, Vector2(150.0, 130.0), Vector2(1.0, 0.0), Vector2(-22.0, 22.0))
+	_shop_button = _chip("SHOP", 26)
+	_shop_button.pressed.connect(func() -> void: shop_opened.emit())
+	shops.add_child(_shop_button)
+	_locker_button = _chip("LOCKER", 26)
+	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
+	shops.add_child(_locker_button)
+
+	# Bottom left: the mode chip, and the squad chip once there is a choice.
+	var left := VBoxContainer.new()
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_theme_constant_override("separation", 8)
+	left.alignment = BoxContainer.ALIGNMENT_END
+	_pin(t, left, 0.0, 1.0, Vector2(260.0, 120.0), Vector2(0.0, 1.0), Vector2(22.0, -24.0))
+	_squad_button = _chip("SQUAD: RIFLES", 22)
+	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
+	left.add_child(_squad_button)
+	_mode_button = _chip("NORMAL", 26)
+	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
+	left.add_child(_mode_button)
+
+	# Bottom right: help and settings.
+	var right := HBoxContainer.new()
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right.add_theme_constant_override("separation", 8)
+	right.alignment = BoxContainer.ALIGNMENT_END
+	_pin(t, right, 1.0, 1.0, Vector2(260.0, 60.0), Vector2(1.0, 1.0), Vector2(-22.0, -24.0))
+	var help := _chip("?", 28)
+	help.custom_minimum_size.x = 56.0
+	help.pressed.connect(func() -> void: help_opened.emit())
+	right.add_child(help)
+	var settings := _chip("SETTINGS", 24)
+	settings.pressed.connect(func() -> void: settings_opened.emit())
+	right.add_child(settings)
+
+	# Bottom centre: where you stand on the road, the next thing to do, MORE.
+	_road_line = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+	_road_line.add_theme_color_override("font_color", COIN)
+	_pin(t, _road_line, 0.5, 1.0, Vector2(520.0, 40.0), Vector2(0.5, 1.0), Vector2(0.0, -176.0))
 	_goal = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
 	_goal.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_goal.custom_minimum_size.x = 560.0
-	_goal.modulate = Color(0.9, 0.9, 0.95)
-	box.add_child(_goal)
+	_goal.modulate = Color(0.92, 0.92, 0.96)
+	_pin(t, _goal, 0.5, 1.0, Vector2(520.0, 70.0), Vector2(0.5, 1.0), Vector2(0.0, -104.0))
+	_more_button = _chip("MORE", 24)
+	_more_button.pressed.connect(_show_more)
+	_pin(t, _more_button, 0.5, 1.0, Vector2(130.0, 48.0), Vector2(0.5, 1.0), Vector2(0.0, -34.0))
+
+	# The drawer behind MORE.
+	_more_card = _card(root)
+	_more_card.visible = false
+	var box: VBoxContainer = _more_card.get_meta("box")
+	_records_button = _button("RECORDS", 34)
+	_records_button.pressed.connect(func() -> void: records_opened.emit())
+	box.add_child(_records_button)
+	_quests_button = _button("QUESTS", 34)
+	_quests_button.pressed.connect(func() -> void: quests_opened.emit())
+	box.add_child(_quests_button)
+	_road_button = _button("TROPHY ROAD", 34)
+	_road_button.pressed.connect(func() -> void: road_opened.emit())
+	_road_button.visible = false
+	box.add_child(_road_button)
+	var more_help := _button("HOW TO PLAY", 34)
+	more_help.pressed.connect(func() -> void: help_opened.emit())
+	box.add_child(more_help)
+	var back := _button("BACK", 34)
+	back.pressed.connect(func() -> void: shop_closed.emit())
+	box.add_child(back)
+
+
+## The rally offer: a small card over the frozen road with a countdown.
+func _build_revive(root: Control) -> void:
+	_revive_card = _card(root)
+	_revive_card.visible = false
+	var box: VBoxContainer = _revive_card.get_meta("box")
+	_revive_title = _label(52, HORIZONTAL_ALIGNMENT_CENTER)
+	_revive_title.text = "RALLY?"
+	box.add_child(_revive_title)
+	_revive_lines = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
+	_revive_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_revive_lines.custom_minimum_size.x = 520.0
+	box.add_child(_revive_lines)
+	_revive_timer = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	_revive_timer.add_theme_color_override("font_color", COIN)
+	box.add_child(_revive_timer)
+	var yes := _button("RALLY", 40)
+	yes.pressed.connect(func() -> void: revive_accepted.emit())
+	box.add_child(yes)
+	var no := _button("LET THEM GO", 28)
+	no.pressed.connect(func() -> void: revive_declined.emit())
+	box.add_child(no)
+
+
+func show_revive(price: int, stars: int, soldiers: int, seconds: float) -> void:
+	_revive_card.visible = true
+	_revive_lines.text = "%d soldiers back, a shield, the clingers shaken off.\n%d %s. You have %d." % [soldiers, price, "star" if price == 1 else "stars", stars]
+	if _revive_tween != null:
+		_revive_tween.kill()
+	_revive_timer.text = "%d" % int(ceil(seconds))
+	_revive_tween = create_tween()
+	_revive_tween.tween_method(func(v: float) -> void: _revive_timer.text = "%d" % int(ceil(v)), seconds, 0.0, seconds)
+	_revive_tween.tween_callback(func() -> void: revive_declined.emit())
+
+
+func hide_revive() -> void:
+	if _revive_tween != null:
+		_revive_tween.kill()
+		_revive_tween = null
+	_revive_card.visible = false
+
+
+## The trophy road: where you stand, the next milestone, the track.
+func show_road(trophies: int, rows: Array, unlocks: Dictionary) -> void:
+	_hide_cards()
+	_road_card.visible = true
+	for child in _road_box.get_children():
+		_road_box.remove_child(child)
+		child.queue_free()
+	var head := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	head.text = "%d TROPHIES   ·   checkpoint %d" % [trophies, Road.checkpoint(trophies)]
+	head.add_theme_color_override("font_color", COIN)
+	_road_box.add_child(head)
+	var blurb := _label(21, HORIZONTAL_ALIGNMENT_LEFT)
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
+	blurb.custom_minimum_size.x = 620.0
+	blurb.text = "Every run adds trophies: %d per level reached, more for good grades, double on hard, triple on nightmare. Nothing ever takes them away. A milestone every %d pays; a checkpoint every %d marks where you stand for good.\n" % [Road.PER_LEVEL, Road.MILESTONE, Road.CHECKPOINT]
+	blurb.modulate = Color(0.8, 0.8, 0.86)
+	_road_box.add_child(blurb)
+	var head2 := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
+	head2.text = "WHAT OPENS WHERE"
+	head2.add_theme_color_override("font_color", COIN)
+	_road_box.add_child(head2)
+	for feature in Road.UNLOCKS:
+		var l := _label(22, HORIZONTAL_ALIGNMENT_LEFT)
+		var open := bool(unlocks.get(feature, false))
+		l.text = "%s %s at %d" % ["✓" if open else "·", Road.reward_text({"kind": "unlock", "id": feature}), int(Road.UNLOCKS[feature])]
+		l.modulate = Color(0.6, 0.6, 0.66) if open else Color(0.9, 0.9, 0.95)
+		_road_box.add_child(l)
+	var head3 := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
+	head3.text = "\nTHE ROAD AHEAD"
+	head3.add_theme_color_override("font_color", COIN)
+	_road_box.add_child(head3)
+	for r in rows:
+		var l := _label(22, HORIZONTAL_ALIGNMENT_LEFT)
+		var mark := "✓" if r.done else ("■" if r.checkpoint else "·")
+		l.text = "%s %d   ·   %s%s" % [mark, int(r.at), r.text, "   (checkpoint)" if r.checkpoint else ""]
+		l.modulate = Color(0.6, 0.6, 0.66) if r.done else (Color(1.0, 0.95, 0.7) if int(r.at) == Road.next_milestone(trophies) else Color(0.9, 0.9, 0.95))
+		_road_box.add_child(l)
+
+
+func _show_more() -> void:
+	_hide_cards()
+	_more_card.visible = true
 
 
 func _build_settings(root: Control) -> void:
@@ -828,6 +1010,9 @@ func _hide_cards() -> void:
 	_records_card.visible = false
 	_help_card.visible = false
 	_quests_card.visible = false
+	_more_card.visible = false
+	_road_card.visible = false
+	hide_revive()
 
 
 ## [param t] keys: best, best_level, best_endless, coins, endless_unlocked,
@@ -847,14 +1032,22 @@ func show_title(t: Dictionary) -> void:
 	var buttons: Dictionary = t.get("buttons", {})
 	_hide_cards()
 	_shop_button.visible = bool(buttons.get("shop", true))
+	_plus_button.visible = _shop_button.visible
 	_daily_button.visible = bool(buttons.get("daily", true))
+	_weekly_button.visible = bool(buttons.get("weekly", _daily_button.visible))
 	_records_button.visible = bool(buttons.get("records", true))
 	_mode_button.visible = bool(buttons.get("mode", true))
 	_endless_button.visible = bool(buttons.get("endless", true))
 	_quests_button.visible = bool(buttons.get("quests", true))
+	_road_button.visible = bool(buttons.get("road", false))
+	_more_button.visible = _records_button.visible or _quests_button.visible or _road_button.visible
 	if not bool(buttons.get("hints", true)):
 		mode_hint = ""
 	_goal.text = str(t.get("goal", ""))
+	var trophies: int = t.get("trophies", 0)
+	_road_line.visible = bool(buttons.get("road", false))
+	var nxt := Road.next_milestone(trophies)
+	_road_line.text = "%d trophies   ·   next at %d: %s" % [trophies, nxt, Road.reward_text(Road.reward(nxt / Road.MILESTONE))]
 	_title_card.visible = true
 	_pause_button.visible = false
 	_boss_box.visible = false
@@ -869,9 +1062,9 @@ func show_title(t: Dictionary) -> void:
 		lines.append(mode_hint)
 	_records.text = "\n".join(lines)
 	_records.visible = not lines.is_empty()
-	_mode_button.text = "MODE: %s" % Modifiers.title(modifier)
+	_mode_button.text = Modifiers.title(modifier)
+	_mode_button.add_theme_color_override("font_color", {"normal": Color(0.97, 0.97, 1.0), "hard": Color(1.0, 0.75, 0.3), "nightmare": Color(1.0, 0.4, 0.4)}.get(modifier, Color.WHITE))
 	_endless_button.disabled = not endless_unlocked
-	_endless_button.text = "ENDLESS" if endless_unlocked else "ENDLESS  (clear level %d)" % Meta.ENDLESS_UNLOCK_LEVEL
 	_squad_button.visible = shotgun_unlocked
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
 	_coins_title.text = str(coins)
@@ -1118,8 +1311,14 @@ func show_game_over(r: Dictionary) -> void:
 	var unlocked: Array = r.get("achievements", [])
 	var quests: Array = r.get("quests_done", [])
 	var rewards: Array = r.get("season_rewards", [])
-	var extras := unlocked.size() + quests.size() + rewards.size()
+	var road: Array = r.get("road_rewards", [])
+	var trophies_earned := int(r.get("trophies_earned", 0))
+	if trophies_earned > 0:
+		coins_line += "\n+%d trophies on the road" % trophies_earned
+	var extras := unlocked.size() + quests.size() + rewards.size() + road.size()
 	if extras <= 4:
+		for rw in road:
+			coins_line += "\nROAD %d: %s" % [int(rw.at), Road.reward_text(rw)]
 		for id in unlocked:
 			var a := Achievements.find(str(id))
 			if not a.is_empty():
@@ -1139,7 +1338,9 @@ func show_game_over(r: Dictionary) -> void:
 			bits.append("%d %s done" % [quests.size(), "quest" if quests.size() == 1 else "quests"])
 		if rewards.size() > 0:
 			bits.append("%d season %s" % [rewards.size(), "tier" if rewards.size() == 1 else "tiers"])
-		coins_line += "\n" + ", ".join(bits) + ": see RECORDS and QUESTS"
+		if road.size() > 0:
+			bits.append("%d road %s" % [road.size(), "milestone" if road.size() == 1 else "milestones"])
+		coins_line += "\n" + ", ".join(bits) + ": see RECORDS, QUESTS and the ROAD"
 	var goal := str(r.get("goal", ""))
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal

@@ -5,7 +5,8 @@ extends RefCounted
 ##
 ## Context keys: runs, best_level, hard_best_level, coins, cheapest (name),
 ## cheapest_cost, vehicles, modifier, character_mode, affordable_item,
-## daily_played, best_score.
+## daily_played, best_score, trophies, hard_open, trophies_to_next,
+## quests_left.
 
 
 static func next(c: Dictionary) -> String:
@@ -13,7 +14,11 @@ static func next(c: Dictionary) -> String:
 	var best_level := int(c.get("best_level", 0))
 	if runs == 0:
 		return "Play a run. Every level starts with one soldier."
-	if best_level < Modifiers.HARD_UNLOCK_LEVEL:
+	var trophies := int(c.get("trophies", 0))
+	if c.has("trophies") and not bool(c.get("hard_open", false)):
+		var target: int = Road.UNLOCKS["endless"] if trophies < int(Road.UNLOCKS["endless"]) else Road.UNLOCKS["hard"]
+		return "%d trophies open %s on the ROAD (you have %d)." % [target, "ENDLESS" if target == int(Road.UNLOCKS["endless"]) else "HARD", trophies]
+	if not c.has("trophies") and best_level < Modifiers.HARD_UNLOCK_LEVEL:
 		return "Reach level %d to open ENDLESS and HARD (best so far: %d)." % [Modifiers.HARD_UNLOCK_LEVEL, maxi(best_level, 1)]
 	var coins := int(c.get("coins", 0))
 	var cheapest := str(c.get("cheapest", ""))
@@ -26,6 +31,9 @@ static func next(c: Dictionary) -> String:
 		return "Something new is waiting in the LOCKER."
 	if str(c.get("modifier", "normal")) == "normal" and int(c.get("hard_best_level", 0)) < Modifiers.NIGHTMARE_UNLOCK_LEVEL:
 		return "Try HARD mode: 1.5x score and coins, and it opens NIGHTMARE."
+	var to_next := int(c.get("trophies_to_next", 0))
+	if to_next > 0 and to_next <= 40:
+		return "%d trophies to the next milestone on the ROAD." % to_next
 	if int(c.get("quests_left", 0)) > 0:
 		return "%d of today's QUESTS still open." % int(c.get("quests_left", 0))
 	if not bool(c.get("daily_played", false)):
@@ -47,4 +55,6 @@ static func title_buttons(runs: int, hard_unlocked: bool, character_mode: bool) 
 		"endless": runs >= 1,
 		"hints": runs >= 1,
 		"quests": runs >= 1,
+		"weekly": runs >= 2,
+		"road": runs >= 1,
 	}

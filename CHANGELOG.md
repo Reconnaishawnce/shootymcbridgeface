@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.28 (home, road, rally)
+
+- The home screen. No box. Title and a big PLAY in the middle, the modes
+  in a row under it, coins and stars top-left with a "+" into the shop,
+  SHOP and LOCKER top-right, MODE and squad bottom-left, "?" and SETTINGS
+  bottom-right, the trophy line and the next thing to do bottom-centre.
+  RECORDS, QUESTS and the ROAD live in a MORE drawer. New players still
+  see PLAY and little else.
+- The trophy road. Every run adds trophies and nothing takes them away:
+  10 per level reached, a grade bonus (S 15, A 10, B 5, C 2), double on
+  hard, triple on nightmare, half rate in endless. A milestone every 100
+  pays coins, stars or a locker item; a checkpoint every 500. ENDLESS
+  opens at 300, HARD at 600, the WEEKLY at 900, NIGHTMARE at 1500.
+  Anything an older save already had by the old level rules stays open.
+  A ROAD page shows what opens where and the track ahead; the title
+  shows your count and the next milestone; the wipe screen shows what
+  the run added.
+- The rally. When the squad hits zero, once a run, a five-second offer:
+  8 soldiers back, a shield, the clingers shaken off, for 3 stars, then
+  5, then 8 within a day. Second wind from the shop is free and fires
+  first. Never in the daily or the weekly.
+
 ## 0.27 (feedback pass: the road watches you)
 
 - The rubber band. Every level expects a squad of a certain size. Run

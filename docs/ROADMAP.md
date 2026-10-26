@@ -210,9 +210,16 @@ word on a sign, everything can be seen and counted.
    screen and title that name the next goal, menus that unlock
    gradually, hit-stop on the big moments.
 5. Come back tomorrow (done): daily quests feeding a free season track.
-   (A trophy road with checkpoints stays on the list for later.)
+   (The trophy road arrived in 0.28.)
 6. Feedback pass (done): the rubber band, compounding caps. Phone
    feedback still welcome.
+
+## Home, road, rally (done)
+
+The home screen without a box; the trophy road (trophies per run,
+milestones every 100, fixed unlock points, checkpoints, a ROAD page);
+the rally on the wipe screen (a five-second paid comeback, once a run,
+never on a shared road). Portrait stays.
 
 ## The graphics arc: from stick figures to a stylized, polished look
 

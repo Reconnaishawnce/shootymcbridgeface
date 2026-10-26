@@ -171,6 +171,23 @@ static func save_stats(d: Dictionary) -> void:
 	_write(STATS, "lifetime", d)
 
 
+static func load_revives() -> Dictionary:
+	var v = _read(STATS, "revives", {})
+	return v if v is Dictionary else {}
+
+
+static func save_revives(d: Dictionary) -> void:
+	_write(STATS, "revives", d)
+
+
+static func load_trophies() -> int:
+	return int(_read(STATS, "trophies", 0))
+
+
+static func save_trophies(n: int) -> void:
+	_write(STATS, "trophies", maxi(0, n))
+
+
 static func load_quests() -> Dictionary:
 	var v = _read(STATS, "quests", {})
 	return v if v is Dictionary else {}

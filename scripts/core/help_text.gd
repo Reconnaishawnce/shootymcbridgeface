@@ -86,14 +86,21 @@ static func sections() -> Array:
 			"Turn CHARACTERS on in Settings and the LOCKER opens: %d heroes, outfits, %d hats, weapon skins, backs and crew styles, all bought with stars. " % [heroes, hats] +
 			"Your hero leads the squad with a name tag, and always escapes."},
 		{"title": "MODES", "body":
-			"NORMAL is the road as it comes. HARD opens once you reach level %d: bigger waves, meaner bosses, 1.5x score and coins. " % Modifiers.HARD_UNLOCK_LEVEL +
-			"NIGHTMARE opens once you reach level %d on hard: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % Modifiers.NIGHTMARE_UNLOCK_LEVEL +
-			"ENDLESS opens once you clear level %d: no bosses, no reset, the road just keeps getting harder.\n" % Meta.ENDLESS_UNLOCK_LEVEL +
+			"NORMAL is the road as it comes. HARD opens at %d trophies: bigger waves, meaner bosses, 1.5x score and coins. " % int(Road.UNLOCKS["hard"]) +
+			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +
+			"ENDLESS opens at %d trophies: no bosses, no reset, the road just keeps getting harder.\n" % int(Road.UNLOCKS["endless"]) +
 			"DAILY: the same road for everyone today, no upgrades, rifles only. Best of the day counts and you can copy your result to share.\n" +
 			"WEEKLY: the same road for everyone all week, on hard, no upgrades."},
 		{"title": "SQUADS", "body":
 			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. " +
 			"Only the front %d soldiers' worth of guns count toward firepower; past that, a bigger squad is extra health, not extra damage." % Progression.DPS_CAP_SOLDIERS},
+		{"title": "THE TROPHY ROAD", "body":
+			"Every run adds trophies and nothing takes them away: %d for every level you reach, more for good grades, double on hard, triple on nightmare. " % Road.PER_LEVEL +
+			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"])] +
+			"Every %d is a checkpoint: where you stand for good." % Road.CHECKPOINT},
+		{"title": "RALLY", "body":
+			"When the squad hits zero, once a run, a RALLY offer appears for five seconds: %d soldiers back, a shield, the clingers shaken off, for a few stars (%d the first time in a day, then %d, then %d). " % [Revive.SOLDIERS, Revive.PRICES[0], Revive.PRICES[1], Revive.PRICES[2]] +
+			"Take it or let them go. Not in the daily or the weekly, where everyone shares one road. SECOND WIND from the shop is the free version and fires first."},
 		{"title": "QUESTS AND THE SEASON", "body":
 			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
 			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +

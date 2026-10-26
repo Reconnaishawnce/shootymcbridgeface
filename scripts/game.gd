@@ -65,6 +65,10 @@ var week_number := 0
 var stats: Dictionary = Stats.blank()
 var quest_state: Dictionary = {}
 var season_state: Dictionary = {}
+var trophies := 0
+var revives: Dictionary = {}
+var _revive_used := false
+var _revive_open := false
 var achievements_done: Array = []
 var _bets_won := 0
 var _bets_lost := 0
@@ -136,7 +140,9 @@ func _ready() -> void:
 		elif a.begins_with("--shots="):
 			_shots_dir = a.get_slice("=", 1)
 	modifier = SaveData.load_modifier()
-	if not Modifiers.unlocked(modifier, SaveData.load_best_level("normal"), SaveData.load_best_level("hard")):
+	trophies = SaveData.load_trophies()
+	revives = SaveData.load_revives()
+	if modifier != "normal" and not _feature_open(modifier):
 		modifier = "normal"
 	_load_bests()
 	if smoke:
@@ -343,6 +349,9 @@ func _build_scene() -> void:
 	hud.settings_opened.connect(open_settings)
 	hud.records_opened.connect(open_records)
 	hud.quests_opened.connect(open_quests)
+	hud.road_opened.connect(open_road)
+	hud.revive_accepted.connect(_on_revive_accepted)
+	hud.revive_declined.connect(_on_revive_declined)
 	hud.help_opened.connect(open_help)
 	hud.help_closed.connect(close_help)
 	hud.settings_closed.connect(show_title)
@@ -366,19 +375,18 @@ func show_title() -> void:
 	if squad.squad_type != squad_type:
 		squad.squad_type = squad_type
 		_apply_looks()
-	var normal_level := SaveData.load_best_level("normal")
-	var hard_level := SaveData.load_best_level("hard")
 	var hint := ""
-	if modifier == "normal" and not Modifiers.unlocked("hard", normal_level, hard_level):
-		hint = "Hard mode: %s" % Modifiers.unlock_text("hard")
-	elif modifier == "hard" and not Modifiers.unlocked("nightmare", normal_level, hard_level):
-		hint = "Nightmare: %s" % Modifiers.unlock_text("nightmare")
+	if modifier == "normal" and not _feature_open("hard"):
+		hint = "Hard mode opens at %d trophies" % int(Road.UNLOCKS["hard"])
+	elif modifier == "hard" and not _feature_open("nightmare"):
+		hint = "Nightmare opens at %d trophies" % int(Road.UNLOCKS["nightmare"])
 	var runs := int(stats.get("runs", 0))
 	hud.show_title({
 		"goal": Goals.next(_goal_context()),
-		"buttons": Goals.title_buttons(runs, Modifiers.unlocked("hard", normal_level, hard_level), character_mode),
+		"buttons": _title_buttons(runs),
+		"trophies": trophies,
 		"best": best, "best_level": best_level, "best_endless": best_endless, "coins": coins,
-		"endless_unlocked": Meta.endless_unlocked(normal_level), "squad_type": squad_type,
+		"endless_unlocked": _feature_open("endless"), "squad_type": squad_type,
 		"shotgun_unlocked": meta.shotgun_unlocked() or meta.squad_unlocked("medic"),
 		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"modifier": modifier, "mode_hint": hint,
@@ -413,8 +421,42 @@ func _goal_context() -> Dictionary:
 		"affordable_item": wardrobe.can_afford_something(),
 		"daily_played": daily_results.has(Daily.day_number(int(Time.get_unix_time_from_system()))),
 		"quests_left": _quests_left(),
+		"trophies": trophies,
+		"trophies_to_next": Road.next_milestone(trophies) - trophies,
+		"hard_open": _feature_open("hard"),
 		"best_score": best,
 	}
+
+
+## A feature is open once the road reaches it, or by the older level rule,
+## so nobody who already had it loses it.
+func _feature_open(feature: String) -> bool:
+	if Road.is_unlocked(feature, trophies):
+		return true
+	var normal_level := SaveData.load_best_level("normal")
+	var hard_level := SaveData.load_best_level("hard")
+	match feature:
+		"endless":
+			return Meta.endless_unlocked(normal_level)
+		"hard", "nightmare":
+			return Modifiers.unlocked(feature, normal_level, hard_level)
+		"weekly":
+			return int(stats.get("weeklies", 0)) > 0
+	return true
+
+
+func _title_buttons(runs: int) -> Dictionary:
+	var b := Goals.title_buttons(runs, _feature_open("hard"), character_mode)
+	b.weekly = bool(b.get("weekly", false)) and _feature_open("weekly")
+	return b
+
+
+func open_road() -> void:
+	sfx.play("click")
+	var unlocks := {}
+	for feature in Road.UNLOCKS:
+		unlocks[feature] = _feature_open(feature)
+	hud.show_road(trophies, Road.rows(trophies), unlocks)
 
 
 func _load_bests() -> void:
@@ -424,7 +466,12 @@ func _load_bests() -> void:
 
 
 func cycle_mode() -> void:
-	modifier = Modifiers.next(modifier, SaveData.load_best_level("normal"), SaveData.load_best_level("hard"))
+	var i := Modifiers.ORDER.find(modifier)
+	for k in range(1, Modifiers.ORDER.size() + 1):
+		var cand: String = Modifiers.ORDER[(i + k) % Modifiers.ORDER.size()]
+		if cand == "normal" or _feature_open(cand):
+			modifier = cand
+			break
 	SaveData.save_modifier(modifier)
 	_load_bests()
 	sfx.play("click")
@@ -641,6 +688,8 @@ func start_run(p_mode: String = "levels") -> void:
 		powerups.grant("bomb", 0.0)
 	hud.set_bombs(powerups.bombs)
 	_second_wind_used = false
+	_revive_used = false
+	_revive_open = false
 	_second_wind_pending = false
 	_vehicles_formed = 0
 	waves_cleared = 0
@@ -784,7 +833,31 @@ func end_run() -> void:
 						else:
 							wardrobe.owned[str(rw.id)] = true
 							SaveData.save_wardrobe(wardrobe.to_dict())
-	# Stars from the season count in the lifetime numbers too.
+	# The road: trophies for the run, milestones passed, rewards applied.
+	var trophies_earned := Road.trophies_for_run(world.level, grades, world.modifier, world.endless)
+	var road_rewards: Array = []
+	if trophies_earned > 0:
+		var ra := Road.advance(trophies, trophies_earned)
+		road_rewards = ra.rewards
+		if smoke:
+			print("SMOKE_ROAD ", JSON.stringify({"earned": trophies_earned, "milestones": road_rewards.size(), "frame": _frames}))
+		else:
+			trophies = int(ra.trophies)
+			SaveData.save_trophies(trophies)
+			for rw in road_rewards:
+				match str(rw.kind):
+					"coins":
+						coins = SaveData.add_coins(int(rw.amount))
+					"stars":
+						stars_earned += int(rw.amount)
+					"item":
+						if wardrobe.is_owned(str(rw.id)):
+							rw.owned = true
+							stars_earned += maxi(1, Wardrobe.cost(str(rw.id)))
+						else:
+							wardrobe.owned[str(rw.id)] = true
+							SaveData.save_wardrobe(wardrobe.to_dict())
+	# Stars from the season and the road count in the lifetime numbers too.
 	run_stats.stars_earned = stars_earned
 	if not smoke:
 		quest_state = qa.state
@@ -809,6 +882,7 @@ func end_run() -> void:
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
 		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
+		"trophies_earned": trophies_earned, "road_rewards": road_rewards,
 	})
 	if character_mode:
 		squad.cheer()
@@ -1396,14 +1470,68 @@ func _on_count_changed(new_count: int) -> void:
 func _on_wiped_out() -> void:
 	# Second wind: the shop's one comeback. Deferred either way, since the
 	# wipe can fire from inside the world's update loop.
-	if _second_wind_pending:
+	if _second_wind_pending or _revive_open:
 		return
 	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
 		_second_wind_used = true
 		_second_wind_pending = true
 		call_deferred("_second_wind")
 		return
+	# The rally: once a run, stars buy a squad back. Not for the bot, not
+	# in the daily or weekly.
+	var price := Revive.price(Revive.uses_today(revives, _today()))
+	if state == State.RUNNING and not smoke and not _revive_used and Revive.allowed(mode) and wardrobe.stars >= price:
+		_revive_open = true
+		call_deferred("_offer_revive", price)
+		return
 	call_deferred("end_run")
+
+
+func _today() -> int:
+	return Daily.day_number(int(Time.get_unix_time_from_system()))
+
+
+func _offer_revive(price: int) -> void:
+	if state != State.RUNNING:
+		_revive_open = false
+		return
+	# The last bite may have slowed time; the countdown runs at full speed.
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
+	get_tree().paused = true
+	hud.show_revive(price, wardrobe.stars, Revive.SOLDIERS, Revive.OFFER_SECONDS)
+	sfx.play("boss_roar", -10.0, 1.6)
+
+
+func _on_revive_accepted() -> void:
+	if not _revive_open:
+		return
+	_revive_open = false
+	_revive_used = true
+	var price := Revive.price(Revive.uses_today(revives, _today()))
+	wardrobe.stars = maxi(0, wardrobe.stars - price)
+	revives = Revive.note_use(revives, _today())
+	SaveData.save_wardrobe(wardrobe.to_dict())
+	SaveData.save_revives(revives)
+	hud.hide_revive()
+	get_tree().paused = false
+	squad.set_count(Revive.SOLDIERS)
+	powerups.grant("shield", _run_time)
+	world.shake_off()
+	hud.show_banner("RALLY!\n%d SOLDIERS BACK" % Revive.SOLDIERS, 1.6)
+	hud.flash(0.6)
+	sfx.play("rally")
+	squad.rally()
+	_punch(6.0)
+
+
+func _on_revive_declined() -> void:
+	if not _revive_open:
+		return
+	_revive_open = false
+	hud.hide_revive()
+	get_tree().paused = false
+	end_run()
 
 
 func _second_wind() -> void:
@@ -1560,6 +1688,10 @@ func _shots_walkthrough() -> void:
 	season_state = {"season": Season.number(Daily.day_number(int(Time.get_unix_time_from_system()))), "points": 460, "claimed": 4}
 	open_quests()
 	await _capture("2j_quests.png", 5)
+	trophies = 640
+	open_road()
+	await _capture("2k_road.png", 5)
+	trophies = 0
 	open_help()
 	await _capture("2i_help.png", 5)
 	close_help()
@@ -1622,6 +1754,9 @@ func _shots_walkthrough() -> void:
 	world.horde_z = 3.0
 	world._place_horde()
 	await _capture("5g_horde.png", 2)
+	hud.show_revive(3, 12, Revive.SOLDIERS, Revive.OFFER_SECONDS)
+	await _capture("5h_rally.png", 2)
+	hud.hide_revive()
 	world.horde_z = World.HORDE_REST_Z
 	world._place_horde()
 	for i in range(600):

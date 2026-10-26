@@ -54,8 +54,8 @@ the same key (see below).
 - **The road watches you.** Run bigger than a level expects and the
   zombies come thicker and bite harder, up to half again; run smaller
   and they ease off. A nudge, not a wall.
-- **Modes.** MODE on the title cycles NORMAL, HARD (reach level 3) and
-  NIGHTMARE (reach level 4 on hard). Harder modes throw more at you and
+- **Modes.** MODE on the title cycles NORMAL, HARD (600 trophies) and
+  NIGHTMARE (1500 trophies). Harder modes throw more at you and
   pay more score, coins and stars. Each keeps its own bests.
 - **Grades.** Every level you clear gets a letter, S to D, for perfect
   gates, soldiers kept and boss speed. Better letters pay more.
@@ -132,8 +132,14 @@ the same key (see below).
 - **Runners** are fast, thin and they find you. Walkers barely steer, so
   lining up the crowd is on you. When a bite leaves you with a handful,
   time slows for a beat.
-- **Endless**: unlocked by clearing level 3. No bosses, no reset, gates
+- **Endless**: opens at 300 trophies. No bosses, no reset, gates
   forever, separate best score.
+- **The trophy road**: every run adds trophies (10 per level, more for
+  good grades, double on hard, triple on nightmare) and nothing takes
+  them away. A milestone every 100 pays; the modes open at fixed points
+  on the ROAD page.
+- **Rally**: squad at zero? Once a run, five seconds to buy 8 soldiers
+  back for a few stars. Not in the daily or weekly.
 - **Weekly**: on the daily card. One road for everyone all week, on hard,
   no upgrades. Best of the week counts and pays two extra stars.
 - **Daily**: the same gates for everyone on a given UTC day, no upgrades,

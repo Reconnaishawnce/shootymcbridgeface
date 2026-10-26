@@ -180,7 +180,7 @@ other way, and your aim as a resource you have to spend wisely.
 - The daily uses one seed per UTC day, a blank upgrade set and rifles.
   Results for the last seven days are kept locally; the best of the day
   is the one that counts. The result line copies to the clipboard.
-- Endless mode (unlocked by reaching level 4) has no bosses and no reset.
+- Endless mode (300 trophies on the road) has no bosses and no reset.
   Levels tick every eight gates for difficulty and the HUD; the run 1
   regulators (multipliers vanish past 150 soldiers, halving gates, brute
   health scaling) keep it from exploding.
@@ -190,9 +190,10 @@ other way, and your aim as a resource you have to spend wisely.
 `Modifiers` scales the threat (waves, health, boss, bites, an extra
 strike) and the pay (score, coins, stars). The threat ramps in over the
 first three levels (`Modifiers.ramp`) so a one-soldier opener on
-nightmare is survivable. Hard opens at normal level 3, nightmare at hard
-level 4; each mode keeps its own bests under suffixed save keys. The
-daily is always normal.
+nightmare is survivable. Hard opens at 600 trophies, nightmare at 1500
+(older saves keep anything the old level rules had already opened); each
+mode keeps its own bests under suffixed save keys. The daily is always
+normal.
 
 `Grades` turns a cleared level into a letter: 35% perfect gates, 40% of
 the level's peak squad kept, 25% boss speed (six seconds is full marks,
@@ -243,15 +244,38 @@ the rewards newly reached: coins, stars every third tier, a locker item
 every fifth from a pool that rotates with the season number. The game
 applies rewards at the end of a run and shows them on the wipe screen.
 
+## The trophy road and the rally
+
+`Road` is pure and small. `trophies_for_run` pays 10 per level reached
+plus a grade bonus per cleared level (S 15, A 10, B 5, C 2), times the
+mode (hard 2, nightmare 3); endless pays half the level rate and no
+grades. Trophies only go up. `Road.advance` walks the milestones crossed
+(every 100) and returns their rewards: a fixed unlock at 300 / 600 /
+900 / 1500 (endless, hard, weekly, nightmare), otherwise a locker item
+from a pool, stars, or coins in a repeating pattern, with a checkpoint
+every 500. `Game._feature_open` asks the road first and the old level
+rule second, so an existing save loses nothing. The title shows the
+count and the next milestone, the wipe screen the run's trophies and any
+milestones crossed, and `Hud.show_road` lists what opens where and the
+next dozen milestones.
+
+`Revive` is the paid comeback: when the squad hits zero and second wind
+has fired or was never bought, the tree pauses and a five-second card
+offers `SOLDIERS` back for `price(uses_today)` stars (3, 5, 8 within a
+UTC day, saved as {day, count}). Once a run, never for the bot, never in
+the daily or weekly. Accepting mirrors second wind: soldiers, a shield,
+`World.shake_off`. Declining, or the timer, ends the run.
+
 ## One look, one next thing
 
 `Hud.make_theme` is the whole UI kit: one button style (dark glass,
 rounded, accent when pressed), one panel style behind every card, one
 scrollbar. `Hud.Icon` draws the coin and the star so no font glyph is
 relied on. `Goals.next` is the single line on the title and the wipe
-screen that says what to do next, in a fixed priority order (play, reach
-the unlock level, an affordable upgrade, form a jeep, try hard, the
-daily, save up, beat your best), and `Goals.title_buttons` decides which
+screen that says what to do next, in a fixed priority order (play, the
+trophies that open endless or hard, an affordable upgrade, form a jeep,
+try hard, a near milestone, open quests, the daily, save up, beat your
+best), and `Goals.title_buttons` decides which
 buttons a player has earned, so the first screen is PLAY and little
 else. `Game._hitstop` freezes a frame on a boss kill and a vehicle
 forming; the auto-player skips it.

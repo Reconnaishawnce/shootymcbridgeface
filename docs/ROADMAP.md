@@ -209,8 +209,8 @@ word on a sign, everything can be seen and counted.
 4. One game, one look (done): a single UI kit, drawn icons, a results
    screen and title that name the next goal, menus that unlock
    gradually, hit-stop on the big moments.
-5. Come back tomorrow: daily quests feeding a free season track, a
-   trophy road with checkpoints.
+5. Come back tomorrow (done): daily quests feeding a free season track.
+   (A trophy road with checkpoints stays on the list for later.)
 6. Feedback pass from the phone.
 
 ## Always

@@ -45,6 +45,9 @@ the same key (see below).
   TANK -60, HELICOPTER -120, MECH -250. Soldiers climb aboard and the
   vehicle rides with you from level to level with its own gun and health
   bar, earning ranks from its kills, until something heavy wrecks it.
+- **Quests and the season.** Three quests a day, the same for everyone,
+  pay points up a free thirty-tier season track with coins, stars and
+  locker items. Nothing to buy.
 - **How to play.** The HOW TO PLAY button on the title (and in pause)
   explains everything below in plain words, with the real numbers.
 - **Records.** Lifetime stats and achievements that pay stars once each.

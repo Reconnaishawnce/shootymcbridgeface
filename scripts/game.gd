@@ -61,6 +61,8 @@ var daily_results: Dictionary = {}
 var week_number := 0
 ## Lifetime numbers and the achievements already paid.
 var stats: Dictionary = Stats.blank()
+var quest_state: Dictionary = {}
+var season_state: Dictionary = {}
 var achievements_done: Array = []
 var _bets_won := 0
 var _bets_lost := 0
@@ -151,6 +153,8 @@ func _ready() -> void:
 	wardrobe.from_dict(SaveData.load_wardrobe())
 	stats = SaveData.load_stats()
 	achievements_done = SaveData.load_achievements()
+	quest_state = SaveData.load_quests()
+	season_state = SaveData.load_season()
 	# The auto-player dresses up so the character code runs in CI too.
 	character_mode = SaveData.load_character_mode() or smoke
 	# Headless CI has no audio device; the dummy driver releases playbacks
@@ -275,6 +279,7 @@ func _build_scene() -> void:
 	hud.bomb_pressed.connect(throw_bomb)
 	hud.settings_opened.connect(open_settings)
 	hud.records_opened.connect(open_records)
+	hud.quests_opened.connect(open_quests)
 	hud.help_opened.connect(open_help)
 	hud.help_closed.connect(close_help)
 	hud.settings_closed.connect(show_title)
@@ -313,6 +318,15 @@ func show_title() -> void:
 	})
 
 
+func _quests_left() -> int:
+	var day := Daily.day_number(int(Time.get_unix_time_from_system()))
+	var n := 0
+	for q in Quests.rows(quest_state, day):
+		if not q.done:
+			n += 1
+	return n
+
+
 ## What Goals needs to name the next thing to do.
 func _goal_context() -> Dictionary:
 	var cheapest := ""
@@ -331,6 +345,7 @@ func _goal_context() -> Dictionary:
 		"modifier": modifier, "character_mode": character_mode,
 		"affordable_item": wardrobe.can_afford_something(),
 		"daily_played": daily_results.has(Daily.day_number(int(Time.get_unix_time_from_system()))),
+		"quests_left": _quests_left(),
 		"best_score": best,
 	}
 
@@ -349,6 +364,12 @@ func cycle_mode() -> void:
 	show_title()
 	if modifier != "normal":
 		hud.toast(Modifiers.blurb(modifier))
+
+
+func open_quests() -> void:
+	sfx.play("click")
+	var day := Daily.day_number(int(Time.get_unix_time_from_system()))
+	hud.show_quests(day, Quests.rows(quest_state, day), Season.number(day), season_state if int(season_state.get("season", -1)) == Season.number(day) else Season.blank(Season.number(day)))
 
 
 func open_records() -> void:
@@ -663,10 +684,36 @@ func end_run() -> void:
 		"nightmare_bosses": bosses_killed if world.modifier == "nightmare" else 0,
 		"s_grades": s_count, "stars_earned": stars_earned, "coins_earned": earned,
 		"best_level": 0 if world.endless else world.level, "endless_level": world.level if world.endless else 0,
-		"escapes": 1 if character_mode else 0, "vehicles": _vehicles_formed,
+		"escapes": 1 if character_mode else 0, "vehicles": _vehicles_formed, "waves": waves_cleared,
 	}
 	var new_achievements: Array = []
+	var quests_done: Array = []
+	var season_rewards: Array = []
+	# Quests and the season run for the auto-player too (so the code is
+	# exercised); only a real player's progress is kept.
+	var day := Daily.day_number(int(Time.get_unix_time_from_system()))
+	var qa := Quests.advance(quest_state, day, run_stats)
+	quests_done = qa.completed
+	if not quests_done.is_empty():
+		var sa := Season.advance(season_state, Season.number(day), Quests.points_for(quests_done))
+		season_rewards = sa.rewards
+		if smoke:
+			print("SMOKE_QUESTS ", JSON.stringify({"done": quests_done.size(), "rewards": season_rewards.size(), "frame": _frames}))
+		else:
+			season_state = sa.state
+			SaveData.save_season(season_state)
+			for rw in season_rewards:
+				match str(rw.kind):
+					"coins":
+						coins = SaveData.add_coins(int(rw.amount))
+					"stars":
+						stars_earned += int(rw.amount)
+					"item":
+						wardrobe.owned[str(rw.id)] = true
+						SaveData.save_wardrobe(wardrobe.to_dict())
 	if not smoke:
+		quest_state = qa.state
+		SaveData.save_quests(quest_state)
 		stats = Stats.merge(stats, run_stats)
 		new_achievements = Achievements.newly_done(stats, achievements_done)
 		if not new_achievements.is_empty():
@@ -686,7 +733,7 @@ func end_run() -> void:
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
-		"goal": Goals.next(_goal_context()),
+		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
 	})
 	if character_mode:
 		squad.cheer()
@@ -1416,6 +1463,9 @@ func _shots_walkthrough() -> void:
 	stats = Stats.merge(stats, {"runs": 12, "kills": 2400, "bosses": 11, "gates": 130, "perfect": 31, "distance": 9000, "best_combo": 140, "best_level": 6})
 	open_records()
 	await _capture("2h_records.png", 5)
+	season_state = {"season": Season.number(Daily.day_number(int(Time.get_unix_time_from_system()))), "points": 460, "claimed": 4}
+	open_quests()
+	await _capture("2j_quests.png", 5)
 	open_help()
 	await _capture("2i_help.png", 5)
 	close_help()

@@ -24,6 +24,7 @@ signal bomb_pressed
 signal quit_pressed
 signal settings_opened
 signal records_opened
+signal quests_opened
 signal help_opened
 signal help_closed
 signal settings_closed
@@ -73,6 +74,9 @@ var _settings_music: Button
 var _settings_characters: Button
 var _pause_characters: Button
 
+var _quests_card: Control
+var _quests_box: VBoxContainer
+var _quests_button: Button
 var _records_card: Control
 var _records_box: VBoxContainer
 var _help_card: Control
@@ -373,6 +377,8 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
+	_quests_card = _scroll_card(root, "QUESTS", func() -> void: shop_closed.emit())
+	_quests_box = _quests_card.get_meta("box")
 	_records_card = _scroll_card(root, "RECORDS", func() -> void: shop_closed.emit())
 	_records_box = _records_card.get_meta("box")
 	_help_card = _scroll_card(root, "HOW TO PLAY", func() -> void: help_closed.emit())
@@ -398,9 +404,19 @@ func _build_title(root: Control) -> void:
 	_endless_button = _button("ENDLESS", 36)
 	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
 	box.add_child(_endless_button)
+	var row0 := HBoxContainer.new()
+	row0.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row0.alignment = BoxContainer.ALIGNMENT_CENTER
+	row0.add_theme_constant_override("separation", 16)
+	box.add_child(row0)
 	_daily_button = _button("DAILY", 36)
+	_daily_button.custom_minimum_size.x = 200.0
 	_daily_button.pressed.connect(func() -> void: daily_opened.emit())
-	box.add_child(_daily_button)
+	row0.add_child(_daily_button)
+	_quests_button = _button("QUESTS", 36)
+	_quests_button.custom_minimum_size.x = 200.0
+	_quests_button.pressed.connect(func() -> void: quests_opened.emit())
+	row0.add_child(_quests_button)
 	_mode_button = _button("MODE: NORMAL", 30)
 	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
 	box.add_child(_mode_button)
@@ -783,6 +799,7 @@ func _hide_cards() -> void:
 	_locker_card.visible = false
 	_records_card.visible = false
 	_help_card.visible = false
+	_quests_card.visible = false
 
 
 ## [param t] keys: best, best_level, best_endless, coins, endless_unlocked,
@@ -806,6 +823,7 @@ func show_title(t: Dictionary) -> void:
 	_records_button.visible = bool(buttons.get("records", true))
 	_mode_button.visible = bool(buttons.get("mode", true))
 	_endless_button.visible = bool(buttons.get("endless", true))
+	_quests_button.visible = bool(buttons.get("quests", true))
 	if not bool(buttons.get("hints", true)):
 		mode_hint = ""
 	_goal.text = str(t.get("goal", ""))
@@ -830,6 +848,46 @@ func show_title(t: Dictionary) -> void:
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
 	_coins_title.text = str(coins)
 	_stars_title.text = "%d   ·   %s" % [stars, hero_name] if hero_name != "" else str(stars)
+
+
+## Today's quests and the season track.
+func show_quests(day: int, quest_rows: Array, season: int, season_state: Dictionary) -> void:
+	_hide_cards()
+	_quests_card.visible = true
+	for child in _quests_box.get_children():
+		_quests_box.remove_child(child)
+		child.queue_free()
+	var head := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	head.text = "TODAY  ·  DAY %d OF SEASON %d" % [Season.day_in_season(day), season]
+	head.add_theme_color_override("font_color", COIN)
+	_quests_box.add_child(head)
+	for q in quest_rows:
+		var l := _label(24, HORIZONTAL_ALIGNMENT_LEFT)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD
+		l.custom_minimum_size.x = 620.0
+		var state := "DONE" if q.done else "%d / %d" % [int(q.progress), int(q.target)]
+		l.text = "%s   ·   %s   ·   %d pts" % [q.title, state, int(q.points)]
+		l.modulate = Color(1, 1, 1) if q.done else Color(0.85, 0.85, 0.9)
+		_quests_box.add_child(l)
+	var points := int(season_state.get("points", 0))
+	var tier := Season.tier_for(points)
+	var head2 := _label(30, HORIZONTAL_ALIGNMENT_LEFT)
+	head2.text = "\nSEASON %d  ·  TIER %d of %d" % [season, tier, Season.TIERS]
+	head2.add_theme_color_override("font_color", COIN)
+	_quests_box.add_child(head2)
+	var bar := _label(24, HORIZONTAL_ALIGNMENT_LEFT)
+	bar.text = "%d / %d points to tier %d" % [Season.tier_progress(points), Season.POINTS_PER_TIER, mini(tier + 1, Season.TIERS)] if tier < Season.TIERS else "Track complete. New season in %d days." % (Season.DAYS - Season.day_in_season(day) + 1)
+	_quests_box.add_child(bar)
+	var blurb := _label(21, HORIZONTAL_ALIGNMENT_LEFT)
+	blurb.text = "Quest points climb the track. Every tier pays, nothing to buy.\n"
+	blurb.modulate = Color(0.8, 0.8, 0.86)
+	_quests_box.add_child(blurb)
+	for t in range(1, Season.TIERS + 1):
+		var l := _label(22, HORIZONTAL_ALIGNMENT_LEFT)
+		var claimed := t <= tier
+		l.text = "%s Tier %d   ·   %s" % ["✓" if claimed else "·", t, Season.reward_text(Season.reward(season, t))]
+		l.modulate = Color(0.6, 0.6, 0.66) if claimed else (Color(1.0, 0.95, 0.7) if t == tier + 1 else Color(0.85, 0.85, 0.9))
+		_quests_box.add_child(l)
 
 
 ## Lifetime numbers and the achievement list.
@@ -1034,6 +1092,10 @@ func show_game_over(r: Dictionary) -> void:
 			coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
 	if unlocked.size() > 3:
 		coins_line += "\n+%d more achievements, see RECORDS" % (unlocked.size() - 3)
+	for q in r.get("quests_done", []):
+		coins_line += "\nQUEST DONE: %s  +%d pts" % [q.title, int(q.points)]
+	for rw in r.get("season_rewards", []):
+		coins_line += "\nSEASON TIER %d: %s" % [int(rw.tier), Season.reward_text(rw)]
 	var goal := str(r.get("goal", ""))
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal

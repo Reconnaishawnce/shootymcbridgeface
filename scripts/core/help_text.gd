@@ -90,6 +90,10 @@ static func sections() -> Array:
 		{"title": "SQUADS", "body":
 			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. " +
 			"Only the front %d soldiers' worth of guns count toward firepower; past that, a bigger squad is extra health, not extra damage." % Progression.DPS_CAP_SOLDIERS},
+		{"title": "QUESTS AND THE SEASON", "body":
+			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
+			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +
+			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play."},
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]

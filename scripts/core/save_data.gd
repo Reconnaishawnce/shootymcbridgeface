@@ -163,6 +163,24 @@ static func save_stats(d: Dictionary) -> void:
 	_write(STATS, "lifetime", d)
 
 
+static func load_quests() -> Dictionary:
+	var v = _read(STATS, "quests", {})
+	return v if v is Dictionary else {}
+
+
+static func save_quests(d: Dictionary) -> void:
+	_write(STATS, "quests", d)
+
+
+static func load_season() -> Dictionary:
+	var v = _read(STATS, "season", {})
+	return v if v is Dictionary else {}
+
+
+static func save_season(d: Dictionary) -> void:
+	_write(STATS, "season", d)
+
+
 static func load_achievements() -> Array:
 	var v = _read(STATS, "achievements", [])
 	return v if v is Array else []

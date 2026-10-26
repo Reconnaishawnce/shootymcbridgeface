@@ -3,6 +3,20 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.22 (polish turn 5: come back tomorrow)
+
+- Three QUESTS a day, the same for everyone, progress kept across the
+  day's runs: kill so many zombies, shoot so many perfect gates, form a
+  vehicle, win a bet, reach a level, and so on. Each one done pays
+  season points.
+- A free SEASON track: thirty days, thirty tiers, a reward at every one.
+  Coins, stars every third tier, a locker item every fifth, rotating
+  with the season. Nothing to buy. The QUESTS page shows today's three,
+  the tier bar and the whole track.
+- The wipe screen lists quests completed and tiers reached; the title's
+  next-goal line nags about open quests. QUESTS appears after the first
+  run.
+
 ## 0.21 (polish turn 4: one game, one look)
 
 - One theme for every screen: rounded dark-glass buttons with a warm

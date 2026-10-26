@@ -26,6 +26,8 @@ static func next(c: Dictionary) -> String:
 		return "Something new is waiting in the LOCKER."
 	if str(c.get("modifier", "normal")) == "normal" and int(c.get("hard_best_level", 0)) < Modifiers.NIGHTMARE_UNLOCK_LEVEL:
 		return "Try HARD mode: 1.5x score and coins, and it opens NIGHTMARE."
+	if int(c.get("quests_left", 0)) > 0:
+		return "%d of today's QUESTS still open." % int(c.get("quests_left", 0))
 	if not bool(c.get("daily_played", false)):
 		return "Play today's DAILY: same road as everyone, best of the day counts."
 	if cheapest != "" and cost > 0:
@@ -44,4 +46,5 @@ static func title_buttons(runs: int, hard_unlocked: bool, character_mode: bool) 
 		"locker": character_mode,
 		"endless": runs >= 1,
 		"hints": runs >= 1,
+		"quests": runs >= 1,
 	}

@@ -219,6 +219,17 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## Quests and the season
+
+`Quests.for_day` draws three templates and targets from the day number,
+so every player has the same three; `Quests.advance` folds a run's
+numbers in (sums, or best-of for combo and level) and reports what was
+completed; completed quests pay points once. `Season.advance` turns
+points into tiers (100 each, 30 tiers over a 30-day season) and returns
+the rewards newly reached: coins, stars every third tier, a locker item
+every fifth from a pool that rotates with the season number. The game
+applies rewards at the end of a run and shows them on the wipe screen.
+
 ## One look, one next thing
 
 `Hud.make_theme` is the whole UI kit: one button style (dark glass,

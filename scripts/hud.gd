@@ -432,8 +432,8 @@ func _build_shop(root: Control) -> void:
 	_shop_card = _card(root)
 	_shop_card.visible = false
 	var box: VBoxContainer = _shop_card.get_meta("box")
-	box.add_theme_constant_override("separation", 10)
-	var head := _label(48, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_theme_constant_override("separation", 4)
+	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
 	head.text = "SHOP"
 	box.add_child(head)
 	_shop_coins = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
@@ -447,12 +447,15 @@ func _build_shop(root: Control) -> void:
 		var text := VBoxContainer.new()
 		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.custom_minimum_size.x = 440.0
 		text.add_theme_constant_override("separation", 0)
 		var name := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
 		text.add_child(name)
-		var desc := _label(20, HORIZONTAL_ALIGNMENT_LEFT)
+		var desc := _label(19, HORIZONTAL_ALIGNMENT_LEFT)
 		desc.modulate = Color(0.85, 0.85, 0.9)
 		desc.text = Meta.description(id)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc.custom_minimum_size.x = 440.0
 		text.add_child(desc)
 		row.add_child(text)
 		var buy := _button("BUY", 24)
@@ -460,7 +463,7 @@ func _build_shop(root: Control) -> void:
 		buy.pressed.connect(func() -> void: buy_pressed.emit(id))
 		row.add_child(buy)
 		box.add_child(row)
-		_shop_rows[id] = {"name": name, "buy": buy}
+		_shop_rows[id] = {"name": name, "buy": buy, "desc": desc}
 	var back := _button("BACK", 34)
 	back.pressed.connect(func() -> void: shop_closed.emit())
 	box.add_child(back)
@@ -610,8 +613,12 @@ func set_characters(on: bool) -> void:
 	_stars_title.visible = on
 
 
+## TIGHT is a focused column, WIDE a fan: the button says so.
+const FORMATION_TEXT := {"TIGHT": "TIGHT · focus", "NORMAL": "NORMAL", "WIDE": "WIDE · cover"}
+
+
 func set_formation(name: String) -> void:
-	_formation_button.text = name
+	_formation_button.text = str(FORMATION_TEXT.get(name, name))
 
 
 func set_bombs(n: int) -> void:
@@ -647,11 +654,11 @@ func show_fork(routes: Dictionary) -> void:
 		var labels := []
 		for p in r.panels:
 			labels.append(GateMath.label(p))
-		var text := "%s  %s
-%s" % [r.name, "!".repeat(int(r.threat)), " · ".join(labels)]
+		var text := "%s  %d+ soldiers
+%s" % ["!".repeat(int(r.threat)), int(r.needs), " · ".join(labels)]
 		var l := _fork_left if side == "left" else _fork_right
 		l.text = ("◀ " + text) if side == "left" else (text + " ▶")
-		l.add_theme_color_override("font_color", Fork.RICH if r.name == "RICH" else Fork.SAFE)
+		l.add_theme_color_override("font_color", Fork.threat_color(int(r.threat)))
 
 
 func hide_fork() -> void:
@@ -850,6 +857,12 @@ func show_shop(meta: Meta, coins: int) -> void:
 		var row: Dictionary = _shop_rows[id]
 		var lvl := meta.level(id)
 		row.name.text = "%s   %d/%d" % [Meta.title(id), lvl, Meta.max_level(id)]
+		var now := Meta.effect_text(id, lvl)
+		var desc: Label = row.desc
+		if meta.is_maxed(id):
+			desc.text = "%s\n%s" % [Meta.description(id), now]
+		else:
+			desc.text = "%s\n%s  >  %s" % [Meta.description(id), now, Meta.effect_text(id, lvl + 1)]
 		var buy: Button = row.buy
 		if meta.is_maxed(id):
 			buy.text = "MAX"

@@ -3,6 +3,32 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.18 (polish turn 1: honest road)
+
+The first of six turns taking the game from pieced-together to one
+design. This one makes three hollow things real.
+
+- The fork has no words. Each side has a sign: one to four skull marks
+  for how heavy its wave is, and a number for roughly how many soldiers
+  the route takes, worked out from the actual wave. The heavier side
+  pays better panels. Sides vary, and from level 3 sometimes neither is
+  gentle. The banner on committing says what you walked into, not a
+  label.
+- Formation width does something. TIGHT is a focused column: less than
+  half the spray, bullets land where you point, the squad fits a storm
+  gap and takes fewer lightning hits. WIDE is a fan: nearly double the
+  spray, the outer soldiers cover the sides of the road. The button
+  says so.
+- The shop costs about four times more and every upgrade can be felt:
+  recruits +2 soldiers per level, firepower +12%, gate bonus +2, armor
+  -12% on every heavy bite (brutes, boss, spit, lightning, horde), coin
+  magnet +20%. Two new ones: BOMB BELT (start every run with bombs) and
+  SECOND WIND (once a run, a wipe becomes a comeback with 8 soldiers, a
+  shield and the clingers shaken off). Every row shows what it does now
+  and what the next level does.
+- Auto-player reads the fork signs and takes `--smoke-upgrades` to play
+  with everything maxed.
+
 ## 0.17 (run 13)
 
 How to play, records, achievements, and the storm.

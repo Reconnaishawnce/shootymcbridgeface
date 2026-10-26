@@ -65,6 +65,8 @@ var achievements_done: Array = []
 var _bets_won := 0
 var _bets_lost := 0
 var _help_from_pause := false
+## Second wind: one comeback per run from the shop.
+var _second_wind_used := false
 var weekly_results: Dictionary = {}
 ## While a finger is dragging the locker preview round, the idle turn waits.
 var _preview_drag_until := 0.0
@@ -89,6 +91,7 @@ var _smoke_frames := SMOKE_FRAMES
 var _smoke_endless := false
 var _smoke_daily := false
 var _smoke_weekly := false
+var _smoke_upgrades := false
 var _shots_dir := ""
 var _since_game_over := 0.0
 var _shake := 0.0
@@ -113,6 +116,8 @@ func _ready() -> void:
 	_smoke_endless = args.has("--endless")
 	_smoke_daily = args.has("--daily")
 	_smoke_weekly = args.has("--weekly")
+	# --smoke-upgrades: play with every shop upgrade maxed, to exercise them.
+	_smoke_upgrades = args.has("--smoke-upgrades")
 	if args.has("--hard"):
 		modifier = "hard"
 	elif args.has("--nightmare"):
@@ -132,6 +137,9 @@ func _ready() -> void:
 		modifier = "hard" if args.has("--hard") else ("nightmare" if args.has("--nightmare") else "normal")
 	coins = SaveData.load_coins()
 	meta.levels = SaveData.load_upgrades()
+	if _smoke_upgrades:
+		for id in Meta.ORDER:
+			meta.levels[id] = Meta.max_level(id)
 	squad_type = SaveData.load_squad_type()
 	if not meta.squad_unlocked(squad_type):
 		squad_type = "rifle"
@@ -507,7 +515,10 @@ func start_run(p_mode: String = "levels") -> void:
 	perks = Perks.new()
 	combo.reset()
 	powerups.reset()
-	hud.set_bombs(0)
+	for i in range(run_meta.start_bombs()):
+		powerups.grant("bomb", 0.0)
+	hud.set_bombs(powerups.bombs)
+	_second_wind_used = false
 	waves_cleared = 0
 	perfect_gates = 0
 	_run_time = 0.0
@@ -1000,7 +1011,10 @@ func _on_level_started(level: int) -> void:
 	_level_perfect = 0
 	_horde_warned = false
 	if not world.endless:
-		squad.redeploy(Difficulty.carry_over(squad.count, run_meta.start_squad()))
+		var carried := Difficulty.carry_over(squad.count, run_meta.start_squad())
+		squad.redeploy(carried)
+		if run_meta.level("start") > 0 and carried == run_meta.start_squad():
+			hud.show_float("RECRUITS  %d" % carried, true)
 		sfx.play("spawn")
 
 
@@ -1050,10 +1064,11 @@ func _on_fork_ahead(routes: Dictionary) -> void:
 
 func _on_fork_chosen(route: Dictionary, _side: int) -> void:
 	if smoke:
-		print("SMOKE_FORK ", JSON.stringify({"level": world.level, "route": route.name, "squad": squad.count, "frame": _frames}))
+		print("SMOKE_FORK ", JSON.stringify({"level": world.level, "threat": route.threat, "needs": route.needs, "squad": squad.count, "frame": _frames}))
 	hud.hide_fork()
-	hud.show_banner("%s ROUTE" % route.name, 0.9)
-	sfx.play("powerup" if route.name == "RICH" else "spawn", -4.0)
+	var heavy := int(route.threat) >= 3
+	hud.show_banner("INTO THE THICK OF IT" if heavy else "THE QUIET ROAD", 0.9)
+	sfx.play("powerup" if heavy else "spawn", -4.0)
 	_punch(2.0)
 
 
@@ -1170,8 +1185,28 @@ func _on_count_changed(new_count: int) -> void:
 
 
 func _on_wiped_out() -> void:
-	# Deferred: the wipe can fire from inside the world's update loop.
+	# Second wind: the shop's one comeback. Deferred either way, since the
+	# wipe can fire from inside the world's update loop.
+	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
+		_second_wind_used = true
+		call_deferred("_second_wind")
+		return
 	call_deferred("end_run")
+
+
+func _second_wind() -> void:
+	if state != State.RUNNING:
+		return
+	if smoke:
+		print("SMOKE_WIND ", JSON.stringify({"level": world.level, "frame": _frames}))
+	squad.set_count(Meta.SECOND_WIND_SOLDIERS)
+	powerups.grant("shield", _run_time)
+	world.shake_off()
+	hud.show_banner("SECOND WIND!\n%d SOLDIERS BACK" % Meta.SECOND_WIND_SOLDIERS, 1.6)
+	hud.flash(0.6)
+	sfx.play("rally")
+	squad.rally()
+	_punch(6.0)
 
 
 func _on_sound_toggled(on: bool) -> void:
@@ -1267,9 +1302,13 @@ func _bot_steer() -> void:
 			return
 	# At a fork, go rich when the squad can afford the crowd, else safe.
 	if world.fork != null and not world.fork.chosen:
+		# Read the signs: take the heavier route when the squad meets its number.
 		var left: Dictionary = world.fork.routes.left
-		var want_rich := squad.count >= 12
-		var go_left: bool = (str(left.name) == "RICH") == want_rich
+		var right: Dictionary = world.fork.routes.right
+		var heavy: Dictionary = left if int(left.threat) >= int(right.threat) else right
+		var light: Dictionary = right if heavy == left else left
+		var pick: Dictionary = heavy if squad.count >= int(heavy.needs) else light
+		var go_left: bool = pick == left
 		squad.target_x = (-1.0 if go_left else 1.0) * world.road_half * 0.5
 		if world.fork.position.z > -24.0:
 			return

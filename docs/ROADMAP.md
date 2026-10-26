@@ -193,11 +193,24 @@ bosses were too easy.
 - RECORDS page: lifetime stats and 26 star-paying achievements.
 - The storm: a third boss with lightning lines and a gap to find.
 
-## Run 14: come back tomorrow
+## The polish arc: from pieced-together to one design
 
-- A season pass with a free track, advanced by daily quests.
-- Trophy road with checkpoints; mission sets that raise a multiplier.
-- Phone feedback pass on everything since run 10.
+The vision: you start with one soldier and build a convoy. Every choice
+trades bodies now for power later, and the road is honest: nothing is a
+word on a sign, everything can be seen and counted.
+
+1. Honest road (done): fork without words, formation width that matters,
+   a shop you can feel.
+2. The convoy, part one: jeep at 20 soldiers, tank at 60, formed at a
+   gate choice; vehicles have health, their own fire, and persist across
+   levels while soldiers reset.
+3. The convoy, part two: helicopter and mech; veteran ranks from kills;
+   brutes and bosses hurt vehicles; perk gates upgrade them.
+4. One game, one look: a single UI kit, icons, a results screen that
+   names the next goal, menus that unlock gradually, hit-stop and pops.
+5. Come back tomorrow: daily quests feeding a free season track, a
+   trophy road with checkpoints.
+6. Feedback pass from the phone.
 
 ## Always
 

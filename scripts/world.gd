@@ -409,9 +409,10 @@ func mod(key: String) -> float:
 	return v
 
 
-## Scale a bite by the modifier; never below one.
+## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
-	return maxi(1, int(round(float(n) * mod("bite"))))
+	var armor := meta.bite_mult() if meta != null else 1.0
+	return maxi(1, int(round(float(n) * mod("bite") * armor)))
 
 
 func _pace() -> float:

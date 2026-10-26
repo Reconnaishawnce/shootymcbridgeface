@@ -426,42 +426,75 @@ static func fork_length() -> float:
 ## Two routes for the fork on [param level]: {"left": route, "right": route}.
 ## A route is {name, threat (1..3), wave_mult, extra_brutes, panels}.
 ## One side is RICH, the other SAFE; which is which is random.
-func make_fork(level: int) -> Dictionary:
+## The fork: two routes, no words. Each route has a threat (1 to 4 skull
+## marks on the sign), a wave multiplier that threat stands for, and its
+## panels, which are visible from the mouth. The heavier route pays more.
+## Which side is which is random, and sometimes both sides bite.
+const FORK_THREAT_WAVE := [0.0, 0.55, 1.0, 1.6, 2.3]
+
+
+## Wave multiplier a threat level stands for.
+static func threat_wave_mult(threat: int) -> float:
+	return FORK_THREAT_WAVE[clampi(threat, 1, 4)]
+
+
+## Soldiers it takes to clear a route's wave before it arrives: total
+## wave health over what a squad kills in the seconds it has. The sign
+## shows this so the choice is a read, not a guess.
+static func route_needs(level: int, threat: int, squad_count: int = 20) -> int:
+	var spec := wave_for(level, FORK_INDEX, squad_count)
+	var mult := threat_wave_mult(threat)
+	var hp := float(spec.count) * mult * float(spec.hp) + float(spec.brutes) * mult * float(spec.brute_hp) * 0.5
+	var seconds := 4.0
+	return maxi(3, int(ceil(hp / (DPS_PER_SOLDIER * seconds))))
+
+
+func _route(level: int, threat: int) -> Dictionary:
 	var lv := level - 1
-	var t := tier_for_level(level)
-	var rich := {
-		"name": "RICH",
-		"threat": 3 if t >= 2 else 2,
-		"wave_mult": RICH_WAVE_MULT,
-		"extra_brutes": 1 + int(lv / 3.0),
+	var route := {
+		"threat": threat,
+		"wave_mult": threat_wave_mult(threat),
+		"extra_brutes": maxi(0, threat - 2) + (int(lv / 3.0) if threat >= 3 else 0),
 		"panels": [],
+		"needs": route_needs(level, threat),
 	}
 	for i in range(FORK_GATES):
-		var roll := rng.randf()
 		var panel: GateMath.GatePanel
-		if roll < 0.1:
-			panel = GateMath.mul(3.0)
-		elif roll < 0.4:
-			panel = GateMath.mul(2.0)
-		else:
-			panel = GateMath.add(rng.randi_range(6, 10) + 2 * lv)
-		rich.panels.append(panel)
-	if level >= Progression.HIDDEN_LEVEL and rng.randf() < RICH_HIDDEN_CHANCE:
+		var roll := rng.randf()
+		match threat:
+			1:
+				panel = GateMath.add(rng.randi_range(2, 4) + lv / 2)
+			2:
+				panel = GateMath.power(Powerups.MYSTERY) if (i == 1 and roll < 0.3) else GateMath.add(rng.randi_range(4, 6) + lv)
+			3:
+				panel = GateMath.mul(2.0) if roll < 0.35 else GateMath.add(rng.randi_range(6, 10) + 2 * lv)
+			_:
+				panel = GateMath.mul(3.0) if roll < 0.3 else (GateMath.mul(2.0) if roll < 0.7 else GateMath.add(rng.randi_range(10, 14) + 3 * lv))
+		route.panels.append(panel)
+	# A heavy route may hide one panel, and a hidden panel may be a trap.
+	if threat >= 3 and level >= Progression.HIDDEN_LEVEL and rng.randf() < RICH_HIDDEN_CHANCE:
 		var which := rng.randi_range(0, FORK_GATES - 1)
 		if rng.randf() < RICH_TRAP_CHANCE:
-			rich.panels[which] = GateMath.add(rng.randi_range(-6, -3) - lv, true)
+			route.panels[which] = GateMath.add(rng.randi_range(-6, -3) - lv, true)
 		else:
-			rich.panels[which].revealed = false
-	var safe := {
-		"name": "SAFE",
-		"threat": 1,
-		"wave_mult": SAFE_WAVE_MULT,
-		"extra_brutes": 0,
-		"panels": [GateMath.add(rng.randi_range(3, 5) + lv / 2), GateMath.add(rng.randi_range(3, 5) + lv / 2)],
-	}
+			route.panels[which].revealed = false
+	return route
+
+
+func make_fork(level: int) -> Dictionary:
+	var t := tier_for_level(level)
+	var heavy := 3 if t >= 2 else 2
+	if t >= 3 or (t == 2 and rng.randf() < 0.35):
+		heavy = 4
+	var light := 1
+	# Sometimes neither side is gentle: pick the lesser evil.
+	if level >= 3 and rng.randf() < 0.25:
+		light = 2
+	var a := _route(level, heavy)
+	var b := _route(level, light)
 	if rng.randf() < 0.5:
-		return {"left": rich, "right": safe}
-	return {"left": safe, "right": rich}
+		return {"left": a, "right": b}
+	return {"left": b, "right": a}
 
 
 ## Chance a gate (after the opener) carries a sum panel, by tier.

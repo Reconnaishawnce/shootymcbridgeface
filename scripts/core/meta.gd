@@ -4,19 +4,23 @@ extends RefCounted
 ## the levels dictionary is loaded from and saved to SaveData by the game.
 
 const CATALOG := {
-	"start": {"name": "RECRUITS", "desc": "Start every level with +1 soldier", "max": 5, "base": 40},
-	"power": {"name": "FIREPOWER", "desc": "+8% damage", "max": 5, "base": 50},
-	"gate": {"name": "GATE BONUS", "desc": "+1 on every positive gate", "max": 3, "base": 80},
-	"armor": {"name": "ARMOR", "desc": "Brutes eat 1% less of the squad", "max": 4, "base": 60},
-	"slayer": {"name": "BOSS SLAYER", "desc": "Boss core takes +0.5x damage", "max": 4, "base": 70},
-	"magnet": {"name": "COIN MAGNET", "desc": "+15% coins", "max": 4, "base": 45},
-	"scout": {"name": "SCOUT", "desc": "Hidden gates show 8 m sooner", "max": 3, "base": 55},
-	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 200},
-	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 250},
+	"start": {"name": "RECRUITS", "desc": "Start every level with more soldiers", "max": 5, "base": 160, "unit": "soldiers"},
+	"power": {"name": "FIREPOWER", "desc": "Every bullet hits harder", "max": 5, "base": 200, "unit": "damage"},
+	"gate": {"name": "GATE BONUS", "desc": "Extra soldiers on every blue gate", "max": 3, "base": 320, "unit": "per gate"},
+	"armor": {"name": "ARMOR", "desc": "Brutes, bosses and lightning take less", "max": 4, "base": 240, "unit": "bites"},
+	"slayer": {"name": "BOSS SLAYER", "desc": "Boss core takes more damage", "max": 4, "base": 280, "unit": "core"},
+	"magnet": {"name": "COIN MAGNET", "desc": "More coins from every run", "max": 4, "base": 180, "unit": "coins"},
+	"scout": {"name": "SCOUT", "desc": "Hidden panels show sooner", "max": 3, "base": 220, "unit": "reveal"},
+	"belt": {"name": "BOMB BELT", "desc": "Start every run with bombs", "max": 2, "base": 300, "unit": "bombs"},
+	"wind": {"name": "SECOND WIND", "desc": "Once a run, a wipe becomes a comeback", "max": 1, "base": 600, "unit": "comeback"},
+	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 500, "unit": "squad"},
+	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 650, "unit": "squad"},
 }
-const ORDER := ["start", "power", "gate", "armor", "slayer", "magnet", "scout", "shotgun", "medic"]
+const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "slayer", "magnet", "scout", "shotgun", "medic"]
 const SQUAD_TYPES := ["rifle", "shotgun", "medic"]
-const COST_GROWTH := 1.7
+const COST_GROWTH := 1.6
+## Soldiers a second wind brings back.
+const SECOND_WIND_SOLDIERS := 8
 ## Clearing this level unlocks Endless mode.
 const ENDLESS_UNLOCK_LEVEL := 3
 
@@ -77,20 +81,25 @@ static func endless_unlocked(best_level: int) -> bool:
 # --- effects ---------------------------------------------------------------
 
 func start_squad() -> int:
-	return 1 + level("start")
+	return 1 + 2 * level("start")
 
 
 func damage_mult() -> float:
-	return 1.0 + 0.08 * level("power")
+	return 1.0 + 0.12 * level("power")
 
 
 func gate_bonus() -> int:
-	return level("gate")
+	return 2 * level("gate")
 
 
 ## Fraction of the squad a brute eats, after armor.
 func brute_bite_fraction(base: float) -> float:
-	return maxf(0.02, base - 0.01 * level("armor"))
+	return base * bite_mult()
+
+
+## What every heavy bite (brute, boss, spit, lightning) is scaled by.
+func bite_mult() -> float:
+	return 1.0 - 0.12 * level("armor")
 
 
 func core_mult_bonus() -> float:
@@ -98,7 +107,41 @@ func core_mult_bonus() -> float:
 
 
 func coin_mult() -> float:
-	return 1.0 + 0.15 * level("magnet")
+	return 1.0 + 0.2 * level("magnet")
+
+
+func start_bombs() -> int:
+	return level("belt")
+
+
+func has_second_wind() -> bool:
+	return level("wind") >= 1
+
+
+## What an upgrade does at [param lvl], for the shop's now-and-next line.
+static func effect_text(id: String, lvl: int) -> String:
+	match id:
+		"start":
+			return "%d at level start" % (1 + 2 * lvl)
+		"power":
+			return "+%d%% damage" % (12 * lvl)
+		"gate":
+			return "+%d per blue gate" % (2 * lvl)
+		"armor":
+			return "-%d%% on bites" % (12 * lvl)
+		"slayer":
+			return "core x%.1f" % (3.0 + 0.5 * lvl)
+		"magnet":
+			return "+%d%% coins" % (20 * lvl)
+		"scout":
+			return "%d m sooner" % (8 * lvl)
+		"belt":
+			return "%d at start" % lvl
+		"wind":
+			return "one comeback" if lvl >= 1 else "none"
+		"shotgun", "medic":
+			return "unlocked" if lvl >= 1 else "locked"
+	return ""
 
 
 func reveal_bonus() -> float:

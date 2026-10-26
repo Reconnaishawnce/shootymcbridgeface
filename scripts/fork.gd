@@ -7,6 +7,11 @@ const WALL := Color(0.5, 0.48, 0.42)
 const STRIPE := Color(0.95, 0.75, 0.2)
 const RICH := Color(1.0, 0.8, 0.25)
 const SAFE := Color(0.45, 0.9, 1.0)
+const THREAT_COLORS := [SAFE, SAFE, Color(1.0, 0.85, 0.3), Color(1.0, 0.55, 0.2), Color(1.0, 0.25, 0.2)]
+
+
+static func threat_color(threat: int) -> Color:
+	return THREAT_COLORS[clampi(threat, 1, 4)]
 
 var length := 48.0
 var routes: Dictionary = {}
@@ -33,14 +38,26 @@ func setup(p_routes: Dictionary, p_length: float, p_road_half: float = 3.3) -> v
 	add_child(nose)
 	for side in [-1, 1]:
 		var route: Dictionary = routes["left" if side < 0 else "right"]
+		var x := float(side) * road_half * 0.5
+		# Skull marks: red orbs on a post, one per threat level. No words.
+		var post := Mats.box(Vector3(0.12, 2.2, 0.12), WALL)
+		post.position = Vector3(x, 1.1, 1.0)
+		add_child(post)
+		var threat := int(route.threat)
+		for i in range(threat):
+			var orb := Mats.sphere(0.32, threat_color(threat))
+			orb.material_override = Mats.flat(threat_color(threat), true)
+			orb.position = Vector3(x + (float(i) - float(threat - 1) * 0.5) * 0.7, 2.5, 1.0)
+			add_child(orb)
+		# The read: roughly how many soldiers the route wants.
 		var label := Label3D.new()
-		label.text = "%s\n%s" % [route.name, "!".repeat(int(route.threat))]
-		label.font_size = 72
-		label.outline_size = 16
+		label.text = "%d+" % int(route.needs)
+		label.font_size = 96
+		label.outline_size = 18
 		label.pixel_size = 0.01
-		label.modulate = RICH if route.name == "RICH" else SAFE
+		label.modulate = threat_color(threat)
 		label.outline_modulate = Color(0.05, 0.05, 0.08)
-		label.position = Vector3(float(side) * road_half * 0.5, 2.4, 1.0)
+		label.position = Vector3(x, 3.4, 1.0)
 		label.no_depth_test = true
 		add_child(label)
 

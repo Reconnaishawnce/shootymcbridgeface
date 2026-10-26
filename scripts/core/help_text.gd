@@ -18,7 +18,8 @@ static func sections() -> Array:
 		{"title": "CONTROLS", "body":
 			"Low on the screen, near the squad: drag left or right to steer, drag up or down to spread out or bunch up, and flick hard sideways to dash (from level %d). " % Progression.DASH_LEVEL +
 			"Higher up, on the road: hold a finger there and every gun aims at that spot with a red laser. Lift to go back to firing straight ahead. " +
-			"The button at the bottom right cycles tight, normal and wide. Tap a zombie that is clinging to your squad to shoot it off."},
+			"The button at the bottom right cycles TIGHT, NORMAL and WIDE. Tight is a focused column: bullets land where you point, the squad fits through gaps and takes fewer lightning hits. " +
+			"Wide is a fan: the outer soldiers cover the sides of the road, but your fire is scattered. Tap a zombie that is clinging to your squad to shoot it off."},
 		{"title": "GATES AND PANELS", "body":
 			"Every gate is a row of panels, one per lane. You walk through exactly one.\n" +
 			"BLUE panels add soldiers (+5) or multiply them (x2).\n" +
@@ -35,7 +36,8 @@ static func sections() -> Array:
 		{"title": "LEVELS", "body":
 			"A level is %d gates and a boss. The road widens as you go, from two lanes up to %d, so later gates have more panels to read. " % [Difficulty.GATES_PER_LEVEL, Progression.MAX_LANES] +
 			"The third and sixth gate of every level is a PERK gate: three purple panels, pick one, it lasts the run. " +
-			"Once per level the road forks: RICH pays more and throws more at you, SAFE is gentler. " +
+			"Once per level the road forks. Each side has a sign: red skull marks for how heavy its zombie wave is, and a number for roughly how many soldiers it takes. " +
+			"The heavier side pays better panels. Read both and pick. " +
 			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
 				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
 		{"title": "ZOMBIES", "body":
@@ -62,7 +64,7 @@ static func sections() -> Array:
 			"Every level you clear gets a GRADE from S to D for perfect gates, soldiers kept and how fast the boss went down. S pays %d points, down to nothing for a D." % Grades.bonus("S")},
 		{"title": "COINS AND THE SHOP", "body":
 			"Every run pays coins: one for every four kills, %d per boss, %d per gate. " % [25, 2] +
-			"The SHOP sells permanent upgrades: more starting soldiers, more damage, a bonus on every blue gate, armor against brutes, extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " +
+			"The SHOP sells permanent upgrades, and each one tells you what it does now and what the next level does: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers, extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
 			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades."},
 		{"title": "STARS AND THE LOCKER", "body":
 			"Stars are the other currency. A run pays one star per boss, one per four perfect gates, and one for getting through at least three gates. " +

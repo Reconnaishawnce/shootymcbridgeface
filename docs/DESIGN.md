@@ -219,6 +219,26 @@ the squad that creeps up while the road is stopped for a boss (0.65 m/s,
 faster on hard and nightmare), eats 5% of the squad every 0.6 s once it
 arrives, and falls back when the boss dies. It is the boss clock.
 
+## Honest road: the fork, formation width, the shop
+
+The fork carries no words. `Difficulty.make_fork` builds two routes with
+different threat levels (1 to 4); threat sets the wave multiplier
+(`FORK_THREAT_WAVE`), the extra brutes and the quality of the panels.
+`route_needs` turns the route's wave into a soldier count (total wave
+health over four seconds of squad fire), shown on the sign and in the
+HUD box, so the choice is a read. From level 3 a quarter of forks have
+no gentle side.
+
+Formation width is a real lever: `Squad.spray_mult` runs from 0.45
+(tight) to 1.8 (wide) on the bullet spray, and the squad's reach, which
+decides lightning, spit and horde hits and whether it fits a storm gap,
+already follows the width. Tight focuses, wide covers.
+
+The shop is priced so the first upgrade is about one good run and
+maxing everything is about forty. Effects are big enough to notice
+(`Meta.effect_text` shows now and next). Armor applies to every heavy
+bite through `World._bite`. Second wind is one comeback per run.
+
 ## The help page, records and the storm
 
 `HelpText.sections()` is the in-game HOW TO PLAY page: short sections a

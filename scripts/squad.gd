@@ -182,6 +182,15 @@ func cycle_formation() -> void:
 	set_spread(PRESETS[(best + 1) % PRESETS.size()])
 
 
+## How the formation shoots. Tight is a focused column: little spray,
+## bullets land where you point. Wide is a fan: the outer soldiers cover
+## the sides of the road, at the cost of focus. The squad's footprint
+## (reach) changes with it too, so tight fits a storm gap and takes
+## fewer lightning hits, wide catches more.
+func spray_mult() -> float:
+	return clampf(0.45 + (spread - Formation.SPREAD_MIN) * 0.9, 0.45, 1.8)
+
+
 func formation_name() -> String:
 	if spread < 0.8:
 		return "TIGHT"
@@ -482,7 +491,7 @@ func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> vo
 		b.damage *= Progression.FOCUS_DAMAGE_MULT
 	else:
 		# Spray. Close targets still get hit; far ones need aiming.
-		vx += randf_range(-Progression.SPRAY, Progression.SPRAY)
+		vx += randf_range(-Progression.SPRAY, Progression.SPRAY) * spray_mult()
 	b.vx = vx
 	b.world = world
 	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0

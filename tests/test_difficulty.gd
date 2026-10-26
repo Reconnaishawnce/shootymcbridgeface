@@ -184,25 +184,38 @@ func test_fork() -> void:
 	check(Difficulty.fork_distance() + Difficulty.fork_length() < Difficulty.gate_distance(Difficulty.FORK_INDEX + Difficulty.FORK_GATES), "merge before the next gate")
 	check(Difficulty.fork_distance() < Difficulty.gate_distance(Difficulty.FORK_INDEX), "fork line before the first route gate")
 	check(Difficulty.fork_distance() > Difficulty.gate_distance(Difficulty.FORK_INDEX - 1), "fork line after the previous gate")
-	var rich_left := 0
+	var heavy_left := 0
+	var both_bite := 0
 	for seed in range(60):
 		var gen := Difficulty.new(seed)
 		var f := gen.make_fork(2)
-		var names := [f.left.name, f.right.name]
-		check(names.has("RICH") and names.has("SAFE"), "one of each")
-		if f.left.name == "RICH":
-			rich_left += 1
+		var a: Dictionary = f.left
+		var b: Dictionary = f.right
+		check(a.threat != b.threat, "the two routes differ")
+		if int(a.threat) > int(b.threat):
+			heavy_left += 1
 		for side in ["left", "right"]:
 			var r: Dictionary = f[side]
 			check_eq(r.panels.size(), Difficulty.FORK_GATES, "a panel per route gate")
-			check(r.threat >= 1 and r.threat <= 3, "threat in range")
-			if r.name == "SAFE":
+			check(r.threat >= 1 and r.threat <= 4, "threat in range")
+			check(int(r.needs) >= 3, "a route says what it needs")
+			check(is_equal_approx(float(r.wave_mult), Difficulty.threat_wave_mult(int(r.threat))), "wave follows threat")
+			if int(r.threat) == 1:
 				for p in r.panels:
-					check(p.revealed and GateMath.is_good(p), "safe panels are visible gains")
+					check(p.revealed and GateMath.is_good(p), "quiet-route panels are visible gains")
+		var heavy: Dictionary = a if int(a.threat) > int(b.threat) else b
+		var light: Dictionary = b if heavy == a else a
+		check(int(heavy.needs) > int(light.needs), "the heavy route needs more")
 		var crates := gen.crates_for_level(2)
 		for c in crates:
 			check(not Difficulty.is_fork_gate(c.index), "no crate inside the fork")
-	check(rich_left > 10 and rich_left < 50, "rich side varies (%d of 60 left)" % rich_left)
+	for seed in range(40):
+		var f3 := Difficulty.new(seed + 100).make_fork(5)
+		if int(f3.left.threat) >= 2 and int(f3.right.threat) >= 2:
+			both_bite += 1
+	check(both_bite > 2 and both_bite < 25, "sometimes both sides bite (%d of 40)" % both_bite)
+	check(Difficulty.route_needs(2, 4) > Difficulty.route_needs(2, 1), "needs grow with threat")
+	check(heavy_left > 10 and heavy_left < 50, "heavy side varies (%d of 60 left)" % heavy_left)
 
 
 func test_level_one_is_simple() -> void:

@@ -43,6 +43,8 @@ var squad_type := "rifle"
 var camera: Camera3D
 var _cam_rig: Node3D
 var _sun: DirectionalLight3D
+var _env: Environment
+var _vignette: ColorRect
 var world: World
 var squad: Squad
 var hud: Hud
@@ -103,7 +105,10 @@ var _smoke_daily := false
 var _smoke_weekly := false
 var _smoke_upgrades := false
 var _shots_dir := ""
-var _since_game_over := 0.0
+var _game_over_at := 0
+var _game_over_frame := 0
+var _smoke_retry := false
+var _smoke_retries := 0
 var _shake := 0.0
 var _drag_scale := 0.015
 var _fov_tween: Tween
@@ -128,6 +133,9 @@ func _ready() -> void:
 	_smoke_weekly = args.has("--weekly")
 	# --smoke-upgrades: play with every shop upgrade maxed, to exercise them.
 	_smoke_upgrades = args.has("--smoke-upgrades")
+	# --smoke-retry: after a wipe, tap through the results and play again,
+	# so the game-over screen and the restart run in CI too.
+	_smoke_retry = args.has("--smoke-retry")
 	if args.has("--hard"):
 		modifier = "hard"
 	elif args.has("--nightmare"):
@@ -179,7 +187,10 @@ func _ready() -> void:
 	hud.set_music(Sfx.music_on)
 	hud.set_characters(character_mode)
 	hud.set_shadows(SaveData.load_shadows_on())
+	hud.set_safe_graphics(SaveData.load_safe_graphics())
+	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
+	Diag.note("ready", {"smoke": smoke, "character_mode": character_mode})
 	show_title()
 	if smoke:
 		start_run("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels")))
@@ -226,6 +237,7 @@ func _build_scene() -> void:
 	e.fog_density = 0.0055
 	e.fog_sky_affect = 0.15
 	env.environment = e
+	_env = e
 	add_child(env)
 
 	_sun = DirectionalLight3D.new()
@@ -319,6 +331,7 @@ func _build_scene() -> void:
 	vignette_layer.layer = 0
 	add_child(vignette_layer)
 	var vignette := ColorRect.new()
+	_vignette = vignette
 	vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sh := Shader.new()
@@ -357,9 +370,16 @@ func _build_scene() -> void:
 	hud.settings_closed.connect(show_title)
 	hud.characters_toggled.connect(_on_characters_toggled)
 	hud.shadows_toggled.connect(func(on: bool) -> void:
-		_sun.shadow_enabled = on
+		_sun.shadow_enabled = on and not SaveData.load_safe_graphics()
 		SaveData.save_shadows_on(on)
+		Diag.note("shadows", {"on": on})
 		sfx.play("click"))
+	hud.safe_graphics_toggled.connect(func(on: bool) -> void:
+		SaveData.save_safe_graphics(on)
+		_apply_graphics(on)
+		Diag.note("safe_graphics", {"on": on})
+		sfx.play("click"))
+	hud.report_pressed.connect(_send_report)
 	hud.locker_opened.connect(open_locker)
 	hud.locker_closed.connect(close_locker)
 	hud.locker_tab.connect(_on_locker_tab)
@@ -368,8 +388,39 @@ func _build_scene() -> void:
 
 # --- menus -----------------------------------------------------------------
 
+## Safe graphics: the plain renderer for phones whose drivers choke on
+## the extras. No glow, no fog, no shadows, no anti-aliasing, no vignette.
+func _apply_graphics(safe: bool) -> void:
+	if _env != null:
+		_env.glow_enabled = not safe
+		_env.fog_enabled = not safe
+		_env.adjustment_enabled = not safe
+	if _sun != null:
+		_sun.shadow_enabled = SaveData.load_shadows_on() and not smoke and not safe
+	if _vignette != null:
+		_vignette.visible = not safe
+	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if safe else Viewport.MSAA_2X
+
+
+## What the report says about this save: enough to reproduce, no secrets.
+func _save_summary() -> Dictionary:
+	return {
+		"runs": int(stats.get("runs", 0)), "best_level": SaveData.load_best_level("normal"),
+		"coins": coins, "stars": wardrobe.stars, "trophies": trophies, "modifier": modifier,
+		"character_mode": character_mode, "upgrades": meta.levels, "squad_type": squad_type,
+		"mode": mode, "state": State.keys()[state], "last_result": _last_result,
+	}
+
+
+func _send_report(note: String) -> void:
+	sfx.play("click")
+	var ok := Diag.send(_save_summary(), note)
+	hud.show_banner("REPORT COPIED\nOPENING MAIL..." if ok else "REPORT COPIED TO CLIPBOARD\nNO MAIL APP FOUND", 2.2)
+
+
 func show_title() -> void:
 	state = State.TITLE
+	Diag.set_state("title")
 	sfx.set_music("calm")
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
@@ -381,8 +432,11 @@ func show_title() -> void:
 	elif modifier == "hard" and not _feature_open("nightmare"):
 		hint = "Nightmare opens at %d trophies" % int(Road.UNLOCKS["nightmare"])
 	var runs := int(stats.get("runs", 0))
+	var goal := Goals.next(_goal_context())
+	if Diag.had_bad_exit() and runs > 0:
+		goal = "The game stopped suddenly last time. SETTINGS has a REPORT A BUG button that emails the details."
 	hud.show_title({
-		"goal": Goals.next(_goal_context()),
+		"goal": goal,
 		"buttons": _title_buttons(runs),
 		"trophies": trophies,
 		"best": best, "best_level": best_level, "best_endless": best_endless, "coins": coins,
@@ -673,6 +727,10 @@ func start_run(p_mode: String = "levels") -> void:
 		run_seed = Daily.seed_for_week(week_number)
 	squad.meta = run_meta
 	world.meta = run_meta
+	# The bot's runs repeat: the same seed gives the same road and the
+	# same dice, so a soak failure can be run again.
+	if smoke:
+		seed(run_seed)
 	total_distance = 0.0
 	kills = 0
 	score = 0
@@ -721,6 +779,8 @@ func start_run(p_mode: String = "levels") -> void:
 	# banner, chime or glide the camera like a mid-run widening.
 	world.reset(run_seed)
 	state = State.RUNNING
+	Diag.set_state("running")
+	Diag.note("start_run", {"mode": mode, "modifier": modifier, "seed": run_seed, "squad_type": squad_type})
 	squad.active = true
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
@@ -739,13 +799,18 @@ func end_run() -> void:
 	if state != State.RUNNING:
 		return
 	state = State.GAME_OVER
+	Diag.set_state("game_over")
+	var t0 := Time.get_ticks_msec()
 	squad.active = false
 	world.frozen = true
 	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
 	hud.set_combo(0, 1.0, 0.0)
 	hud.set_danger(0.0)
 	sfx.set_music("")
-	_since_game_over = 0.0
+	_game_over_at = Time.get_ticks_msec()
+	_game_over_frame = _frames
+	Diag.mark("end_run:records")
 	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
@@ -833,6 +898,7 @@ func end_run() -> void:
 						else:
 							wardrobe.owned[str(rw.id)] = true
 							SaveData.save_wardrobe(wardrobe.to_dict())
+	Diag.mark("end_run:road")
 	# The road: trophies for the run, milestones passed, rewards applied.
 	var trophies_earned := Road.trophies_for_run(world.level, grades, world.modifier, world.endless)
 	var road_rewards: Array = []
@@ -859,6 +925,7 @@ func end_run() -> void:
 							SaveData.save_wardrobe(wardrobe.to_dict())
 	# Stars from the season and the road count in the lifetime numbers too.
 	run_stats.stars_earned = stars_earned
+	Diag.mark("end_run:stats")
 	if not smoke:
 		quest_state = qa.state
 		SaveData.save_quests(quest_state)
@@ -874,6 +941,7 @@ func end_run() -> void:
 	if not smoke and stars_earned > 0:
 		wardrobe.stars += stars_earned
 		SaveData.save_wardrobe(wardrobe.to_dict())
+	Diag.mark("end_run:card")
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.show_game_over({
 		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
@@ -884,6 +952,8 @@ func end_run() -> void:
 		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
 		"trophies_earned": trophies_earned, "road_rewards": road_rewards,
 	})
+	Diag.note("end_run_done", {"ms": Time.get_ticks_msec() - t0, "level": world.level, "score": score, "mode": mode})
+	Diag.mark("end_run:shown")
 	if character_mode:
 		squad.cheer()
 	sfx.play("wipe")
@@ -894,6 +964,7 @@ func pause_game() -> void:
 	if state != State.RUNNING or get_tree().paused:
 		return
 	get_tree().paused = true
+	Diag.set_state("paused")
 	hud.show_paused(true)
 	sfx.play("click")
 
@@ -902,6 +973,7 @@ func resume_game() -> void:
 	if not get_tree().paused:
 		return
 	get_tree().paused = false
+	Diag.set_state("running")
 	hud.show_paused(false)
 	sfx.play("click")
 
@@ -933,8 +1005,13 @@ func _process(delta: float) -> void:
 	match state:
 		State.RUNNING:
 			_tick_run(delta)
-		State.GAME_OVER:
-			_since_game_over += delta
+		_:
+			# Insurance: slow motion belongs to the run. Anything that left
+			# the clock slow after it would make every menu crawl.
+			if Engine.time_scale != 1.0:
+				Diag.note("time_scale_reset", {"was": Engine.time_scale})
+				Engine.time_scale = 1.0
+				_slowmo_until = 0.0
 	_keyboard_steer(delta)
 	_apply_shake(delta)
 	if smoke:
@@ -1087,7 +1164,8 @@ func _on_dash() -> void:
 
 
 func _try_retry() -> void:
-	if state == State.GAME_OVER and _since_game_over >= RETRY_LOCKOUT:
+	if state == State.GAME_OVER and Time.get_ticks_msec() - _game_over_at >= int(RETRY_LOCKOUT * 1000.0):
+		Diag.note("retry")
 		start_run(mode)
 
 
@@ -1498,6 +1576,8 @@ func _offer_revive(price: int) -> void:
 	# The last bite may have slowed time; the countdown runs at full speed.
 	Engine.time_scale = 1.0
 	_slowmo_until = 0.0
+	Diag.set_state("revive_offer")
+	Diag.note("revive_offer", {"price": price, "stars": wardrobe.stars, "level": world.level})
 	get_tree().paused = true
 	hud.show_revive(price, wardrobe.stars, Revive.SOLDIERS, Revive.OFFER_SECONDS)
 	sfx.play("boss_roar", -10.0, 1.6)
@@ -1508,6 +1588,8 @@ func _on_revive_accepted() -> void:
 		return
 	_revive_open = false
 	_revive_used = true
+	Diag.set_state("running")
+	Diag.note("revive_accepted")
 	var price := Revive.price(Revive.uses_today(revives, _today()))
 	wardrobe.stars = maxi(0, wardrobe.stars - price)
 	revives = Revive.note_use(revives, _today())
@@ -1529,6 +1611,7 @@ func _on_revive_declined() -> void:
 	if not _revive_open:
 		return
 	_revive_open = false
+	Diag.note("revive_declined")
 	hud.hide_revive()
 	get_tree().paused = false
 	end_run()
@@ -1538,6 +1621,7 @@ func _second_wind() -> void:
 	_second_wind_pending = false
 	if state != State.RUNNING:
 		return
+	Diag.note("second_wind", {"level": world.level})
 	if smoke:
 		print("SMOKE_WIND ", JSON.stringify({"level": world.level, "frame": _frames}))
 	squad.set_count(Meta.SECOND_WIND_SOLDIERS)
@@ -1573,6 +1657,18 @@ func _smoke_tick() -> void:
 		return
 	if _shots_dir != "":
 		return
+	# --smoke-retry: sit on the results for a second and a half, check the
+	# clock is back to normal, then tap through and play again, once.
+	if _smoke_retry and state == State.GAME_OVER and _smoke_retries == 0 and _frames < _smoke_frames:
+		# Frames, not the clock: headless frames on a frozen road are fast.
+		if _frames - _game_over_frame < 90:
+			return
+		_smoke_retries += 1
+		if Engine.time_scale != 1.0:
+			push_error("game over left the clock at %s" % Engine.time_scale)
+		print("SMOKE_RETRY ", JSON.stringify({"frame": _frames, "level": world.level, "time_scale": Engine.time_scale, "stalls": Diag.stalls.size()}))
+		start_run(mode)
+		return
 	if _frames >= _smoke_frames or state == State.GAME_OVER:
 		var summary := {
 			"frames": _frames,
@@ -1591,6 +1687,7 @@ func _smoke_tick() -> void:
 			"peak_squad": peak_squad,
 			"score": score,
 			"state": state,
+			"retries": _smoke_retries,
 		}
 		print("SMOKE_RESULT ", JSON.stringify(summary))
 		var ok := gates_passed >= 3 and total_distance > 100.0

@@ -132,6 +132,12 @@ the same key (see below).
 - **Runners** are fast, thin and they find you. Walkers barely steer, so
   lining up the crowd is on you. When a bite leaves you with a handful,
   time slows for a beat.
+- **Bug reports**: SETTINGS has REPORT A BUG BY EMAIL. It opens your mail
+  app with the diagnostics filled in (phone, GPU, app version, the last
+  game events, stalls, how the previous session ended, engine errors)
+  and copies the same text to the clipboard. SAFE GRAPHICS in the same
+  card turns off glow, fog, shadows and anti-aliasing for phones that
+  glitch.
 - **Endless**: opens at 300 trophies. No bosses, no reset, gates
   forever, separate best score.
 - **The trophy road**: every run adds trophies (10 per level, more for

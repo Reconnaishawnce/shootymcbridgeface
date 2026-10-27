@@ -266,6 +266,46 @@ UTC day, saved as {day, count}). Once a run, never for the bot, never in
 the daily or weekly. Accepting mirrors second wind: soldiers, a shield,
 `World.shake_off`. Declining, or the timer, ends the run.
 
+## Diagnostics and bug reports
+
+Phones fail in ways the headless bot never sees, so the game carries
+its own black box. `Diag` (an autoload) keeps a ring of the last 200
+events (`Report.line`), detects frames longer than half a second on the
+wall clock and records them with the state and breadcrumb they happened
+in, and writes a heartbeat file every three seconds and on every state
+change or breadcrumb. The heartbeat carries `clean`: true once the app
+is backgrounded or closing, false while it is in the foreground, so a
+process that vanishes with `clean == false` was a crash or an ANR, not
+the system reclaiming memory. On the next launch the previous heartbeat
+becomes the "previous session" part of the report and, if it was a bad
+exit, the title's next-thing line points at the report button.
+
+`Report` is pure and tested: the report text (device, app, previous
+session, stalls, engine error lines from the previous and current
+`user://logs/godot.log`, a save summary, the event log) and the
+`mailto:` link, cut from the front so the newest events survive a mail
+app's body limit. `Diag.send` copies the text to the clipboard first,
+so nothing is lost. File logging is on for every platform in
+`project.godot` so release builds keep script errors.
+
+Breadcrumbs mark the results path (`end_run:records`, `road`, `stats`,
+`card`, `shown`) and the time `end_run` took is logged, because the
+results screen is where phones have frozen. Two guards sit there too:
+`Engine.time_scale` is forced to 1 in every state but RUNNING (slow
+motion from the last bite or a hit-stop can otherwise outlive the run
+and make every menu crawl), and the retry lockout runs on
+`Time.get_ticks_msec`, not on scaled delta.
+
+SAFE GRAPHICS turns off glow, fog, colour adjustment, shadows, MSAA and
+the vignette (`Game._apply_graphics`), for drivers that glitch on the
+extras; the report says whether it is on.
+
+QA: `--smoke-retry` makes the bot sit on the results for ninety frames,
+assert the clock is back to normal, and play again; `check.sh` runs it
+on a nightmare seed. `seed(run_seed)` in smoke mode makes a seed
+replay. `scripts/ci/soak.sh` plays every mode and modifier across seeds
+and fails on any script error.
+
 ## One look, one next thing
 
 `Hud.make_theme` is the whole UI kit: one button style (dark glass,

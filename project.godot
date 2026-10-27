@@ -16,6 +16,16 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 run/max_fps=60
 config/icon="res://icon.svg"
+config/version="dev"
+
+[autoload]
+
+Diag="*res://scripts/diag.gd"
+
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/max_log_files=3
 
 [display]
 

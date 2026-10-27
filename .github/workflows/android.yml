@@ -123,6 +123,8 @@ jobs:
         run: |
           sed -i "s|^version/code=.*|version/code=${{ steps.ver.outputs.code }}|" export_presets.cfg
           sed -i "s|^version/name=.*|version/name=\"${{ steps.ver.outputs.name }}\"|" export_presets.cfg
+          sed -i "s|^config/version=.*|config/version=\"${{ steps.ver.outputs.name }}\"|" project.godot
+          grep -E "^config/version" project.godot
           grep -E "^version/" export_presets.cfg
 
       - name: Export APK

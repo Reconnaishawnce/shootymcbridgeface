@@ -59,6 +59,14 @@ static func save_sound_on(on: bool) -> void:
 	_write(SETTINGS, "sound_on", on)
 
 
+static func load_safe_graphics() -> bool:
+	return bool(_read(SETTINGS, "safe_graphics", false))
+
+
+static func save_safe_graphics(on: bool) -> void:
+	_write(SETTINGS, "safe_graphics", on)
+
+
 static func load_shadows_on() -> bool:
 	return bool(_read(SETTINGS, "shadows_on", true))
 

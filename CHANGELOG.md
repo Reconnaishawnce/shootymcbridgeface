@@ -3,6 +3,36 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.29 (diagnostics, bug reports, safe graphics)
+
+- Bug reports by email. SETTINGS has a line for what happened and a
+  REPORT A BUG BY EMAIL button. It opens the mail app with a report
+  filled in (phone, Android version, GPU, app version, the last 200
+  game events, any frames that stalled for half a second or more, how
+  the previous session ended and where, error lines from the engine's
+  own log of the previous session, a save summary) and copies the same
+  text to the clipboard.
+- A heartbeat. The game writes what it is doing every few seconds and on
+  every change (title, running, paused, game over and each step of the
+  results: records, road, stats, card). If it dies in the foreground,
+  the next launch says so on the title screen and the report names the
+  step. Going to the home screen is a clean exit, so the system killing
+  a backgrounded app is not counted.
+- The engine's log is kept on the phone (three sessions) so script
+  errors from release builds reach the report.
+- SAFE GRAPHICS in SETTINGS: no glow, fog, shadows, anti-aliasing or
+  vignette, for phones whose drivers glitch on the extras.
+- Two guards on the results screen: slow motion can never outlive the
+  run (the clock is forced back to normal in every state but RUNNING and
+  the reset is logged), and the tap-to-retry lockout runs on the wall
+  clock, not on game time. If a phone was freezing on the results
+  screen because the clock was left slow, that was the fix; the report
+  will say if it ever happens again.
+- QA: the bot can play through the results screen and restart
+  (`--smoke-retry`); CI now does that on a nightmare seed. The bot's
+  dice are seeded, so a seed replays. `scripts/ci/soak.sh` runs every
+  mode and modifier across seeds and fails on any script error.
+
 ## 0.28 (home, road, rally)
 
 - The home screen. No box. Title and a big PLAY in the middle, the modes

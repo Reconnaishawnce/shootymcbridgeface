@@ -8,6 +8,10 @@
   teenager: short sections, plain words, numbers taken from the constants.
   `tests/test_run13.gd::test_help_text` fails if a mode, power-up or panel
   colour goes unmentioned; extend that test when you add one.
+- Phones freeze where the bot does not: keep `Diag.set_state` /
+  `Diag.mark` breadcrumbs on new states and on long steps, and keep
+  `Report` pure. `scripts/ci/soak.sh <godot>` before a release that
+  touches the run loop.
 - Before a push to `main`: `scripts/ci/check.sh <godot>` and
   `scripts/ci/check_export.sh <godot>` from a fresh cache (`rm -rf .godot build`).
 - Always push to `main`. Releases are built and tagged by CI from `VERSION`.

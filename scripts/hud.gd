@@ -33,6 +33,8 @@ signal help_closed
 signal settings_closed
 signal characters_toggled(on: bool)
 signal shadows_toggled(on: bool)
+signal safe_graphics_toggled(on: bool)
+signal report_pressed(note: String)
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -90,6 +92,8 @@ var _settings_sound: Button
 var _settings_music: Button
 var _settings_characters: Button
 var _settings_shadows: Button
+var _settings_safe: Button
+var _report_note: LineEdit
 var _pause_characters: Button
 
 var _quests_card: Control
@@ -701,10 +705,29 @@ func _build_settings(root: Control) -> void:
 		set_shadows(on)
 		shadows_toggled.emit(on))
 	box.add_child(_settings_shadows)
-	var blurb := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Characters on: pick a hero, outfits, hats,\nweapons and more in the LOCKER. Stars pay for them."
+	_settings_safe = _button("SAFE GRAPHICS: OFF", 34)
+	_settings_safe.pressed.connect(func() -> void:
+		var on := not _settings_safe.text.ends_with("ON")
+		set_safe_graphics(on)
+		safe_graphics_toggled.emit(on))
+	box.add_child(_settings_safe)
+	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch."
+	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
+	blurb.custom_minimum_size.x = 520.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
 	box.add_child(blurb)
+	# Bug reports: a line for what happened, a button that opens the mail
+	# app with the diagnostics filled in.
+	_report_note = LineEdit.new()
+	_report_note.placeholder_text = "Something wrong? Say what happened..."
+	_report_note.max_length = 300
+	_report_note.custom_minimum_size = Vector2(520.0, 56.0)
+	_report_note.add_theme_font_size_override("font_size", 22)
+	box.add_child(_report_note)
+	var report := _button("REPORT A BUG BY EMAIL", 28)
+	report.pressed.connect(func() -> void: report_pressed.emit(_report_note.text))
+	box.add_child(report)
 	var back := _button("BACK", 34)
 	back.pressed.connect(func() -> void: settings_closed.emit())
 	box.add_child(back)
@@ -1169,6 +1192,10 @@ func show_help() -> void:
 func show_settings() -> void:
 	_hide_cards()
 	_settings_card.visible = true
+
+
+func set_safe_graphics(on: bool) -> void:
+	_settings_safe.text = "SAFE GRAPHICS: %s" % ("ON" if on else "OFF")
 
 
 ## The locker: one tab of items. Owned items say so, the equipped one is

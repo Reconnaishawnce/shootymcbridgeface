@@ -29,8 +29,8 @@ echo "== smoke play (900 fixed frames, auto-steer)"
 fail_on_script_errors "smoke play"
 grep -q "SMOKE_RESULT" "$LOG" || { echo "::error::smoke run produced no result line"; exit 1; }
 
-echo "== wipe and retry (nightmare, seed 11: the results screen and the restart)"
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=9000 --smoke-seed=11 --nightmare --smoke-retry 2>&1 | tee "$LOG"
+echo "== wipe and retry (nightmare, seed 11, a forced wipe at frame 4500: the results screen and the restart)"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=11 --nightmare --smoke-retry --smoke-wipe-at=4500 2>&1 | tee "$LOG"
 fail_on_script_errors "wipe and retry"
 grep -q "SMOKE_RETRY" "$LOG" || { echo "::error::the bot never reached the results screen and played again"; exit 1; }
 echo "== all checks passed"

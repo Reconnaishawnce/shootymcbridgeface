@@ -42,6 +42,9 @@ signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 signal saw_spawned
 signal saw_hit(hit: bool)
+## A perk just did something you could have missed: thick skin softened
+## a bite by [param amount], the recruiter added [param amount].
+signal perk_felt(id: String, amount: int)
 
 enum Phase { GATES, BOSS, CLEAR }
 
@@ -425,7 +428,14 @@ func mod(key: String) -> float:
 ## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
 	var armor := meta.bite_mult() if meta != null else 1.0
-	return maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
+	var base := maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
+	# Thick skin softens every heavy bite, and says so each time.
+	if perks != null and perks.stack("skin") > 0:
+		var softened := maxi(1, int(round(float(base) * perks.brute_bite_mult())))
+		if base - softened > 0:
+			perk_felt.emit("skin", base - softened)
+		return softened
+	return base
 
 
 ## The rubber band for the squad as it stands right now.
@@ -576,7 +586,7 @@ func _spawn() -> void:
 				route_gates.append(rg)
 		elif offer.size() >= 2:
 			var pg := PerkGate.new()
-			pg.setup(offer, road_half)
+			pg.setup(offer, road_half, perks.stacks if perks != null else {})
 			pg.position = Vector3(0.0, 0.0, z)
 			add_child(pg)
 			perk_gates.append(pg)
@@ -855,8 +865,9 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 				if after > 0:
 					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
 						after += meta.gate_bonus()
-					if perks != null:
+					if perks != null and perks.recruit_per_gate() > 0:
 						after += perks.recruit_per_gate()
+						perk_felt.emit("recruit", perks.recruit_per_gate())
 				p_squad.set_count(after)
 				_gates_passed += 1
 				gate_passed.emit(panel, before, after)
@@ -910,8 +921,9 @@ func _move_fork(delta: float, p_squad: Squad) -> void:
 					var panel: GateMath.GatePanel = rg.choose()
 					var before := p_squad.count
 					var after := GateMath.apply(before, panel)
-					if after > 0 and perks != null:
+					if after > 0 and perks != null and perks.recruit_per_gate() > 0:
 						after += perks.recruit_per_gate()
+						perk_felt.emit("recruit", perks.recruit_per_gate())
 					p_squad.set_count(after)
 					_gates_passed += 1
 					gate_passed.emit(panel, before, after)
@@ -985,13 +997,11 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 				continue
 			var bite: int = z.bite
 			if z.is_tank():
-				bite = maxi(1, int(Difficulty.tank_bite(p_squad.count) * p_squad.bite_mult()))
+				bite = _bite(maxi(1, int(Difficulty.tank_bite(p_squad.count) * p_squad.bite_mult())))
 			elif z.brute:
 				var fraction := Difficulty.BRUTE_BITE_FRACTION
 				if meta != null:
 					fraction = meta.brute_bite_fraction(fraction)
-				if perks != null:
-					fraction *= perks.brute_bite_mult()
 				bite = _bite(maxi(1, int(Difficulty.brute_bite(p_squad.count, fraction) * p_squad.bite_mult())))
 			p_squad.add(-bite)
 			if z.brute or z.is_tank():

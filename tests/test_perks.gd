@@ -53,3 +53,13 @@ func test_effects_scale_with_stacks() -> void:
 	check_near(p.brute_bite_mult(), 0.67, 0.0001, "skin")
 	check_near(p.coin_mult(), 1.3, 0.0001, "greed")
 	check(p.reveal_bonus() == 0.0, "no sight")
+
+
+func test_pickup_text_and_summary() -> void:
+	check(Perks.pickup_text("skin", 1).begins_with("THICK SKIN\n"), "name then what it does")
+	check(Perks.pickup_text("skin", 2).begins_with("THICK SKIN  x2\n"), "a second stack says so")
+	check_eq(Perks.summary({}), "", "nothing held, nothing said")
+	var text := Perks.summary({"rapid": 2, "skin": 1})
+	check(text.contains("RAPID FIRE  x2") and text.contains("THICK SKIN"), "the strip names every perk held")
+	for id in Perks.CATALOG:
+		check(Perks.description(id) != "" and Perks.max_stack(id) >= 1, "every perk explains itself: %s" % id)

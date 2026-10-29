@@ -110,6 +110,9 @@ var _shots_dir := ""
 var _game_over_at := 0
 var _game_over_frame := 0
 var _smoke_retry := false
+## --smoke-wipe-at=N: the bot loses its whole squad at frame N, so the
+## results screen and the restart are exercised whatever the balance.
+var _smoke_wipe_at := 0
 var _warming := false
 var _fps_frames := 0
 var _fps_since := 0.0
@@ -151,6 +154,8 @@ func _ready() -> void:
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-wipe-at="):
+			_smoke_wipe_at = int(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):
 			_shots_dir = a.get_slice("=", 1)
 	modifier = SaveData.load_modifier()
@@ -319,6 +324,7 @@ func _build_scene() -> void:
 		hud.show_float("SAW AHEAD", false)
 		sfx.play("boss_roar", -12.0, 2.2))
 	world.saw_hit.connect(_on_saw_hit)
+	world.perk_felt.connect(_on_perk_felt)
 	world.horde_bit.connect(_on_horde_bit)
 	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
 	world.powerups = powerups
@@ -925,6 +931,7 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.set_bounty(0, mode != "daily" and mode != "weekly")
+	hud.set_perks("")
 	hud.show_hint(Progression.hint_for(1), 4.0)
 	if character_mode:
 		hud.toast("%s: %s" % [wardrobe.hero_name(), Wardrobe.hero_line(wardrobe.equipped.get("hero", "max"))])
@@ -1394,7 +1401,8 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
 	bounty += Bounty.for_kind(zombie.kind_name())
 	if mode != "daily" and mode != "weekly":
-		hud.set_bounty(bounty)
+		# Greed shows on the counter as it happens, not only at the end.
+		hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
 	var chain := combo.kill(_run_time)
 	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
@@ -1484,9 +1492,19 @@ func _on_level_started(level: int) -> void:
 func _on_perk_chosen(id: String) -> void:
 	perks.take(id)
 	world.perk_count = perks.total()
-	hud.show_banner(Perks.title(id), 0.9)
+	hud.show_banner(Perks.pickup_text(id, perks.stack(id)), 1.5)
+	hud.set_perks(Perks.summary(perks.stacks))
 	sfx.play("gate_good")
 	_punch(3.0)
+
+
+## A perk did its job: say so, every time, so the gate was worth it.
+func _on_perk_felt(id: String, amount: int) -> void:
+	match id:
+		"skin":
+			hud.show_banner("THICK SKIN\nSAVED %d" % amount, 0.8)
+		"recruit":
+			hud.show_banner("RECRUITER  +%d" % amount, 0.6)
 
 
 func _on_powerup_granted(id: String, from_crate: bool) -> void:
@@ -1808,6 +1826,10 @@ func _smoke_tick() -> void:
 	if _quitting:
 		return
 	if _frames < _smoke_frames and state == State.RUNNING:
+		if _smoke_wipe_at > 0 and _frames >= _smoke_wipe_at and _smoke_retries == 0:
+			print("SMOKE_WIPE ", JSON.stringify({"frame": _frames, "level": world.level}))
+			squad.set_count(0)
+			return
 		_bot_steer()
 		return
 	if _shots_dir != "":

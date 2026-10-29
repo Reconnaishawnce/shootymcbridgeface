@@ -13,10 +13,11 @@ var passed := false
 var slot_w := SLOT_W
 var _mats: Array[StandardMaterial3D] = []
 var _labels: Array[Label3D] = []
+var _descs: Array[Label3D] = []
 
 
 ## Slots share the road: [param road_half] is half its width.
-func setup(p_ids: Array, road_half: float = 3.0) -> void:
+func setup(p_ids: Array, road_half: float = 3.0, stacks: Dictionary = {}) -> void:
 	ids = p_ids
 	slot_w = road_half * 2.0 / float(maxi(ids.size(), 1))
 	for i in range(ids.size()):
@@ -35,16 +36,31 @@ func setup(p_ids: Array, road_half: float = 3.0) -> void:
 		_mats.append(mat)
 		var label := Label3D.new()
 		label.text = Perks.title(ids[i])
-		label.font_size = 40
+		label.font_size = 36
 		label.outline_size = 12
 		label.pixel_size = 0.01
 		label.width = (slot_w - 0.3) / 0.01
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD
 		label.outline_modulate = Color(0.05, 0.05, 0.08)
-		label.position = Vector3(x, HEIGHT * 0.55, 0.2)
+		label.position = Vector3(x, HEIGHT * 0.74, 0.2)
 		label.no_depth_test = true
 		add_child(label)
 		_labels.append(label)
+		# What it does, and how many you already hold: no mystery panels.
+		var have := int(stacks.get(ids[i], 0))
+		var desc := Label3D.new()
+		desc.text = Perks.description(ids[i]) + ("\n%d of %d held" % [have, Perks.max_stack(ids[i])] if have > 0 else "")
+		desc.font_size = 20
+		desc.outline_size = 8
+		desc.pixel_size = 0.01
+		desc.width = (slot_w - 0.3) / 0.01
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc.modulate = Color(0.95, 0.9, 1.0)
+		desc.outline_modulate = Color(0.05, 0.05, 0.08)
+		desc.position = Vector3(x, HEIGHT * 0.34, 0.2)
+		desc.no_depth_test = true
+		add_child(desc)
+		_descs.append(desc)
 	for i in range(ids.size() + 1):
 		var post := Mats.box(Vector3(0.16, HEIGHT + 0.3, 0.3), POST)
 		post.position = Vector3((float(i) - float(ids.size()) * 0.5) * slot_w, (HEIGHT + 0.3) * 0.5, 0.0)
@@ -77,4 +93,5 @@ func choose(i: int) -> String:
 		else:
 			tw.tween_property(_mats[j], "albedo_color:a", 0.0, 0.3)
 		tw.parallel().tween_property(_labels[j], "modulate:a", 0.0, 0.4)
+		tw.parallel().tween_property(_descs[j], "modulate:a", 0.0, 0.4)
 	return ids[i]

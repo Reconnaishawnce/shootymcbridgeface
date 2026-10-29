@@ -147,6 +147,7 @@ var _music_button: Button
 var _formation_button: Button
 var _bomb_button: Button
 var _powers: Label
+var _perk_strip: Label
 var _fork_box: Control
 var _hint: Label
 var _hint_tween: Tween
@@ -376,6 +377,11 @@ func _init() -> void:
 	root.add_child(_bomb_button)
 	_powers = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _powers, 0.15, 0.85, 124.0)
+	# The perks you hold, always on screen, so a gate's effect is a fact.
+	_perk_strip = _label(19, HORIZONTAL_ALIGNMENT_CENTER)
+	_perk_strip.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_place(root, _perk_strip, 0.08, 0.92, 152.0)
+	_perk_strip.add_theme_color_override("font_color", Color(0.85, 0.75, 1.0))
 	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
 
 	# Teaching line: one new thing per level, big, then gone.
@@ -1142,11 +1148,16 @@ func set_powers(text: String) -> void:
 	_powers.text = text
 
 
+func set_perks(text: String) -> void:
+	_perk_strip.text = text
+
+
 func _hide_cards() -> void:
 	_formation_button.visible = false
 	_bounty_row.visible = false
 	_bomb_button.visible = false
 	_powers.text = ""
+	_perk_strip.text = ""
 	_fork_box.visible = false
 	_hint.modulate.a = 0.0
 	_dash.modulate.a = 0.0

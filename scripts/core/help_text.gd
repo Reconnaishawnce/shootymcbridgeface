@@ -43,6 +43,10 @@ static func sections() -> Array:
 			"The heavier side pays better panels. Read both and pick. " +
 			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
 				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
+		{"title": "PERKS", "body":
+			"Every perk panel says what it does and how many of it you already hold, the banner on the way through says it again, and the strip under your stats lists everything you carry. " +
+			"When a perk does its job you see it: THICK SKIN tells you how many soldiers it just saved, RECRUITER shows its extra soldier at the gate, GREED shows on the bounty counter as it grows.\n" +
+			_perk_lines()},
 		{"title": "THE CONVOY", "body":
 			"Soldiers can become vehicles. Once your squad is big enough, a gate offers an olive panel like JEEP -%d: walk through it and that many soldiers climb aboard. " % Convoy.cost("jeep") +
 			"A JEEP (%d soldiers, up to %d) rides on your flank with a mounted gun: fast, straight, through two zombies at a time. " % [Convoy.cost("jeep"), int(Convoy.spec("jeep").max)] +
@@ -113,3 +117,10 @@ static func sections() -> Array:
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]
+
+
+static func _perk_lines() -> String:
+	var lines := []
+	for id in Perks.CATALOG:
+		lines.append("%s: %s (up to %d)." % [Perks.title(id), Perks.description(id), Perks.max_stack(id)])
+	return "\n".join(lines)

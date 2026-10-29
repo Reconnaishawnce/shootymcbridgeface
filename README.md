@@ -125,9 +125,10 @@ the same key (see below).
   march on into the next level; the rest of the squad is rebuilt from
   gates.
 - **Perk gates**: the third and sixth gate of each level is a purple
-  three-way gate. Steer through the perk you want at full speed. Perks
-  last the run and stack: rapid fire, big bullets, piercing, gate
-  whisperer, recruiter, thick skin, long sight, core sight, greed.
+  three-way gate. Each panel says what the perk does and how many you
+  hold; steer through the one you want at full speed. Perks last the
+  run, stack, show in a strip under your stats, and tell you when they
+  work (thick skin says what it saved, the recruiter shows its soldier).
 - **Combos**: kills within 1.4 s of each other chain. Every five kills in
   a chain raises the score multiplier, up to 4x. Clear a whole wave before
   any of it reaches you for a bonus. Shoot a gate panel up three steps

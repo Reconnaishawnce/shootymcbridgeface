@@ -309,7 +309,8 @@ watchdog: under 22 fps over five seconds turns SAFE GRAPHICS on once
 per install and tells the player. A bad exit opens a one-tap crash
 card on the next launch (`Hud.show_crash_card`).
 
-QA: `--smoke-retry` makes the bot sit on the results for ninety frames,
+QA: `--smoke-wipe-at=N` takes the bot's whole squad at frame N so the
+results screen is reached whatever the balance; `--smoke-retry` makes the bot sit on the results for ninety frames,
 assert the clock is back to normal, and play again; `check.sh` runs it
 on a nightmare seed. `seed(run_seed)` in smoke mode makes a seed
 replay. `scripts/ci/soak.sh` plays every mode and modifier across seeds
@@ -422,6 +423,19 @@ The bot steps round the nearest saw before anything else.
 Deaths: `Squad._tumble` reparents a lost soldier to the world, freezes
 its animation and tweens it up, out toward the nearest curb and down
 past the bridge, spinning, over 1.1 s, at most `MAX_TUMBLING` at once.
+
+## Perks you can read and feel
+
+A perk gate panel carries three lines: the name, what it does
+(`Perks.description`) and, once you hold one, "n of max held"
+(`PerkGate.setup` takes the current stacks). Taking one banners
+`Perks.pickup_text` (name, count, effect) and the HUD strip under the
+stats shows `Perks.summary` for the rest of the run. Effects announce
+themselves through `World.perk_felt`: `World._bite` applies thick skin
+to every heavy bite and emits how many soldiers it saved, the recruiter
+emits its soldier at each gate, and the bounty counter shows the greed
+multiplier as kills land. The help page's PERKS section is generated
+from the catalog.
 
 ## The help page, records and the storm
 

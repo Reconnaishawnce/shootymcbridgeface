@@ -3,6 +3,25 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.33 (gates that explain themselves)
+
+Turn 4 of the second feedback arc: no more mystery perks.
+
+- Every perk panel says what it does under its name, and how many of
+  it you already hold ("1 of 2 held").
+- Walking through one banners the name, the new count and the effect,
+  and a strip under the stats lists every perk you carry for the rest
+  of the run.
+- Perks you can feel. THICK SKIN now softens every heavy bite (brutes,
+  tanks, bosses, lightning, spit, saws, the horde), not just brutes, and
+  banners how many soldiers it just saved each time. RECRUITER shows
+  its extra soldier at every gate. GREED shows on the bounty counter as
+  the run goes, not only at the end.
+- ARMOR from the shop now covers tank bites too, so the shop's line
+  about heavy bites is true everywhere.
+- HOW TO PLAY has a PERKS section listing every perk, what it does and
+  how many you can stack, read from the catalog so it cannot go stale.
+
 ## 0.32 (bosses you can dodge, buzz saws, soldiers over the side)
 
 Turn 3 of the second feedback arc.

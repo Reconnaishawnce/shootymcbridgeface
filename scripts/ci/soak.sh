@@ -17,7 +17,7 @@ for mode in "" "--endless" "--daily" "--weekly"; do
     for seed in $(seq 1 "$SEEDS"); do
       runs=$((runs + 1))
       # shellcheck disable=SC2086
-      if ! "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames="$FRAMES" --smoke-seed="$seed" --smoke-retry $mode $mod >"$LOG" 2>&1; then
+      if ! "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames="$FRAMES" --smoke-seed="$seed" --smoke-retry --smoke-wipe-at=$((FRAMES * 2 / 3)) $mode $mod >"$LOG" 2>&1; then
         echo "exit code non-zero: mode=$mode mod=$mod seed=$seed"
       fi
       if grep -E "SCRIPT ERROR|^ERROR:|Parse Error|Compile Error" "$LOG" >/dev/null; then

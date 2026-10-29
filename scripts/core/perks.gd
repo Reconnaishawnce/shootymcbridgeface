@@ -10,7 +10,7 @@ const CATALOG := {
 	"pierce": {"name": "PIERCING", "desc": "Bullets pass through a kill", "max": 2},
 	"whisper": {"name": "GATE WHISPERER", "desc": "Gates step up 25% faster", "max": 3},
 	"recruit": {"name": "RECRUITER", "desc": "+1 soldier at every gate", "max": 2},
-	"skin": {"name": "THICK SKIN", "desc": "Brutes eat a third less", "max": 2},
+	"skin": {"name": "THICK SKIN", "desc": "Every heavy bite takes a third less", "max": 2},
 	"sight": {"name": "LONG SIGHT", "desc": "Hidden gates show from farther", "max": 2},
 	"core": {"name": "CORE SIGHT", "desc": "Boss core takes +1x damage", "max": 3},
 	"greed": {"name": "GREED", "desc": "+30% coins", "max": 3},
@@ -72,6 +72,30 @@ static func title(id: String) -> String:
 
 static func description(id: String) -> String:
 	return CATALOG[id]["desc"]
+
+
+static func max_stack(id: String) -> int:
+	return int(CATALOG[id]["max"])
+
+
+## What the banner says when a perk is taken: the name, how many you
+## now hold, and what it does.
+static func pickup_text(id: String, stack_now: int) -> String:
+	var head := title(id)
+	if stack_now > 1:
+		head += "  x%d" % stack_now
+	return "%s\n%s" % [head, description(id)]
+
+
+## The strip under the stats: every perk held, with its count.
+static func summary(p_stacks: Dictionary) -> String:
+	var parts := []
+	for id in CATALOG:
+		var n := int(p_stacks.get(id, 0))
+		if n <= 0:
+			continue
+		parts.append(title(id) + ("  x%d" % n if n > 1 else ""))
+	return "   ·   ".join(parts)
 
 
 # --- effects ---------------------------------------------------------------

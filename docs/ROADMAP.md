@@ -241,10 +241,11 @@ goes first because nothing else can be judged on a phone that crawls.
    smaller splash, longer warning on lightning with a filling ring; buzz
    saws that roll down the bridge from level 2; soldiers that tumble off
    the side when they die.
-4. Gates that explain themselves: every perk gate panel says what the
-   perk does, every pickup banners the effect, a perk strip in the HUD,
-   and effects big enough to feel (thick skin shows every bite it
-   softens).
+4. Gates that explain themselves (done): every perk gate panel says
+   what the perk does and how many you hold, every pickup banners the
+   effect, a perk strip in the HUD, and effects you can feel (thick skin
+   covers every heavy bite and shows what it saved, the recruiter shows
+   its soldier, greed shows on the counter).
 
 ## The graphics arc: from stick figures to a stylized, polished look
 

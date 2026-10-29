@@ -27,6 +27,8 @@ var state: int = State.TITLE
 var mode := "levels"
 var total_distance := 0.0
 var kills := 0
+## Coins the kills have paid this run, before the multipliers.
+var bounty := 0
 var score := 0
 var bonus := 0
 var best := 0
@@ -865,6 +867,7 @@ func start_run(p_mode: String = "levels") -> void:
 		seed(run_seed)
 	total_distance = 0.0
 	kills = 0
+	bounty = 0
 	score = 0
 	bonus = 0
 	peak_squad = 1
@@ -917,6 +920,7 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
+	hud.set_bounty(0, mode != "daily" and mode != "weekly")
 	hud.show_hint(Progression.hint_for(1), 4.0)
 	if character_mode:
 		hud.toast("%s: %s" % [wardrobe.hero_name(), Wardrobe.hero_line(wardrobe.equipped.get("hero", "max"))])
@@ -943,7 +947,7 @@ func end_run() -> void:
 	_game_over_at = Time.get_ticks_msec()
 	_game_over_frame = _frames
 	Diag.mark("end_run:records")
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(kills, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(bounty, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
@@ -1384,6 +1388,9 @@ func _on_gate_stepped(gate: Gate, index: int) -> void:
 
 func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
+	bounty += Bounty.for_kind(zombie.kind_name())
+	if mode != "daily" and mode != "weekly":
+		hud.set_bounty(bounty)
 	var chain := combo.kill(_run_time)
 	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
@@ -1816,6 +1823,7 @@ func _smoke_tick() -> void:
 			"waves_cleared": waves_cleared,
 			"perfect_gates": perfect_gates,
 			"kills": kills,
+			"bounty": bounty,
 			"squad": squad.count,
 			"peak_squad": peak_squad,
 			"score": score,
@@ -1851,6 +1859,18 @@ func _bot_steer() -> void:
 			if _bot_spread:
 				squad.set_spread(0.6)
 			return
+	# Straight fire when something heavy is lined up ahead; spray
+	# otherwise. The bot plays both plans.
+	var drill := false
+	if world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive:
+		drill = absf(world.boss.position.x + world.boss.core_x - squad.position.x) < 1.0
+	else:
+		for z in world.zombies:
+			if (z.brute or z.is_tank()) and z.position.z > -20.0 and absf(z.position.x - squad.position.x) < 0.8:
+				drill = true
+				break
+	if drill != squad.straight and _bot_spread:
+		squad.set_straight(drill)
 	var focus := world.focus_target(24.0)
 	if focus != null:
 		squad.set_focus(focus.position)

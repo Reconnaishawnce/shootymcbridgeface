@@ -43,6 +43,10 @@ var powerups: Powerups
 var squad_type := "rifle"
 ## Sideways stretch of the formation, player-controlled.
 var spread := 1.0
+## Straight fire: every round leaves from the middle of the formation and
+## flies dead ahead, harder and through one more body. The drill for
+## what is in front of you; the sides of the road go unwatched.
+var straight := false
 ## Run seconds, kept current by the game for timed power-ups.
 var now := 0.0
 ## Estimated sideways speed, for the spitter's lead.
@@ -115,6 +119,7 @@ func reset(start_count: int = 1) -> void:
 	_prev_x = 0.0
 	velocity_x = 0.0
 	spread = 1.0
+	straight = false
 	_fire_accum = 0.0
 	# Run clocks restart at zero: a dash from the last run must not leave
 	# this one invulnerable, or unable to dash, for minutes.
@@ -237,11 +242,23 @@ func set_spread(v: float) -> void:
 
 
 func adjust_spread(d: float) -> void:
+	# A drag on the width is a spray decision: straight fire ends.
+	straight = false
 	set_spread(spread + d)
 
 
-## Jump to the next preset: tight, normal, wide.
+func set_straight(on: bool) -> void:
+	straight = on
+	if on:
+		set_spread(PRESETS[0])
+
+
+## Jump to the next preset: tight, normal, wide, straight, and round.
 func cycle_formation() -> void:
+	if straight:
+		straight = false
+		set_spread(PRESETS[0])
+		return
 	var best := 0
 	var best_d := 100.0
 	for i in range(PRESETS.size()):
@@ -249,7 +266,10 @@ func cycle_formation() -> void:
 		if d < best_d:
 			best_d = d
 			best = i
-	set_spread(PRESETS[(best + 1) % PRESETS.size()])
+	if best == PRESETS.size() - 1:
+		set_straight(true)
+		return
+	set_spread(PRESETS[best + 1])
 
 
 ## How the formation shoots. Tight is a focused column: little spray,
@@ -262,6 +282,8 @@ func spray_mult() -> float:
 
 
 func formation_name() -> String:
+	if straight:
+		return "STRAIGHT"
 	if spread < 0.8:
 		return "TIGHT"
 	if spread > 1.3:
@@ -574,7 +596,12 @@ func _fire(delta: float) -> void:
 func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> void:
 	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0))
 	b.damage = damage
-	if focus_on:
+	if straight and not focus_on:
+		# Out of the middle, dead ahead, harder, and through one more.
+		origin = Vector3(global_position.x, origin.y, origin.z)
+		b.damage *= Bounty.STRAIGHT_DAMAGE_MULT
+		b.hits_left_bonus = Bounty.STRAIGHT_PIERCE
+	elif focus_on:
 		# Converge on the focus point: sideways speed that gets there as the
 		# bullet covers the distance. Focused rounds also hit harder.
 		var dz := maxf(0.5, origin.z - focus_point.z)
@@ -586,6 +613,6 @@ func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> vo
 	b.vx = vx
 	b.world = world
 	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0
-	b.hits_left = 1 + (perks.pierce() if perks != null else 0)
+	b.hits_left = 1 + (perks.pierce() if perks != null else 0) + b.hits_left_bonus
 	world.bullets.add_child(b)
 	b.global_position = origin

@@ -3,6 +3,29 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.31 (fire modes and the bounty)
+
+Turn 2 of the second feedback arc: two ways to shoot, and coins for
+every kill, so wide-and-rich and narrow-and-sure are both real plans.
+
+- STRAIGHT fire. The formation button now cycles TIGHT, NORMAL, WIDE
+  and STRAIGHT. In STRAIGHT every round leaves from the middle of the
+  squad and flies dead ahead, 25% harder and through one more body: the
+  drill for a brute, a tank, a boss core or a panel in front of you,
+  while the sides of the road go unwatched. A drag on the width ends it.
+- The bounty. Every kill pays coins by kind: walkers and runners 1,
+  thieves and latchers 2, brutes 3, tanks 5; bosses 25 and gates 2 as
+  before. A coin counter under the level shows the run's bounty growing
+  and bumps on every kill. The old quarter-coin-per-kill is gone, so a
+  run pays about three times the coins it did; shop prices are up two
+  and a half times to match, so the first upgrade is still about one
+  good run.
+- The formation button says what each mode is for: TIGHT focus, WIDE
+  cover and coins, STRAIGHT drill.
+- The bot plays both plans: it drills when a heavy or the boss core is
+  lined up ahead and sprays otherwise. Seed 3, normal: 624 kills, 742
+  bounty, level 5.
+
 ## 0.30 (runs on the slow phones: warm-up, watchdog, crash card)
 
 The first turn of the second feedback arc. Phones were freezing or

@@ -230,12 +230,12 @@ goes first because nothing else can be judged on a phone that crawls.
    shader and font before the title, a frame-rate watchdog that lowers
    the graphics once and says so, a one-tap crash report card, boot
    timings in the report.
-2. Fire modes and the bounty: a STRAIGHT fire mode (everything out of
-   the middle, for what is in front of you) beside TIGHT, NORMAL and
-   WIDE; a coin bounty per zombie by kind, visible as it grows, paid at
-   the end; the formation button says what each mode is for; the shop
-   and perks repriced around it, so wide-and-rich and narrow-and-sure
-   are both real plans.
+2. Fire modes and the bounty (done): a STRAIGHT fire mode (everything
+   out of the middle, for what is in front of you) beside TIGHT, NORMAL
+   and WIDE; a coin bounty per zombie by kind, visible as it grows,
+   paid at the end; the formation button says what each mode is for;
+   the shop repriced around it, so wide-and-rich and narrow-and-sure are
+   both real plans.
 3. Bosses you can dodge, hazards, deaths: globs that fly visibly from
    the boss with a shadow and land where the ring says, smaller splash,
    longer warning on lightning; buzz saws that cross the bridge from

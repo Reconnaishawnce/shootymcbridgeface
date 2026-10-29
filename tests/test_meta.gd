@@ -4,11 +4,11 @@ extends TestCase
 func test_costs_grow_and_purchases_apply() -> void:
 	var m := Meta.new()
 	check_eq(m.level("start"), 0, "fresh")
-	check_eq(m.cost("start"), 160, "base cost")
+	check_eq(m.cost("start"), 400, "base cost")
 	check(Meta.cost_at("start", 1) > Meta.cost_at("start", 0), "cost grows")
 	check(not m.can_buy("start", 159), "too poor")
-	check_eq(m.buy("start", 159), 159, "failed buy keeps coins")
-	check_eq(m.buy("start", 200), 40, "buy deducts")
+	check_eq(m.buy("start", 399), 399, "failed buy keeps coins")
+	check_eq(m.buy("start", 440), 40, "buy deducts")
 	check_eq(m.level("start"), 1, "level up")
 	check_eq(m.start_squad(), 3, "effect applies, and you can feel it")
 
@@ -21,7 +21,7 @@ func test_max_level_blocks_buying() -> void:
 	check_eq(m.level("shotgun"), 1, "one-shot unlock")
 	check(m.is_maxed("shotgun"), "maxed")
 	check(m.shotgun_unlocked(), "unlocked")
-	check_eq(coins, 100000 - 500, "charged once")
+	check_eq(coins, 100000 - 1250, "charged once")
 
 
 func test_effects() -> void:
@@ -53,7 +53,7 @@ func test_squad_cycling() -> void:
 
 
 func test_coins_and_endless_unlock() -> void:
-	check_eq(Meta.coins_for_run(40, 2, 10), 10 + 50 + 20, "payout")
+	check_eq(Meta.coins_for_run(40, 2, 10), 40 + 50 + 20, "payout: the bounty, the bosses, the gates")
 	check(not Meta.endless_unlocked(3), "level 3 reached is not enough")
 	check(Meta.endless_unlocked(4), "reaching level 4 means level 3 was cleared")
 	for id in Meta.ORDER:

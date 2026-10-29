@@ -4,17 +4,17 @@ extends RefCounted
 ## the levels dictionary is loaded from and saved to SaveData by the game.
 
 const CATALOG := {
-	"start": {"name": "RECRUITS", "desc": "Start every level with more soldiers", "max": 5, "base": 160, "unit": "soldiers"},
-	"power": {"name": "FIREPOWER", "desc": "Every bullet hits harder", "max": 5, "base": 200, "unit": "damage"},
-	"gate": {"name": "GATE BONUS", "desc": "Extra soldiers on every blue gate", "max": 3, "base": 320, "unit": "per gate"},
-	"armor": {"name": "ARMOR", "desc": "Brutes, bosses and lightning take less", "max": 4, "base": 240, "unit": "bites"},
-	"slayer": {"name": "BOSS SLAYER", "desc": "Boss core takes more damage", "max": 4, "base": 280, "unit": "core"},
-	"magnet": {"name": "COIN MAGNET", "desc": "More coins from every run", "max": 4, "base": 180, "unit": "coins"},
-	"scout": {"name": "SCOUT", "desc": "Hidden panels show sooner", "max": 3, "base": 220, "unit": "reveal"},
-	"belt": {"name": "BOMB BELT", "desc": "Start every run with bombs", "max": 2, "base": 300, "unit": "bombs"},
-	"wind": {"name": "SECOND WIND", "desc": "Once a run, a wipe becomes a comeback", "max": 1, "base": 600, "unit": "comeback"},
-	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 500, "unit": "squad"},
-	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 650, "unit": "squad"},
+	"start": {"name": "RECRUITS", "desc": "Start every level with more soldiers", "max": 5, "base": 400, "unit": "soldiers"},
+	"power": {"name": "FIREPOWER", "desc": "Every bullet hits harder", "max": 5, "base": 500, "unit": "damage"},
+	"gate": {"name": "GATE BONUS", "desc": "Extra soldiers on every blue gate", "max": 3, "base": 800, "unit": "per gate"},
+	"armor": {"name": "ARMOR", "desc": "Brutes, bosses and lightning take less", "max": 4, "base": 600, "unit": "bites"},
+	"slayer": {"name": "BOSS SLAYER", "desc": "Boss core takes more damage", "max": 4, "base": 700, "unit": "core"},
+	"magnet": {"name": "COIN MAGNET", "desc": "More coins from every run", "max": 4, "base": 450, "unit": "coins"},
+	"scout": {"name": "SCOUT", "desc": "Hidden panels show sooner", "max": 3, "base": 550, "unit": "reveal"},
+	"belt": {"name": "BOMB BELT", "desc": "Start every run with bombs", "max": 2, "base": 750, "unit": "bombs"},
+	"wind": {"name": "SECOND WIND", "desc": "Once a run, a wipe becomes a comeback", "max": 1, "base": 1500, "unit": "comeback"},
+	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 1250, "unit": "squad"},
+	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 1600, "unit": "squad"},
 }
 const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "slayer", "magnet", "scout", "shotgun", "medic"]
 const SQUAD_TYPES := ["rifle", "shotgun", "medic"]
@@ -70,8 +70,9 @@ static func max_level(id: String) -> int:
 
 
 ## Coins a run pays out before multipliers.
-static func coins_for_run(kills: int, bosses: int, gates: int) -> int:
-	return kills / 4 + bosses * 25 + gates * 2
+## The run's coins. The bounty is what the kills paid (see Bounty).
+static func coins_for_run(bounty: int, bosses: int, gates: int) -> int:
+	return Bounty.coins_for_run(bounty, bosses, gates)
 
 
 static func endless_unlocked(best_level: int) -> bool:

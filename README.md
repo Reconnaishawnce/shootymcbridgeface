@@ -31,8 +31,9 @@ the same key (see below).
   steer, up and down to spread or tighten the formation, and **flick** hard
   sideways to dash (from level 2). **The road above: hold** a finger on it
   and every gun converges on that spot with a red laser. Lift to go back
-  to spraying ahead. The button at the bottom right cycles tight, normal
-  and wide. On desktop: arrows or WASD, Q/E to dash, click and hold the
+  to spraying ahead. The button at the bottom right cycles tight, normal,
+  wide and STRAIGHT (every round out of the middle, dead ahead, harder
+  and through one more body: the drill for what is in front of you). On desktop: arrows or WASD, Q/E to dash, click and hold the
   road to focus, F to cycle, B to throw a bomb.
 - **Sums.** Teal panels like **+3 x2** are worked out left to right, so
   they are not the same as **x2 +3**. A sum sits close in value to the
@@ -164,7 +165,8 @@ the same key (see below).
 - **Squads**: rifles (balanced), shotguns (three pellets, more damage),
   medics (less damage, a revived soldier every three seconds, brutes bite
   for less). The latter two are shop unlocks.
-- **Coins and shop**: every run pays coins (kills, bosses, gates). The shop
+- **Coins and shop**: every kill pays a bounty by kind (walkers 1, brutes
+  3, tanks 5...), bosses 25, gates 2; a counter shows it growing. The shop
   on the title screen sells nine permanent upgrades, including the shotgun
   and medic squads.
 - Score is metres travelled plus ten per kill plus a bonus per level

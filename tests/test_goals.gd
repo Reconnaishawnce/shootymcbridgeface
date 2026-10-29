@@ -7,7 +7,7 @@ func test_next_goal_order() -> void:
 	check(Goals.next({"runs": 3, "trophies": 120, "hard_open": false}).contains("300 trophies open ENDLESS"), "with a road: endless first")
 	check(Goals.next({"runs": 3, "trophies": 420, "hard_open": false}).contains("600 trophies open HARD"), "then hard")
 	check(not Goals.next({"runs": 3, "trophies": 420, "hard_open": true, "coins": 0}).contains("trophies open"), "open: move on")
-	var ctx := {"runs": 5, "best_level": 4, "coins": 500, "cheapest": "RECRUITS", "cheapest_cost": 160, "vehicles": 0}
+	var ctx := {"runs": 5, "best_level": 4, "coins": 500, "cheapest": "RECRUITS", "cheapest_cost": 400, "vehicles": 0}
 	check(Goals.next(ctx).contains("RECRUITS"), "then: an affordable upgrade")
 	ctx.coins = 10
 	check(Goals.next(ctx).contains("JEEP"), "then: form a jeep")

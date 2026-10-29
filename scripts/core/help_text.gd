@@ -18,8 +18,10 @@ static func sections() -> Array:
 		{"title": "CONTROLS", "body":
 			"Low on the screen, near the squad: drag left or right to steer, drag up or down to spread out or bunch up, and flick hard sideways to dash (from level %d). " % Progression.DASH_LEVEL +
 			"Higher up, on the road: hold a finger there and every gun aims at that spot with a red laser. Lift to go back to firing straight ahead. " +
-			"The button at the bottom right cycles TIGHT, NORMAL and WIDE. Tight is a focused column: bullets land where you point, the squad fits through gaps and takes fewer lightning hits. " +
-			"Wide is a fan: the outer soldiers cover the sides of the road, but your fire is scattered. Tap a zombie that is clinging to your squad to shoot it off."},
+			"The button at the bottom right cycles TIGHT, NORMAL, WIDE and STRAIGHT. Tight is a focused column: bullets land where you point, the squad fits through gaps and takes fewer lightning hits. " +
+			"Wide is a fan: the outer soldiers cover the sides of the road, so you kill more of a crowd and earn more bounty, but your fire is scattered. " +
+			"STRAIGHT sends every round out of the middle of the squad, dead ahead, %d%% harder and through one more body: the drill for a brute, a tank, a boss core or a panel in front of you, while the sides go unwatched. A drag on the width ends it. " % int(round((Bounty.STRAIGHT_DAMAGE_MULT - 1.0) * 100.0)) +
+			"Tap a zombie that is clinging to your squad to shoot it off."},
 		{"title": "GATES AND PANELS", "body":
 			"Every gate is a row of panels, one per lane. You walk through exactly one.\n" +
 			"BLUE panels add soldiers (+5) or multiply them (x2).\n" +
@@ -77,7 +79,8 @@ static func sections() -> Array:
 			"Score is mostly distance, plus kills times the multiplier, PERFECT gates, cleared waves, and a bonus for each boss. " +
 			"Every level you clear gets a GRADE from S to D for perfect gates, soldiers kept and how fast the boss went down. S pays %d points, down to nothing for a D." % Grades.bonus("S")},
 		{"title": "COINS AND THE SHOP", "body":
-			"Every run pays coins: one for every four kills, %d per boss, %d per gate. " % [25, 2] +
+			"Every zombie you kill pays a bounty in coins: walkers and runners %d, thieves and latchers %d, brutes %d, tanks %d. Bosses pay %d and every gate %d. The counter under the level shows the run's bounty growing. " % [Bounty.for_kind("normal"), Bounty.for_kind("thief"), Bounty.for_kind("brute"), Bounty.for_kind("tank"), Bounty.BOSS, Bounty.GATE] +
+			"So a wide squad that mows the whole road earns more than a narrow one that drills, and the shop is where the bounty goes. " +
 			"The SHOP sells permanent upgrades, and each one tells you what it does now and what the next level does: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers, extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
 			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades."},
 		{"title": "STARS AND THE LOCKER", "body":

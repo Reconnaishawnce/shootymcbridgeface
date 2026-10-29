@@ -54,6 +54,9 @@ const FLOAT_START_Y := -140.0
 var _level: Label
 var _count: Label
 var _subline: Label
+var _bounty_row: HBoxContainer
+var _bounty_label: Label
+var _bounty_tween: Tween
 var _pause_button: Button
 var _boss_box: Control
 var _boss_fill: ColorRect
@@ -268,6 +271,18 @@ func _init() -> void:
 	_count = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _count, 0.3, 0.7, 14.0)
 	_count.pivot_offset = Vector2(0.0, 40.0)
+	# The bounty: coins this run has earned so far, under the level.
+	_bounty_row = _currency("coin", 26, COIN)
+	_bounty_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_bounty_row.anchor_left = 0.0
+	_bounty_row.anchor_right = 0.4
+	_bounty_row.offset_left = 22.0
+	_bounty_row.offset_top = 76.0
+	_bounty_row.offset_bottom = 110.0
+	_bounty_row.visible = false
+	root.add_child(_bounty_row)
+	_bounty_label = _bounty_row.get_meta("label")
+	_bounty_label.pivot_offset = Vector2(0.0, 16.0)
 	_subline = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _subline, 0.2, 0.8, 92.0)
 
@@ -1058,11 +1073,24 @@ func set_characters(on: bool) -> void:
 
 
 ## TIGHT is a focused column, WIDE a fan: the button says so.
-const FORMATION_TEXT := {"TIGHT": "TIGHT · focus", "NORMAL": "NORMAL", "WIDE": "WIDE · cover"}
+const FORMATION_TEXT := {"TIGHT": "TIGHT · focus", "NORMAL": "NORMAL", "WIDE": "WIDE · cover · coins", "STRAIGHT": "STRAIGHT · drill"}
 
 
 func set_formation(name: String) -> void:
 	_formation_button.text = str(FORMATION_TEXT.get(name, name))
+
+
+## The run's bounty so far. Bumps when it grows.
+func set_bounty(n: int, show: bool = true) -> void:
+	_bounty_row.visible = show
+	var text := "+%d" % n
+	if _bounty_label.text != text:
+		_bounty_label.scale = Vector2(1.3, 1.3)
+		if _bounty_tween != null:
+			_bounty_tween.kill()
+		_bounty_tween = create_tween()
+		_bounty_tween.tween_property(_bounty_label, "scale", Vector2.ONE, 0.18)
+	_bounty_label.text = text
 
 
 func set_bombs(n: int) -> void:
@@ -1116,6 +1144,7 @@ func set_powers(text: String) -> void:
 
 func _hide_cards() -> void:
 	_formation_button.visible = false
+	_bounty_row.visible = false
 	_bomb_button.visible = false
 	_powers.text = ""
 	_fork_box.visible = false
@@ -1388,6 +1417,7 @@ func show_running() -> void:
 	_hide_cards()
 	_pause_button.visible = true
 	_formation_button.visible = true
+	_bounty_row.visible = true
 	if _prompt_tween != null:
 		_prompt_tween.kill()
 

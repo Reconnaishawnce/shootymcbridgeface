@@ -380,6 +380,26 @@ maxing everything is about forty. Effects are big enough to notice
 (`Meta.effect_text` shows now and next). Armor applies to every heavy
 bite through `World._bite`. Second wind is one comeback per run.
 
+## Fire modes and the bounty
+
+Two plans, both real. `Squad.straight` is the fourth formation state:
+every round spawns at the formation's centre x and flies with no spray,
+`Bounty.STRAIGHT_DAMAGE_MULT` harder and with `STRAIGHT_PIERCE` extra
+hits (`Squad._spawn_bullet`), the formation held tight. It drills a
+brute, a tank, a boss core or a panel and leaves the flanks open; a
+drag on the width ends it (`adjust_spread`), the button cycles into
+and out of it. WIDE is the other plan: a fan that mows a crowd.
+
+`Bounty.for_kind` pays coins per kill by kind (walkers and runners 1,
+thieves and latchers 2, brutes 3, tanks 5); `Bounty.coins_for_run`
+adds bosses and gates. `Game.bounty` grows on every kill and the HUD
+counter under the level bumps with it (`Hud.set_bounty`); the run's
+coins are the bounty times the greed, magnet and mode multipliers. The
+old quarter-coin-per-kill is gone: a run pays about three times the
+coins, and `Meta.CATALOG` prices are two and a half times higher, so an
+upgrade still costs about one good run. The bot drills when a heavy or
+the boss core is lined up and sprays otherwise, so both paths run in CI.
+
 ## The help page, records and the storm
 
 `HelpText.sections()` is the in-game HOW TO PLAY page: short sections a

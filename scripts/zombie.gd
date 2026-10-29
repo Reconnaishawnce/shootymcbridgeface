@@ -115,6 +115,10 @@ func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
 		_body.rotation.y = PI
 
 
+func kind_name() -> String:
+	return ["normal", "brute", "thief", "tank", "runner", "latcher"][kind]
+
+
 func is_thief() -> bool:
 	return kind == Kind.THIEF
 

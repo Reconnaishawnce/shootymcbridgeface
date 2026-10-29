@@ -460,7 +460,8 @@ trait each: `promote` after a boss (a fresh name, a random trait),
 reads (`damage_mult`, `bite_mult`, `coin_mult`, `medics`). The squad
 owns it (`Squad.veterans`): `mark_veterans` dresses the front-rank
 soldiers (behind the hero) with `Soldier.set_veteran` (a beret in the
-trait colour and a name tag) and only touches a soldier whose mark is
+trait colour; the name stays in banners and the pause menu, since three
+tags on adjacent heads read as one smear) and only touches a soldier whose mark is
 wrong, so the crowd's churn costs nothing; `lose_veteran` tumbles that
 soldier over the side by name and lets the crowd close the gap.
 `World._bite` reads the tough multiplier with the armour; the game

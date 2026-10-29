@@ -1061,7 +1061,7 @@ func _build_over(root: Control) -> void:
 	var box: VBoxContainer = _over_card.get_meta("box")
 	_over_title = _label(64, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_title)
-	_over_lines = _label(34, HORIZONTAL_ALIGNMENT_CENTER)
+	_over_lines = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
 	_over_lines.custom_minimum_size.x = 560.0
 	_over_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(_over_lines)

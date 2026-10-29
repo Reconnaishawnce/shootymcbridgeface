@@ -6,8 +6,7 @@ Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 ## 0.36 (veterans)
 
 - Veterans. Beat a boss with anyone left and one survivor steps up with
-  a name, a beret in their trait's colour and a name tag, riding in the
-  front ranks: DEADEYE (+8% damage for the whole squad), TOUGH (heavy
+  a name and a beret in their trait's colour, riding in the front ranks: DEADEYE (+8% damage for the whole squad), TOUGH (heavy
   bites take 8% less), FIELD MEDIC (a soldier comes back every 8
   seconds), LUCKY (+15% coins at the end). Up to three a run; they do
   not carry over.

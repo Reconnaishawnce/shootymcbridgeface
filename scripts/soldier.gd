@@ -79,41 +79,30 @@ func _init(p_detailed: bool = true, p_type: String = "rifle", p_look: Dictionary
 	_build()
 
 
-## A veteran wears a beret in the colour of their trait and a name tag.
-func set_veteran(v: Dictionary, rank: int = 0) -> void:
+## A veteran wears a beret in the colour of their trait. The name lives
+## in the banners and the pause menu, not over the squad: three tags on
+## three adjacent heads only read as one smear.
+func set_veteran(v: Dictionary, _rank: int = 0) -> void:
 	clear_veteran()
 	var color := Veterans.color(str(v.trait))
 	var beret := Mats.ball(HEAD_R + 0.07, color)
 	beret.position = Vector3(0.0, HEAD_Y + 0.17, -0.03)
 	beret.scale = Vector3(1.05, 0.42, 1.05)
 	beret.name = "VetBeret"
-	add_child(beret)
-	var tag := Label3D.new()
-	tag.name = "VetTag"
-	tag.text = str(v.name)
-	tag.font_size = 56
-	tag.pixel_size = 0.0045
-	tag.outline_size = 16
-	tag.modulate = color.lightened(0.4)
-	tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	tag.no_depth_test = true
-	# Each veteran's tag a step higher than the last, so three names in a
-	# tight squad stack instead of sitting on each other.
-	tag.position.y = 1.45 + 0.22 * float(rank)
-	add_child(tag)
+	add_child(Mats.ink(beret, 0.02) if detailed else beret)
+	set_meta("vet_name", str(v.name))
 
 
 func veteran_name() -> String:
-	var tag := get_node_or_null("VetTag")
-	return tag.text if tag != null else ""
+	return str(get_meta("vet_name", ""))
 
 
 func clear_veteran() -> void:
-	for n in ["VetBeret", "VetTag"]:
-		var node := get_node_or_null(n)
-		if node != null:
-			node.name = n + "Old"
-			node.queue_free()
+	var node := get_node_or_null("VetBeret")
+	if node != null:
+		node.name = "VetBeretOld"
+		node.queue_free()
+	set_meta("vet_name", "")
 
 
 func _vest_for_type() -> Color:

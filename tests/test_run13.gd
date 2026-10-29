@@ -38,7 +38,7 @@ func test_help_text() -> void:
 	for sec in sections:
 		check(str(sec.title) != "" and str(sec.body).length() > 40, "section has a title and a body")
 		all += str(sec.body) + "\n"
-	for word in ["BLUE", "RED", "TEAL", "PURPLE", "AMBER", "PERFECT", "coins", "Stars", "LOCKER", "HARD", "NIGHTMARE", "ENDLESS", "DAILY", "WEEKLY", "GRADE", "horde", "STORM", "dash", "OLIVE", "JEEP", "TANK", "HELICOPTER", "MECH", "RANK", "QUESTS", "SEASON", "ROAD", "RALLY", "trophies", "STRAIGHT", "bounty", "SAW", "THICK SKIN", "RECRUITER", "GOLD", "SUPPLY"]:
+	for word in ["BLUE", "RED", "TEAL", "PURPLE", "AMBER", "PERFECT", "coins", "Stars", "LOCKER", "HARD", "NIGHTMARE", "ENDLESS", "DAILY", "WEEKLY", "GRADE", "horde", "STORM", "dash", "OLIVE", "JEEP", "TANK", "HELICOPTER", "MECH", "RANK", "QUESTS", "SEASON", "ROAD", "RALLY", "trophies", "STRAIGHT", "bounty", "SAW", "THICK SKIN", "RECRUITER", "GOLD", "SUPPLY", "LEARN"]:
 		check(all.contains(word), "help mentions %s" % word)
 	for id in Powerups.ORDER:
 		check(all.contains(Powerups.title(id)), "help mentions power-up %s" % id)

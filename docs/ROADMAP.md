@@ -250,7 +250,11 @@ goes first because nothing else can be judged on a phone that crawls.
 5. Supply panels (done): gold panels that sell soldiers or a power-up
    for coins out of the run's bounty, at the gate, so the bounty is a
    currency on the road as well as in the shop.
-6. Next: a balance and feedback pass once the first phone reports
+6. QA and the learning round (done): the running screen's text given
+   its own bands, the formation button and perk strip fixed, perk
+   panels reduced to names, and lessons that pause the road the first
+   time each mechanic appears, replayable with LEARN.
+7. Next: a balance and feedback pass once the first phone reports
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 

@@ -107,6 +107,7 @@ var _smoke_daily := false
 var _smoke_weekly := false
 var _smoke_upgrades := false
 var _shots_dir := ""
+var _shots_quick := false
 var _game_over_at := 0
 var _game_over_frame := 0
 var _smoke_retry := false
@@ -117,6 +118,13 @@ var _warming := false
 var _fps_frames := 0
 var _fps_since := 0.0
 var _crash_card_shown := false
+## The learning round: lessons pop up once each, the first time a thing
+## appears; LEARN starts a run where every lesson shows again.
+var lessons_seen: Array = []
+var lessons_on := true
+var _learning := false
+var _lesson_open := false
+var _lesson_last := -100.0
 var _smoke_retries := 0
 var _shake := 0.0
 var _drag_scale := 0.015
@@ -158,9 +166,13 @@ func _ready() -> void:
 			_smoke_wipe_at = int(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):
 			_shots_dir = a.get_slice("=", 1)
+		elif a == "--shots-quick":
+			_shots_quick = true
 	modifier = SaveData.load_modifier()
 	trophies = SaveData.load_trophies()
 	revives = SaveData.load_revives()
+	lessons_seen = SaveData.load_lessons_seen()
+	lessons_on = SaveData.load_lessons_on()
 	if modifier != "normal" and not _feature_open(modifier):
 		modifier = "normal"
 	_load_bests()
@@ -201,6 +213,7 @@ func _ready() -> void:
 	hud.set_characters(character_mode)
 	hud.set_shadows(SaveData.load_shadows_on())
 	hud.set_safe_graphics(SaveData.load_safe_graphics())
+	hud.set_lessons(lessons_on)
 	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
 	Diag.note("ready", {"smoke": smoke, "character_mode": character_mode})
@@ -404,6 +417,12 @@ func _build_scene() -> void:
 		Diag.note("safe_graphics", {"on": on})
 		sfx.play("click"))
 	hud.report_pressed.connect(_send_report)
+	hud.lesson_closed.connect(_close_lesson)
+	hud.learn_pressed.connect(start_learning_round)
+	hud.lessons_toggled.connect(func(on: bool) -> void:
+		lessons_on = on
+		SaveData.save_lessons_on(on)
+		sfx.play("click"))
 	hud.crash_dismissed.connect(func() -> void:
 		hud.hide_crash_card()
 		sfx.play("click"))
@@ -414,6 +433,86 @@ func _build_scene() -> void:
 
 
 # --- menus -----------------------------------------------------------------
+
+# --- lessons ---------------------------------------------------------------
+
+## LEARN on the title: a normal run where every lesson pops up again.
+func start_learning_round() -> void:
+	sfx.play("click")
+	_learning = true
+	start_run("levels")
+	hud.toast("Learning round: every lesson pops up as it comes")
+
+
+## Show [param id] now if it is due: the road pauses under the card.
+func _teach(id: String, body_override: String = "") -> bool:
+	if smoke or _lesson_open or state != State.RUNNING or get_tree().paused:
+		return false
+	var since := Time.get_ticks_msec() * 0.001 - _lesson_last
+	if not Lessons.due(id, lessons_seen, lessons_on, _learning, since):
+		return false
+	lessons_seen = Lessons.mark_seen(lessons_seen, id)
+	SaveData.save_lessons_seen(lessons_seen)
+	_lesson_open = true
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
+	get_tree().paused = true
+	Diag.set_state("lesson")
+	Diag.note("lesson", {"id": id})
+	hud.show_lesson(Lessons.title(id), body_override if body_override != "" else Lessons.body(id))
+	sfx.play("click", -4.0, 1.2)
+	return true
+
+
+func _close_lesson() -> void:
+	if not _lesson_open:
+		return
+	_lesson_open = false
+	_lesson_last = Time.get_ticks_msec() * 0.001
+	hud.hide_lesson()
+	get_tree().paused = false
+	Diag.set_state("running")
+	sfx.play("click")
+
+
+## What is coming down the road that the player has not met yet.
+func _check_lessons() -> void:
+	if smoke or _lesson_open or not lessons_on and not _learning:
+		return
+	if gates_passed == 0 and _run_time < 0.5:
+		if _teach("basics"):
+			return
+	if squad.count >= 12 and _teach("fire_modes"):
+		return
+	if kills >= 10 and _teach("bounty"):
+		return
+	var g := world.nearest_upcoming_gate()
+	if g != null and g.position.z > -26.0:
+		if gates_passed == 0 and _teach("shoot_panels"):
+			return
+		for panel in g.panels:
+			var id := ""
+			if not panel.revealed:
+				id = "hidden"
+			elif GateMath.is_expr(panel):
+				id = "expr"
+			elif GateMath.is_deal(panel):
+				id = "deal"
+			elif GateMath.is_supply(panel):
+				id = "supply"
+			elif GateMath.is_vehicle(panel):
+				id = "vehicle"
+			if id != "" and _teach(id):
+				return
+	var pg := world.nearest_upcoming_perk_gate()
+	if pg != null and pg.position.z > -28.0 and _teach("perk", Lessons.perk_body(pg.ids)):
+		return
+	if world.fork != null and not world.fork.chosen and world.fork.position.z > -34.0 and _teach("fork"):
+		return
+	var saw := world.nearest_saw(26.0)
+	if saw != null and _teach("saw"):
+		return
+
 
 ## The warm-up. Phones compile every shader the first time it is drawn,
 ## so the first zombie, boss, vehicle and particle each used to cost a
@@ -898,6 +997,8 @@ func start_run(p_mode: String = "levels") -> void:
 	_revive_used = false
 	_revive_open = false
 	_second_wind_pending = false
+	_lesson_open = false
+	_lesson_last = -100.0
 	_vehicles_formed = 0
 	waves_cleared = 0
 	perfect_gates = 0
@@ -931,6 +1032,8 @@ func start_run(p_mode: String = "levels") -> void:
 	Diag.set_state("running")
 	Diag.note("start_run", {"mode": mode, "modifier": modifier, "seed": run_seed, "squad_type": squad_type})
 	squad.active = true
+	if mode != "levels":
+		_learning = false
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
@@ -951,6 +1054,7 @@ func end_run() -> void:
 	if state != State.RUNNING:
 		return
 	state = State.GAME_OVER
+	_learning = false
 	Diag.set_state("game_over")
 	var t0 := Time.get_ticks_msec()
 	squad.active = false
@@ -1205,12 +1309,14 @@ func _tick_run(delta: float) -> void:
 			_touches.erase(idx)
 			if _cling_touch.is_empty() and not _touches.values().has("focus"):
 				squad.clear_focus()
+	_check_lessons()
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
 	score = int((total_distance + float(bonus)) * world.mod("score"))
 	if world.horde_z < World.HORDE_REST_Z - 0.5 and not _horde_warned:
 		_horde_warned = true
 		hud.show_banner("THE HORDE IS COMING\nKILL IT FAST", 1.6)
+		_teach("horde")
 		sfx.play("boss_roar", -6.0, 0.8)
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.set_combo(combo.count if combo.alive(_run_time) else 0, combo.multiplier(), combo.remaining(_run_time))
@@ -1438,6 +1544,7 @@ func _on_boss_spawned(boss: Boss) -> void:
 		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
 	hud.show_boss(true)
 	hud.show_banner("BOSS", 1.2)
+	_teach(Lessons.boss_lesson(["walker", "spitter", "storm"][boss.kind]))
 	sfx.play("boss_roar")
 	_shake = 0.6
 
@@ -1482,6 +1589,9 @@ func _on_level_started(level: int) -> void:
 		return
 	hud.show_banner("LEVEL %d" % level, 1.0)
 	hud.show_hint(Progression.hint_for(level), 3.6)
+	for id in Lessons.for_level(level):
+		if _teach(id):
+			break
 	_level_peak = 1
 	_level_gates = 0
 	_level_perfect = 0
@@ -1497,7 +1607,7 @@ func _on_level_started(level: int) -> void:
 func _on_perk_chosen(id: String) -> void:
 	perks.take(id)
 	world.perk_count = perks.total()
-	hud.show_banner(Perks.pickup_text(id, perks.stack(id)), 1.5)
+	hud.show_banner(Perks.title(id) + ("  x%d" % perks.stack(id) if perks.stack(id) > 1 else ""), 1.0)
 	hud.set_perks(Perks.summary(perks.stacks))
 	sfx.play("gate_good")
 	_punch(3.0)
@@ -1750,6 +1860,8 @@ func _on_wiped_out() -> void:
 	# wipe can fire from inside the world's update loop.
 	if _second_wind_pending or _revive_open:
 		return
+	if _lesson_open:
+		_close_lesson()
 	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
 		_second_wind_used = true
 		_second_wind_pending = true
@@ -1996,6 +2108,29 @@ func _bot_steer() -> void:
 func _shots_walkthrough() -> void:
 	DirAccess.make_dir_recursive_absolute(_shots_dir)
 	await _capture("1_title.png", 20)
+	if _shots_quick:
+		# The menus only: every state of the home screen, the cards.
+		stats.runs = 3
+		trophies = 640
+		modifier = "hard"
+		show_title()
+		await _capture("q1_title_full.png", 5)
+		character_mode = true
+		hud.set_characters(true)
+		wardrobe.stars = 12
+		show_title()
+		await _capture("q2_title_hero.png", 5)
+		open_settings()
+		await _capture("q3_settings.png", 5)
+		show_title()
+		hud._show_more()
+		await _capture("q4_more.png", 5)
+		show_title()
+		hud.show_lesson(Lessons.title("perk"), Lessons.perk_body(["rapid", "skin", "greed"]))
+		await _capture("q5_lesson.png", 5)
+		hud.hide_lesson()
+		_quit_with(0)
+		return
 	open_shop()
 	await _capture("2_shop.png", 5)
 	open_daily()
@@ -2081,6 +2216,9 @@ func _shots_walkthrough() -> void:
 	hud.show_revive(3, 12, Revive.SOLDIERS, Revive.OFFER_SECONDS)
 	await _capture("5h_rally.png", 2)
 	hud.hide_revive()
+	hud.show_lesson(Lessons.title("perk"), Lessons.perk_body(["rapid", "skin", "greed"]))
+	await _capture("5k_lesson.png", 2)
+	hud.hide_lesson()
 	world.spawn_saw(0.8, -12.0)
 	await _capture("5i_saw.png", 2)
 	squad.set_count(maxi(1, squad.count - 12))

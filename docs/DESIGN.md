@@ -452,6 +452,26 @@ the bounty so the end-of-run coins are what is left. Gold on the panel,
 "NEED n COINS" when short. The bot buys soldiers under sixty and a
 power-up otherwise, when the bounty covers it.
 
+## The learning round
+
+Text on the road is kept to what the eye needs; teaching happens in
+paused cards. `Lessons` (pure) holds the catalog, the order for the
+LEARN page, `for_level` (what a new level introduces), `perk_body`
+(the three perks on offer, with effects) and `due` (on, not yet seen
+unless a learning round, and past the cooldown). `Game._check_lessons`
+runs each frame of a run and looks at what is within reach: the next
+gate's panel kinds, the next perk gate, the fork, the nearest saw, the
+squad size and kill count; `_teach` pauses the tree, marks the lesson
+seen and shows the card; `GOT IT` resumes. Bosses, the horde and new
+levels teach from their own signals. A wipe closes any open card first.
+LEARN starts a run with `_learning` set so every lesson is due again;
+LESSONS in SETTINGS turns them off. The bot never sees a card.
+
+HUD bands on the road, top to bottom: stats, power-up timers, the boss
+bar or fork preview, the banner (0.23), the hint (0.37), floats rising
+from 0.47, the combo (0.57), the squad, then the dash readiness and the
+formation and bomb buttons. Nothing is placed in another band's space.
+
 ## The help page, records and the storm
 
 `HelpText.sections()` is the in-game HOW TO PLAY page: short sections a

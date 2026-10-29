@@ -49,6 +49,9 @@ the same key (see below).
 - **Quests and the season.** Three quests a day, the same for everyone,
   pay points up a free thirty-tier season track with coins, stars and
   locker items. Nothing to buy.
+- **Learn as you go.** The first time something new appears, the road
+  pauses and one short card explains it. LEARN on the home screen
+  replays every lesson in a run; LESSONS in SETTINGS turns them off.
 - **How to play.** The HOW TO PLAY button on the title (and in pause)
   explains everything below in plain words, with the real numbers.
 - **Records.** Lifetime stats and achievements that pay stars once each.

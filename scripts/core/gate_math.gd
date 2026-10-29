@@ -230,7 +230,7 @@ static func label(panel: GatePanel) -> String:
 			return "%s %d" % [Convoy.title(panel.power), int(round(panel.value))]
 		Kind.SUPPLY:
 			var what := "+%d SOLDIERS" % panel.amount if panel.power == "soldiers" else Powerups.title(panel.power)
-			return "%s %dc" % [what, supply_cost(panel)]
+			return "%s\n%dc" % [what, supply_cost(panel)]
 	return "?"
 
 

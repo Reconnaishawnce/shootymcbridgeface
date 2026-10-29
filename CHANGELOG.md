@@ -3,6 +3,30 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.35 (QA pass and the learning round)
+
+- QA on the running screen. The formation button's long labels ran off
+  the right edge of the screen; it now says TIGHT, NORMAL, WIDE or
+  STRAIGHT only. The perk strip sat on top of the boss bar and the fork
+  preview; it is gone from the road and lives in the pause menu. The
+  level banner, the teaching hint, the floating gate text and the combo
+  readout each have their own band now, so none lands on another: the
+  banner at the top quarter, the hint under it, floats start below the
+  hint and drift up into the gap, the combo sits above the squad.
+  Perk panels show the perk's name only (and a small count for one you
+  hold); what each does is taught, not printed on the gate. Supply
+  panels put their price on a second line.
+- The learning round. The first time something new appears on the road
+  (a hidden panel, a sum, a deal, a supply panel, a vehicle panel, a
+  perk gate with the three perks on offer, the fork, a saw, each boss,
+  the horde, the dash, clingers, hot panels, fire modes once the squad
+  is big enough, the bounty after the first kills) the road pauses and
+  one short card explains it; GOT IT and play on. Each card shows once,
+  ever, with a few seconds between cards so a busy gate does not stack
+  them. LEARN on the home screen starts a learning round where every
+  card shows again; LESSONS in SETTINGS turns them off. HOW TO PLAY
+  stays as the long version.
+
 ## 0.34 (supply panels: spend the bounty on the road)
 
 Turn 5 of the second feedback arc: the bounty is a currency you can

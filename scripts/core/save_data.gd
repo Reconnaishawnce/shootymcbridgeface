@@ -223,6 +223,23 @@ static func save_season(d: Dictionary) -> void:
 	_write(STATS, "season", d)
 
 
+static func load_lessons_seen() -> Array:
+	var v = _read(STATS, "lessons_seen", [])
+	return v if v is Array else []
+
+
+static func save_lessons_seen(ids: Array) -> void:
+	_write(STATS, "lessons_seen", ids)
+
+
+static func load_lessons_on() -> bool:
+	return bool(_read(SETTINGS, "lessons_on", true))
+
+
+static func save_lessons_on(on: bool) -> void:
+	_write(SETTINGS, "lessons_on", on)
+
+
 static func load_achievements() -> Array:
 	var v = _read(STATS, "achievements", [])
 	return v if v is Array else []

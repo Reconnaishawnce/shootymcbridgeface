@@ -16,10 +16,10 @@ func test_supply_panels() -> void:
 	var p := GateMath.supply(42, "shield")
 	check(GateMath.is_supply(p) and not GateMath.is_deal(p), "its own kind, its own colour")
 	check_eq(GateMath.supply_cost(p), 42, "cost")
-	check_eq(GateMath.label(p), "SHIELD 42c", "label says the price in coins")
+	check_eq(GateMath.label(p), "SHIELD\n42c", "label says the price in coins")
 	check_eq(GateMath.apply(20, p), 20, "walking through alone changes nothing; the world pays")
 	var sp := GateMath.supply(56, "soldiers", 8)
-	check_eq(GateMath.label(sp), "+8 SOLDIERS 56c", "soldiers say how many")
+	check_eq(GateMath.label(sp), "+8 SOLDIERS\n56c", "soldiers say how many")
 	var d := Difficulty.new(3)
 	for i in range(20):
 		var panel := d.make_supply(40)

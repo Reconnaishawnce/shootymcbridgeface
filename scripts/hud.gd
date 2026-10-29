@@ -36,6 +36,9 @@ signal shadows_toggled(on: bool)
 signal safe_graphics_toggled(on: bool)
 signal report_pressed(note: String)
 signal crash_dismissed
+signal lesson_closed
+signal learn_pressed
+signal lessons_toggled(on: bool)
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -49,7 +52,7 @@ const STAR := Color(1.0, 0.95, 0.5)
 const BOSS_BAR := Color(0.95, 0.25, 0.3)
 const BOSS_BAR_BG := Color(0.1, 0.1, 0.12, 0.8)
 ## Gate result text starts a little above centre so it never covers the squad.
-const FLOAT_START_Y := -140.0
+const FLOAT_START_Y := -20.0
 
 var _level: Label
 var _count: Label
@@ -147,7 +150,12 @@ var _music_button: Button
 var _formation_button: Button
 var _bomb_button: Button
 var _powers: Label
-var _perk_strip: Label
+var _pause_perks: Label
+var _lesson_card: Control
+var _lesson_title: Label
+var _lesson_body: Label
+var _learn_button: Button
+var _settings_lessons: Button
 var _fork_box: Control
 var _hint: Label
 var _hint_tween: Tween
@@ -340,8 +348,8 @@ func _init() -> void:
 	_banner = _label(56, HORIZONTAL_ALIGNMENT_CENTER)
 	_banner.anchor_left = 0.0
 	_banner.anchor_right = 1.0
-	_banner.anchor_top = 0.3
-	_banner.anchor_bottom = 0.3
+	_banner.anchor_top = 0.23
+	_banner.anchor_bottom = 0.23
 	_banner.offset_bottom = 160.0
 	_banner.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_banner.modulate.a = 0.0
@@ -377,19 +385,14 @@ func _init() -> void:
 	root.add_child(_bomb_button)
 	_powers = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _powers, 0.15, 0.85, 124.0)
-	# The perks you hold, always on screen, so a gate's effect is a fact.
-	_perk_strip = _label(19, HORIZONTAL_ALIGNMENT_CENTER)
-	_perk_strip.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_place(root, _perk_strip, 0.08, 0.92, 152.0)
-	_perk_strip.add_theme_color_override("font_color", Color(0.85, 0.75, 1.0))
 	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
 
 	# Teaching line: one new thing per level, big, then gone.
 	_hint = _label(34, HORIZONTAL_ALIGNMENT_CENTER)
 	_hint.anchor_left = 0.0
 	_hint.anchor_right = 1.0
-	_hint.anchor_top = 0.44
-	_hint.anchor_bottom = 0.44
+	_hint.anchor_top = 0.37
+	_hint.anchor_bottom = 0.37
 	_hint.offset_bottom = 120.0
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_hint.modulate.a = 0.0
@@ -457,6 +460,7 @@ func _init() -> void:
 	_build_over(root)
 	_build_pause(root)
 	_build_crash(root)
+	_build_lesson(root)
 	# Last, so it sits over everything while the game warms up.
 	_loading = Control.new()
 	_loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -475,6 +479,47 @@ func _init() -> void:
 	l.text = "LOADING..."
 	l.add_theme_color_override("font_color", COIN)
 	_pin(_loading, l, 0.5, 0.56, Vector2(400.0, 50.0))
+
+
+## A lesson: the road pauses, one card says how the new thing works.
+func _build_lesson(root: Control) -> void:
+	_lesson_card = _card(root)
+	_lesson_card.visible = false
+	var shade: ColorRect = _lesson_card.get_child(0)
+	shade.color = Color(0.0, 0.0, 0.0, 0.45)
+	var box: VBoxContainer = _lesson_card.get_meta("box")
+	var tag := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	tag.text = "NEW ON THE ROAD"
+	tag.add_theme_color_override("font_color", COIN)
+	box.add_child(tag)
+	_lesson_title = _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_lesson_title)
+	_lesson_body = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	_lesson_body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_lesson_body.custom_minimum_size.x = 560.0
+	box.add_child(_lesson_body)
+	var ok := _button("GOT IT", 36)
+	ok.pressed.connect(func() -> void: lesson_closed.emit())
+	box.add_child(ok)
+	var skip := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
+	skip.text = "Lessons can be turned off in SETTINGS, and replayed with LEARN."
+	skip.modulate = Color(0.75, 0.75, 0.8)
+	box.add_child(skip)
+
+
+func show_lesson(title: String, body: String) -> void:
+	_lesson_card.move_to_front()
+	_lesson_title.text = title
+	_lesson_body.text = body
+	_lesson_card.visible = true
+
+
+func hide_lesson() -> void:
+	_lesson_card.visible = false
+
+
+func set_lessons(on: bool) -> void:
+	_settings_lessons.text = "LESSONS: %s" % ("ON" if on else "OFF")
 
 
 ## The black box's one-tap offer after a crash.
@@ -611,6 +656,10 @@ func _build_title(root: Control) -> void:
 	_weekly_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
 	modes.add_child(_weekly_button)
+	# Under the modes: the learning round, its own small button.
+	_learn_button = _chip("LEARN THE ROAD", 22)
+	_learn_button.pressed.connect(func() -> void: learn_pressed.emit())
+	_pin(t, _learn_button, 0.5, 0.635, Vector2(220.0, 46.0))
 
 	# Top left: the wallet, and a + that opens the shop.
 	var wallet := VBoxContainer.new()
@@ -672,11 +721,11 @@ func _build_title(root: Control) -> void:
 	# Bottom centre: where you stand on the road, the next thing to do, MORE.
 	_road_line = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_road_line.add_theme_color_override("font_color", COIN)
-	_pin(t, _road_line, 0.5, 1.0, Vector2(520.0, 40.0), Vector2(0.5, 1.0), Vector2(0.0, -176.0))
+	_pin(t, _road_line, 0.5, 1.0, Vector2(520.0, 40.0), Vector2(0.5, 1.0), Vector2(0.0, -226.0))
 	_goal = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
 	_goal.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_goal.modulate = Color(0.92, 0.92, 0.96)
-	_pin(t, _goal, 0.5, 1.0, Vector2(520.0, 70.0), Vector2(0.5, 1.0), Vector2(0.0, -104.0))
+	_pin(t, _goal, 0.5, 1.0, Vector2(520.0, 70.0), Vector2(0.5, 1.0), Vector2(0.0, -150.0))
 	_more_button = _chip("MORE", 24)
 	_more_button.pressed.connect(_show_more)
 	_pin(t, _more_button, 0.5, 1.0, Vector2(130.0, 48.0), Vector2(0.5, 1.0), Vector2(0.0, -34.0))
@@ -817,6 +866,12 @@ func _build_settings(root: Control) -> void:
 		set_shadows(on)
 		shadows_toggled.emit(on))
 	box.add_child(_settings_shadows)
+	_settings_lessons = _button("LESSONS: ON", 34)
+	_settings_lessons.pressed.connect(func() -> void:
+		var on := not _settings_lessons.text.ends_with("ON")
+		set_lessons(on)
+		lessons_toggled.emit(on))
+	box.add_child(_settings_lessons)
 	_settings_safe = _button("SAFE GRAPHICS: OFF", 34)
 	_settings_safe.pressed.connect(func() -> void:
 		var on := not _settings_safe.text.ends_with("ON")
@@ -980,8 +1035,8 @@ func _build_combo(root: Control) -> void:
 	_combo = _label(44, HORIZONTAL_ALIGNMENT_CENTER)
 	_combo.anchor_left = 0.0
 	_combo.anchor_right = 1.0
-	_combo.anchor_top = 0.62
-	_combo.anchor_bottom = 0.62
+	_combo.anchor_top = 0.57
+	_combo.anchor_bottom = 0.57
 	_combo.offset_bottom = 60.0
 	_combo.add_theme_color_override("font_color", COIN)
 	_combo.modulate.a = 0.0
@@ -991,8 +1046,8 @@ func _build_combo(root: Control) -> void:
 	_combo_bar.color = COIN
 	_combo_bar.anchor_left = 0.4
 	_combo_bar.anchor_right = 0.6
-	_combo_bar.anchor_top = 0.62
-	_combo_bar.anchor_bottom = 0.62
+	_combo_bar.anchor_top = 0.57
+	_combo_bar.anchor_bottom = 0.57
 	_combo_bar.offset_top = 62.0
 	_combo_bar.offset_bottom = 68.0
 	_combo_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1027,6 +1082,12 @@ func _build_pause(root: Control) -> void:
 	var paused := _label(56, HORIZONTAL_ALIGNMENT_CENTER)
 	paused.text = "PAUSED"
 	box.add_child(paused)
+	_pause_perks = _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	_pause_perks.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_pause_perks.custom_minimum_size.x = 500.0
+	_pause_perks.modulate = Color(0.85, 0.75, 1.0)
+	_pause_perks.visible = false
+	box.add_child(_pause_perks)
 	var resume := _button("RESUME", 40)
 	resume.pressed.connect(func() -> void: resume_pressed.emit())
 	box.add_child(resume)
@@ -1079,7 +1140,7 @@ func set_characters(on: bool) -> void:
 
 
 ## TIGHT is a focused column, WIDE a fan: the button says so.
-const FORMATION_TEXT := {"TIGHT": "TIGHT · focus", "NORMAL": "NORMAL", "WIDE": "WIDE · cover · coins", "STRAIGHT": "STRAIGHT · drill"}
+const FORMATION_TEXT := {"TIGHT": "TIGHT", "NORMAL": "NORMAL", "WIDE": "WIDE", "STRAIGHT": "STRAIGHT"}
 
 
 func set_formation(name: String) -> void:
@@ -1148,8 +1209,10 @@ func set_powers(text: String) -> void:
 	_powers.text = text
 
 
+## The perks held this run, shown in the pause menu, not on the road.
 func set_perks(text: String) -> void:
-	_perk_strip.text = text
+	_pause_perks.text = "PERKS: " + text if text != "" else ""
+	_pause_perks.visible = text != ""
 
 
 func _hide_cards() -> void:
@@ -1157,8 +1220,8 @@ func _hide_cards() -> void:
 	_bounty_row.visible = false
 	_bomb_button.visible = false
 	_powers.text = ""
-	_perk_strip.text = ""
 	_fork_box.visible = false
+	_lesson_card.visible = false
 	_hint.modulate.a = 0.0
 	_dash.modulate.a = 0.0
 	_title_card.visible = false

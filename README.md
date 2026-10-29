@@ -169,7 +169,9 @@ the same key (see below).
   medics (less damage, a revived soldier every three seconds, brutes bite
   for less). The latter two are shop unlocks.
 - **Coins and shop**: every kill pays a bounty by kind (walkers 1, brutes
-  3, tanks 5...), bosses 25, gates 2; a counter shows it growing. The shop
+  3, tanks 5...), bosses 25, gates 2; a counter shows it growing. GOLD
+  supply panels sell soldiers or a power-up for bounty right at the
+  gate; what you spend there you do not take home. The shop
   on the title screen sells nine permanent upgrades, including the shotgun
   and medic squads.
 - Score is metres travelled plus ten per kill plus a bonus per level

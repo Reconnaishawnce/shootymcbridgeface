@@ -566,6 +566,12 @@ const SCOUT_LEVEL := 2
 const SCOUT_CHANCE := 0.12
 const BET_CHANCE := 0.1
 const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
+## Supply panels: the bounty spent on the road instead of in the shop.
+const SUPPLY_LEVEL := 2
+const SUPPLY_CHANCE := 0.2
+const SUPPLY_POWER_COST := {"shield": 40, "bomb": 30, "frenzy": 40, "slow": 35}
+const SUPPLY_SOLDIER_COST := 7
+const SUPPLY_SOLDIERS_MAX := 40
 ## The road answers the convoy: each vehicle counts as this many soldiers
 ## when waves are sized, and adds this fraction to boss health.
 const CONVOY_SOLDIER_EQUIV := 20
@@ -654,6 +660,9 @@ func make_gate(level: int, index: int, count: int, lanes: int, owned: Dictionary
 		elif not deal_done and i > 0 and level >= BET_LEVEL and rng.randf() < BET_CHANCE:
 			deal_done = true
 			panels.append(GateMath.bet())
+		elif not deal_done and level >= SUPPLY_LEVEL and rng.randf() < SUPPLY_CHANCE:
+			deal_done = true
+			panels.append(make_supply(count))
 		elif not deal_done and level >= SCOUT_LEVEL and rng.randf() < SCOUT_CHANCE:
 			deal_done = true
 			panels.append(GateMath.scout(maxi(2, int(float(count) * rng.randf_range(0.06, 0.12)))))
@@ -722,6 +731,18 @@ static func saw_distance(index: int) -> float:
 
 static func saw_bite(squad_count: int) -> int:
 	return maxi(3, int(float(squad_count) * SAW_BITE_FRACTION))
+
+
+## A supply panel for a squad of [param count]: half the time soldiers
+## (a few, or an eighth of the squad, at a flat price each), otherwise a
+## power-up at its list price.
+func make_supply(count: int) -> GateMath.GatePanel:
+	if rng.randf() < 0.5:
+		var n := clampi(maxi(6, count / 8), 6, SUPPLY_SOLDIERS_MAX)
+		return GateMath.supply(n * SUPPLY_SOLDIER_COST, "soldiers", n)
+	var ids := SUPPLY_POWER_COST.keys()
+	var id: String = ids[rng.randi_range(0, ids.size() - 1)]
+	return GateMath.supply(int(SUPPLY_POWER_COST[id]), id)
 
 
 ## Where this level's saws roll in: gate indices (never the opener, never

@@ -3,6 +3,22 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.34 (supply panels: spend the bounty on the road)
+
+Turn 5 of the second feedback arc: the bounty is a currency you can
+spend before the run ends, not just a score for the shop.
+
+- GOLD panels are SUPPLY. From level 2, in the extra lanes, a gate may
+  offer soldiers (six, or an eighth of the squad, at 7 coins each) or a
+  power-up (shield 40, bomb 30, frenzy 40, slow-mo 35) for coins out of
+  this run's bounty, paid at the gate. The counter under the level drops
+  by the price. What you spend on the road you do not take home, so a
+  wide, rich run can buy its way out of a bad patch and a careful one
+  can bank it all for the shop.
+- Not enough bounty and the panel does nothing but say so.
+- The bot spends when it can: soldiers for a small squad, a power-up
+  otherwise.
+
 ## 0.33 (gates that explain themselves)
 
 Turn 4 of the second feedback arc: no more mystery perks.

@@ -437,6 +437,21 @@ emits its soldier at each gate, and the bounty counter shows the greed
 multiplier as kills land. The help page's PERKS section is generated
 from the catalog.
 
+## Supply: the bounty on the road
+
+`GateMath.supply(cost, id, amount)` is a panel priced in coins
+(`value` is minus the cost, `power` the power-up or "soldiers",
+`amount` the soldiers). `Difficulty.make_supply` prices soldiers at
+`SUPPLY_SOLDIER_COST` each (six, or an eighth of the squad, up to
+`SUPPLY_SOLDIERS_MAX`) and power-ups from `SUPPLY_POWER_COST`, offered
+from `SUPPLY_LEVEL` in the extra lanes with the other deals. The world
+keeps `supply_funds` equal to the run's bounty (the game updates it on
+every kill and purchase); on the gate it pays or refuses
+(`supply_bought` / `supply_refused`), and the game takes the cost off
+the bounty so the end-of-run coins are what is left. Gold on the panel,
+"NEED n COINS" when short. The bot buys soldiers under sixty and a
+power-up otherwise, when the bounty covers it.
+
 ## The help page, records and the storm
 
 `HelpText.sections()` is the in-game HOW TO PLAY page: short sections a

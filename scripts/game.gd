@@ -325,6 +325,10 @@ func _build_scene() -> void:
 		sfx.play("boss_roar", -12.0, 2.2))
 	world.saw_hit.connect(_on_saw_hit)
 	world.perk_felt.connect(_on_perk_felt)
+	world.supply_bought.connect(_on_supply_bought)
+	world.supply_refused.connect(func(cost: int) -> void:
+		hud.show_float("NEED %d COINS" % cost, false)
+		sfx.play("gate_bad", -4.0))
 	world.horde_bit.connect(_on_horde_bit)
 	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
 	world.powerups = powerups
@@ -930,7 +934,8 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.show_running()
 	hud.set_formation(squad.formation_name())
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.set_bounty(0, mode != "daily" and mode != "weekly")
+	hud.set_bounty(0)
+	world.supply_funds = 0
 	hud.set_perks("")
 	hud.show_hint(Progression.hint_for(1), 4.0)
 	if character_mode:
@@ -1400,9 +1405,9 @@ func _on_gate_stepped(gate: Gate, index: int) -> void:
 func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
 	bounty += Bounty.for_kind(zombie.kind_name())
-	if mode != "daily" and mode != "weekly":
-		# Greed shows on the counter as it happens, not only at the end.
-		hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
+	world.supply_funds = bounty
+	# Greed shows on the counter as it happens, not only at the end.
+	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
 	var chain := combo.kill(_run_time)
 	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
@@ -1496,6 +1501,19 @@ func _on_perk_chosen(id: String) -> void:
 	hud.set_perks(Perks.summary(perks.stacks))
 	sfx.play("gate_good")
 	_punch(3.0)
+
+
+## The bounty spent on the road: fewer coins home, more squad now.
+func _on_supply_bought(id: String, amount: int, cost: int) -> void:
+	bounty = maxi(0, bounty - cost)
+	world.supply_funds = bounty
+	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
+	var what := "+%d SOLDIERS" % amount if id == "soldiers" else Powerups.title(id)
+	hud.show_banner("SUPPLY: %s\n-%d COINS" % [what, cost], 1.2)
+	sfx.play("gate_good", -2.0, 1.1)
+	_punch(3.0)
+	if smoke:
+		print("SMOKE_SUPPLY ", JSON.stringify({"id": id, "amount": amount, "cost": cost, "left": bounty, "level": world.level, "frame": _frames}))
 
 
 ## A perk did its job: say so, every time, so the gate was worth it.
@@ -1615,6 +1633,15 @@ func _bot_panel(g: Gate) -> int:
 	if squad.count >= 24:
 		for i in range(g.panels.size()):
 			if GateMath.is_bet(g.panels[i]):
+				return i
+	# Supply when the bounty covers it: soldiers for a small squad, a
+	# power-up otherwise. Spending on the road is a plan the bot tests.
+	for i in range(g.panels.size()):
+		var sp: GateMath.GatePanel = g.panels[i]
+		if GateMath.is_supply(sp) and world.supply_funds >= GateMath.supply_cost(sp):
+			if sp.power == "soldiers" and squad.count < 60:
+				return i
+			if sp.power != "soldiers" and squad.count >= 10:
 				return i
 	return GateMath.best_index(g.panels, squad.count)
 

@@ -17,6 +17,8 @@ const THINK := Color(0.15, 0.7, 0.68, 0.85)
 const DEAL := Color(0.95, 0.6, 0.15, 0.85)
 ## Convoy panels: olive steel. Soldiers in, a vehicle out.
 const CONVOY := Color(0.5, 0.56, 0.38, 0.9)
+## Supply: gold, the colour of the bounty it spends.
+const SUPPLY := Color(0.98, 0.78, 0.2, 0.9)
 
 var _mesh: MeshInstance3D
 var _strip: MeshInstance3D
@@ -78,6 +80,8 @@ func refresh(panel: GateMath.GatePanel) -> void:
 		color = POWER
 	elif GateMath.is_vehicle(panel):
 		color = CONVOY
+	elif GateMath.is_supply(panel):
+		color = SUPPLY
 	elif GateMath.is_deal(panel):
 		color = DEAL
 	elif GateMath.is_expr(panel):

@@ -247,6 +247,13 @@ goes first because nothing else can be judged on a phone that crawls.
    covers every heavy bite and shows what it saved, the recruiter shows
    its soldier, greed shows on the counter).
 
+5. Supply panels (done): gold panels that sell soldiers or a power-up
+   for coins out of the run's bounty, at the gate, so the bounty is a
+   currency on the road as well as in the shop.
+6. Next: a balance and feedback pass once the first phone reports
+   arrive (the warm-up and watchdog target the likeliest cause of the
+   slow starts; the reports will say whether they were right).
+
 ## The graphics arc: from stick figures to a stylized, polished look
 
 An Epic-style look needs modelled, textured, rigged characters and a

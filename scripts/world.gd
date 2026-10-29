@@ -45,6 +45,9 @@ signal saw_hit(hit: bool)
 ## A perk just did something you could have missed: thick skin softened
 ## a bite by [param amount], the recruiter added [param amount].
 signal perk_felt(id: String, amount: int)
+## A supply panel paid off, or could not be paid.
+signal supply_bought(id: String, amount: int, cost: int)
+signal supply_refused(cost: int)
 
 enum Phase { GATES, BOSS, CLEAR }
 
@@ -142,6 +145,9 @@ var _latched: Array[Zombie] = []
 var _crates: Array[Crate] = []
 var _crate_plan: Array = []
 var _saw_plan: Array = []
+## Coins the squad can spend at a supply panel: the game keeps it equal
+## to the run's bounty.
+var supply_funds := 0
 var _saws: Array[Saw] = []
 var _bombs: Array[Bomb] = []
 ## Bosses get tougher as perks stack; the game keeps this current.
@@ -839,6 +845,17 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 					powerup_granted.emit(Powerups.resolve(panel.power, gen.rng), false)
 				elif GateMath.is_trade(panel):
 					powerup_granted.emit(panel.power, false)
+				elif GateMath.is_supply(panel):
+					var cost := GateMath.supply_cost(panel)
+					if supply_funds >= cost:
+						supply_funds -= cost
+						if panel.power == "soldiers":
+							after = before + panel.amount
+						else:
+							powerup_granted.emit(panel.power, false)
+						supply_bought.emit(panel.power, panel.amount, cost)
+					else:
+						supply_refused.emit(cost)
 				elif GateMath.is_vehicle(panel):
 					if p_squad.add_vehicle(panel.power):
 						vehicle_formed.emit(panel.power)

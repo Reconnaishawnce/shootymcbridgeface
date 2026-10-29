@@ -30,6 +30,7 @@ static func sections() -> Array:
 			"PURPLE panels hand you a power-up.\n" +
 			"AMBER panels are deals: a trade (pay soldiers now for a power-up now), a bet (double your squad if you clear the next wave with no bites, half if you do not), or scouts (pay a few soldiers and the next %d gates show every panel).\n" % GateMath.SCOUT_GATES +
 			"OLIVE panels turn soldiers into a vehicle (see THE CONVOY).\n" +
+			"GOLD panels are SUPPLY: pay coins out of this run's bounty, right there at the gate, for a few soldiers or a power-up now. What you spend on the road you do not take home to the shop, so it is a real choice. Not enough bounty and the panel does nothing.\n" +
 			"GREY panels with a ? are hidden until you get close or shoot them."},
 		{"title": "SHOOT THE PANELS", "body":
 			"Your bullets hit the panels too. Every bit of fire steps a panel up: a +2 becomes a +3, a x2 becomes x2.5, a trade gets cheaper. " +

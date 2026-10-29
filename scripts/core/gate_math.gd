@@ -7,7 +7,7 @@ extends RefCounted
 ## every STEP of accumulated bullet damage nudges the panel's value upward.
 ## That is the core "your aim is a resource" decision of the game.
 
-enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET, SCOUT, VEHICLE }
+enum Kind { ADD, MUL, POWER, EXPR, TRADE, BET, SCOUT, VEHICLE, SUPPLY }
 ## Gates a scout party reveals ahead.
 const SCOUT_GATES := 3
 
@@ -34,6 +34,8 @@ class GatePanel:
 	var power: String = ""
 	## EXPR panels: a short sum applied left to right, [[kind, value], ...].
 	var ops: Array = []
+	## SUPPLY panels: soldiers delivered when the power is "soldiers".
+	var amount: int = 0
 
 	func _init(p_kind: int, p_value: float, p_hidden: bool = false) -> void:
 		kind = p_kind
@@ -72,6 +74,25 @@ static func vehicle(id: String) -> GatePanel:
 
 static func is_vehicle(panel: GatePanel) -> bool:
 	return panel.kind == Kind.VEHICLE
+
+
+## Supply: pay [param cost] coins out of this run's bounty for power-up
+## [param id] now, or for [param amount] soldiers when [param id] is
+## "soldiers". The world checks the funds; the count only changes when
+## the squad can pay.
+static func supply(cost: int, id: String, amount: int = 0) -> GatePanel:
+	var p := GatePanel.new(Kind.SUPPLY, float(-absi(cost)), false)
+	p.power = id
+	p.amount = amount
+	return p
+
+
+static func is_supply(panel: GatePanel) -> bool:
+	return panel.kind == Kind.SUPPLY
+
+
+static func supply_cost(panel: GatePanel) -> int:
+	return int(round(-panel.value))
 
 
 ## Scouts: send [param cost] soldiers ahead and the next SCOUT_GATES gates
@@ -207,6 +228,9 @@ static func label(panel: GatePanel) -> String:
 			return "SCOUT %d" % int(round(panel.value))
 		Kind.VEHICLE:
 			return "%s %d" % [Convoy.title(panel.power), int(round(panel.value))]
+		Kind.SUPPLY:
+			var what := "+%d SOLDIERS" % panel.amount if panel.power == "soldiers" else Powerups.title(panel.power)
+			return "%s %dc" % [what, supply_cost(panel)]
 	return "?"
 
 

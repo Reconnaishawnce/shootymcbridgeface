@@ -67,6 +67,15 @@ static func save_safe_graphics(on: bool) -> void:
 	_write(SETTINGS, "safe_graphics", on)
 
 
+## The watchdog lowers the graphics once per install, never twice.
+static func load_auto_safe_done() -> bool:
+	return bool(_read(SETTINGS, "auto_safe_done", false))
+
+
+static func save_auto_safe_done(done: bool) -> void:
+	_write(SETTINGS, "auto_safe_done", done)
+
+
 static func load_shadows_on() -> bool:
 	return bool(_read(SETTINGS, "shadows_on", true))
 

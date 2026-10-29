@@ -108,6 +108,10 @@ var _shots_dir := ""
 var _game_over_at := 0
 var _game_over_frame := 0
 var _smoke_retry := false
+var _warming := false
+var _fps_frames := 0
+var _fps_since := 0.0
+var _crash_card_shown := false
 var _smoke_retries := 0
 var _shake := 0.0
 var _drag_scale := 0.015
@@ -181,7 +185,9 @@ func _ready() -> void:
 	# auto-player silent so its exit is deterministic.
 	Sfx.enabled = SaveData.load_sound_on() and not smoke
 	Sfx.music_on = SaveData.load_music_on()
+	var t_boot := Time.get_ticks_msec()
 	_build_scene()
+	Diag.note("boot_scene", {"ms": Time.get_ticks_msec() - t_boot})
 	_drag_scale = (squad.road_half * 2.0) / (get_viewport().get_visible_rect().size.x * 0.5)
 	hud.set_sound(Sfx.enabled)
 	hud.set_music(Sfx.music_on)
@@ -191,6 +197,8 @@ func _ready() -> void:
 	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
 	Diag.note("ready", {"smoke": smoke, "character_mode": character_mode})
+	if not smoke:
+		await _warm_up()
 	show_title()
 	if smoke:
 		start_run("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels")))
@@ -380,6 +388,9 @@ func _build_scene() -> void:
 		Diag.note("safe_graphics", {"on": on})
 		sfx.play("click"))
 	hud.report_pressed.connect(_send_report)
+	hud.crash_dismissed.connect(func() -> void:
+		hud.hide_crash_card()
+		sfx.play("click"))
 	hud.locker_opened.connect(open_locker)
 	hud.locker_closed.connect(close_locker)
 	hud.locker_tab.connect(_on_locker_tab)
@@ -387,6 +398,119 @@ func _build_scene() -> void:
 
 
 # --- menus -----------------------------------------------------------------
+
+## The warm-up. Phones compile every shader the first time it is drawn,
+## so the first zombie, boss, vehicle and particle each used to cost a
+## stutter, and the first screens hitched on the glyph caches. Under a
+## loading screen, draw one of everything for a few frames, then free it.
+func _warm_up() -> void:
+	_warming = true
+	Diag.set_state("warm_up")
+	var t0 := Time.get_ticks_msec()
+	hud.show_loading(true)
+	hud.warm_fonts()
+	var warm := Node3D.new()
+	warm.position = Vector3(0.0, 0.0, -26.0)
+	add_child(warm)
+	var x := -7.0
+	for k in Zombie.Kind.values():
+		var zb := Zombie.new()
+		zb.setup(10.0, 0.0, k)
+		zb.position = Vector3(x, 0.0, 0.0)
+		warm.add_child(zb)
+		x += 1.4
+	x = -6.0
+	for k in Boss.Kind.values():
+		var b := Boss.new()
+		b.setup(100.0, k)
+		b.position = Vector3(x, 0.0, -6.0)
+		warm.add_child(b)
+		x += 5.0
+	x = -6.0
+	for id in Convoy.SPECS:
+		var v := Vehicle.new(id)
+		v.position = Vector3(x, 0.0, 4.0)
+		v.target_offset = v.position
+		warm.add_child(v)
+		x += 3.5
+	for i in range(3):
+		var s := Soldier.new(i < 2, ["rifle", "shotgun", "medic"][i], wardrobe.look() if i == 0 else {})
+		s.position = Vector3(-2.0 + float(i) * 2.0, 0.0, 7.0)
+		warm.add_child(s)
+	var g := Gate.new()
+	g.setup([GateMath.add(5), GateMath.mul(2.0), GateMath.add(-3, true), GateMath.power("bomb"), GateMath.vehicle("jeep")])
+	g.position = Vector3(0.0, 0.0, -10.0)
+	warm.add_child(g)
+	var pg := PerkGate.new()
+	pg.setup(["rapid", "skin", "greed"], 3.0)
+	pg.position = Vector3(0.0, 0.0, -14.0)
+	warm.add_child(pg)
+	var rg := RouteGate.new()
+	rg.setup(GateMath.add(4), -1, 3.3)
+	rg.position = Vector3(0.0, 0.0, -18.0)
+	warm.add_child(rg)
+	var c := Crate.new()
+	c.setup("bomb")
+	c.position = Vector3(3.0, 0.0, 2.0)
+	warm.add_child(c)
+	var st := Strike.new()
+	st.setup(-3.0)
+	warm.add_child(st)
+	var sp := Spit.new()
+	warm.add_child(sp)
+	sp.launch(Vector3(0.0, 3.0, -8.0), 1.0, warm)
+	var sh := Shell.new()
+	sh.position = Vector3(2.0, 0.6, 0.0)
+	warm.add_child(sh)
+	var bm := Bomb.new()
+	bm.launch(Vector3(-2.0, 1.0, 0.0))
+	warm.add_child(bm)
+	for args in [[1.0, Bullet.COLOR, 0.7], [0.8, Color(1.0, 0.35, 0.3), 2.4]]:
+		var bl := Bullet.new(args[0], args[1], args[2])
+		bl.position = Vector3(0.0, 0.8, 0.0)
+		warm.add_child(bl)
+	var at := warm.position + Vector3(0.0, 1.0, 0.0)
+	Fx.blood(warm, at, true)
+	Fx.dust(warm, at, 6)
+	Fx.sparks(warm, at, 6)
+	Fx.smoke(warm, at, 4)
+	Fx.trail(warm, Vector3.ZERO)
+	Burst.spawn(warm, at, Color(1.0, 0.6, 0.15), 6, 0.14, 2.0, 1.0)
+	for i in range(4):
+		await get_tree().process_frame
+	warm.queue_free()
+	hud.end_font_warm()
+	await get_tree().process_frame
+	hud.show_loading(false)
+	_warming = false
+	_fps_frames = 0
+	_fps_since = Time.get_ticks_msec() * 0.001
+	Diag.note("warm_up", {"ms": Time.get_ticks_msec() - t0})
+
+
+## The watchdog: a phone that cannot hold the frame rate gets the safe
+## renderer, once, and is told.
+func _watch_fps() -> void:
+	if smoke or _warming or _shots_dir != "" or get_tree().paused:
+		return
+	_fps_frames += 1
+	var now := Time.get_ticks_msec() * 0.001
+	var seconds := now - _fps_since
+	if seconds < Perf.SAMPLE_SECONDS:
+		return
+	var avg := Perf.average_fps(_fps_frames, seconds)
+	if avg < 40.0:
+		Diag.note("fps_low", {"avg": snappedf(avg, 0.1), "state": State.keys()[state]})
+	if Perf.should_degrade(avg, seconds, SaveData.load_safe_graphics(), SaveData.load_auto_safe_done()):
+		SaveData.save_safe_graphics(true)
+		SaveData.save_auto_safe_done(true)
+		hud.set_safe_graphics(true)
+		_apply_graphics(true)
+		hud.toast(Perf.notice())
+		Diag.note("auto_safe_graphics", {"avg": snappedf(avg, 0.1)})
+	_fps_frames = 0
+	_fps_since = now
+
 
 ## Safe graphics: the plain renderer for phones whose drivers choke on
 ## the extras. No glow, no fog, no shadows, no anti-aliasing, no vignette.
@@ -435,6 +559,9 @@ func show_title() -> void:
 	var goal := Goals.next(_goal_context())
 	if Diag.had_bad_exit() and runs > 0:
 		goal = "The game stopped suddenly last time. SETTINGS has a REPORT A BUG button that emails the details."
+	if Diag.had_bad_exit() and runs > 0 and not _crash_card_shown and not smoke and _shots_dir == "":
+		_crash_card_shown = true
+		call_deferred("_offer_crash_report")
 	hud.show_title({
 		"goal": goal,
 		"buttons": _title_buttons(runs),
@@ -445,6 +572,11 @@ func show_title() -> void:
 		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"modifier": modifier, "mode_hint": hint,
 	})
+
+
+func _offer_crash_report() -> void:
+	if state == State.TITLE:
+		hud.show_crash_card()
 
 
 func _quests_left() -> int:
@@ -1014,6 +1146,7 @@ func _process(delta: float) -> void:
 				_slowmo_until = 0.0
 	_keyboard_steer(delta)
 	_apply_shake(delta)
+	_watch_fps()
 	if smoke:
 		_smoke_tick()
 
@@ -1779,6 +1912,10 @@ func _shots_walkthrough() -> void:
 	await _capture("2b_daily.png", 5)
 	open_settings()
 	await _capture("2c_settings.png", 5)
+	show_title()
+	hud.show_crash_card()
+	await _capture("2c2_crash.png", 5)
+	hud.hide_crash_card()
 	stats = Stats.merge(stats, {"runs": 12, "kills": 2400, "bosses": 11, "gates": 130, "perfect": 31, "distance": 9000, "best_combo": 140, "best_level": 6})
 	open_records()
 	await _capture("2h_records.png", 5)

@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.30 (runs on the slow phones: warm-up, watchdog, crash card)
+
+The first turn of the second feedback arc. Phones were freezing or
+crawling right after launch and settling later, which is what shader
+and font compilation looks like on a phone's GPU driver: every material,
+particle and text size is compiled the first time it is drawn.
+
+- A loading screen. Under it the game draws one of everything for a few
+  frames (every zombie kind, every boss, every vehicle, soldiers of each
+  squad, a gate with every panel type, a perk gate, a route gate, a
+  crate, a strike, a glob, a shell, a bomb, tracers, every particle) and
+  every text size the HUD uses, then frees it all. The stutters that
+  used to land on the first boss, the first vehicle and the first death
+  now happen once, behind the loading screen.
+- A frame-rate watchdog. If the game averages under 22 frames a second
+  over five seconds, SAFE GRAPHICS switches itself on, once per install,
+  with a note saying where to change it back. Low frame rates are logged
+  for the report either way.
+- After a crash, the next launch opens a card: THAT WAS A CRASH, with
+  SEND THE REPORT (one tap into the mail app) or NOT NOW.
+- Boot timings (scene build, warm-up) go into the report.
+
 ## 0.29 (diagnostics, bug reports, safe graphics)
 
 - Bug reports by email. SETTINGS has a line for what happened and a

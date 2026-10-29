@@ -35,6 +35,7 @@ signal characters_toggled(on: bool)
 signal shadows_toggled(on: bool)
 signal safe_graphics_toggled(on: bool)
 signal report_pressed(note: String)
+signal crash_dismissed
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -94,6 +95,9 @@ var _settings_characters: Button
 var _settings_shadows: Button
 var _settings_safe: Button
 var _report_note: LineEdit
+var _loading: Control
+var _font_warm: Control
+var _crash_card: Control
 var _pause_characters: Button
 
 var _quests_card: Control
@@ -431,6 +435,93 @@ func _init() -> void:
 	_build_combo(root)
 	_build_over(root)
 	_build_pause(root)
+	_build_crash(root)
+	# Last, so it sits over everything while the game warms up.
+	_loading = Control.new()
+	_loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_loading.mouse_filter = Control.MOUSE_FILTER_STOP
+	_loading.visible = false
+	root.add_child(_loading)
+	var shade := ColorRect.new()
+	shade.color = Color(0.05, 0.06, 0.09, 1.0)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading.add_child(shade)
+	var title := _label(64, HORIZONTAL_ALIGNMENT_CENTER)
+	title.text = "SHOOTY\nMcBRIDGEFACE"
+	_pin(_loading, title, 0.5, 0.4, Vector2(680.0, 180.0))
+	var l := _label(30, HORIZONTAL_ALIGNMENT_CENTER)
+	l.text = "LOADING..."
+	l.add_theme_color_override("font_color", COIN)
+	_pin(_loading, l, 0.5, 0.56, Vector2(400.0, 50.0))
+
+
+## The black box's one-tap offer after a crash.
+func _build_crash(root: Control) -> void:
+	_crash_card = _card(root)
+	_crash_card.visible = false
+	var box: VBoxContainer = _crash_card.get_meta("box")
+	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = "THAT WAS A CRASH"
+	box.add_child(head)
+	var body := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.custom_minimum_size.x = 520.0
+	body.text = "The game stopped suddenly last time. A report (phone, graphics, what the game was doing) helps fix it. One tap opens your mail app with it filled in; nothing is sent on its own."
+	body.modulate = Color(0.9, 0.9, 0.95)
+	box.add_child(body)
+	var send := _button("SEND THE REPORT", 34)
+	send.pressed.connect(func() -> void:
+		report_pressed.emit("The game stopped suddenly during the previous session.")
+		crash_dismissed.emit())
+	box.add_child(send)
+	var no := _button("NOT NOW", 28)
+	no.pressed.connect(func() -> void: crash_dismissed.emit())
+	box.add_child(no)
+
+
+func show_crash_card() -> void:
+	_crash_card.move_to_front()
+	_crash_card.visible = true
+
+
+func hide_crash_card() -> void:
+	_crash_card.visible = false
+
+
+## The loading screen, over everything, while shaders and fonts compile.
+func show_loading(on: bool) -> void:
+	_loading.move_to_front()
+	_loading.visible = on
+
+
+## Every text size the HUD uses, drawn once under the loading screen so
+## the glyph caches are built before a label appears on the road.
+func warm_fonts() -> void:
+	_font_warm = Control.new()
+	_font_warm.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_font_warm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading.add_child(_font_warm)
+	_loading.move_child(_font_warm, 0)
+	var sample := "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 .,:;!?+-x÷%/()·✓■◀▶"
+	var y := 0.0
+	for size in [19, 20, 21, 22, 23, 24, 26, 28, 30, 34, 40, 44, 48, 52, 56, 64, 72]:
+		var l := _label(size, HORIZONTAL_ALIGNMENT_LEFT)
+		l.text = sample
+		l.position = Vector2(0.0, y)
+		_font_warm.add_child(l)
+		y += 8.0
+	for size in [16, 22, 24, 26, 28, 30, 34, 40, 52]:
+		var b := _button(sample, size)
+		b.position = Vector2(0.0, y)
+		_font_warm.add_child(b)
+		y += 8.0
+
+
+func end_font_warm() -> void:
+	if _font_warm != null:
+		_font_warm.queue_free()
+		_font_warm = null
 
 
 ## Pin [param c] at a point of the screen given by anchors, with its own
@@ -1042,6 +1133,7 @@ func _hide_cards() -> void:
 	_quests_card.visible = false
 	_more_card.visible = false
 	_road_card.visible = false
+	_crash_card.visible = false
 	hide_revive()
 
 

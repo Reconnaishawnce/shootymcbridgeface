@@ -132,6 +132,8 @@ the same key (see below).
 - **Runners** are fast, thin and they find you. Walkers barely steer, so
   lining up the crowd is on you. When a bite leaves you with a handful,
   time slows for a beat.
+- **Slow phone?** The game lowers its own graphics once if it cannot
+  hold the frame rate, and says so; SETTINGS turns it back.
 - **Bug reports**: SETTINGS has REPORT A BUG BY EMAIL. It opens your mail
   app with the diagnostics filled in (phone, GPU, app version, the last
   game events, stalls, how the previous session ended, engine errors)

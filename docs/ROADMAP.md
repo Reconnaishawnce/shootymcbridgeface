@@ -221,6 +221,30 @@ milestones every 100, fixed unlock points, checkpoints, a ROAD page);
 the rally on the wipe screen (a five-second paid comeback, once a run,
 never on a shared road). Portrait stays.
 
+## Feedback arc 2: phones first, then the strategy of fire
+
+Four turns from the second round of phone feedback. The slow-phone work
+goes first because nothing else can be judged on a phone that crawls.
+
+1. Runs on the slow phones (done): a loading warm-up that compiles every
+   shader and font before the title, a frame-rate watchdog that lowers
+   the graphics once and says so, a one-tap crash report card, boot
+   timings in the report.
+2. Fire modes and the bounty: a STRAIGHT fire mode (everything out of
+   the middle, for what is in front of you) beside TIGHT, NORMAL and
+   WIDE; a coin bounty per zombie by kind, visible as it grows, paid at
+   the end; the formation button says what each mode is for; the shop
+   and perks repriced around it, so wide-and-rich and narrow-and-sure
+   are both real plans.
+3. Bosses you can dodge, hazards, deaths: globs that fly visibly from
+   the boss with a shadow and land where the ring says, smaller splash,
+   longer warning on lightning; buzz saws that cross the bridge from
+   level 2; soldiers that tumble off the side when they die.
+4. Gates that explain themselves: every perk gate panel says what the
+   perk does, every pickup banners the effect, a perk strip in the HUD,
+   and effects big enough to feel (thick skin shows every bite it
+   softens).
+
 ## The graphics arc: from stick figures to a stylized, polished look
 
 An Epic-style look needs modelled, textured, rigged characters and a

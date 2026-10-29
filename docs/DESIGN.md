@@ -300,6 +300,15 @@ SAFE GRAPHICS turns off glow, fog, colour adjustment, shadows, MSAA and
 the vignette (`Game._apply_graphics`), for drivers that glitch on the
 extras; the report says whether it is on.
 
+Startup on phones: `Game._warm_up` draws one of everything (every
+zombie, boss and vehicle kind, soldiers, gates and panels, projectiles,
+particles) plus every HUD text size (`Hud.warm_fonts`) under a loading
+screen for a few frames, so shader and glyph compilation happens once
+at boot instead of on the first boss. `Perf` is the frame-rate
+watchdog: under 22 fps over five seconds turns SAFE GRAPHICS on once
+per install and tells the player. A bad exit opens a one-tap crash
+card on the next launch (`Hud.show_crash_card`).
+
 QA: `--smoke-retry` makes the bot sit on the results for ninety frames,
 assert the clock is back to normal, and play again; `check.sh` runs it
 on a nightmare seed. `seed(run_seed)` in smoke mode makes a seed

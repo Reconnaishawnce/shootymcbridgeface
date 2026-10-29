@@ -5,7 +5,7 @@ extends Node3D
 ## through the core deal [member core_mult] damage, so tracking it with your
 ## steering is the skill.
 
-enum Kind { WALKER, SPITTER, STORM }
+enum Kind { WALKER, SPITTER, STORM, FOREMAN }
 
 const BODY_RADIUS := 1.7
 ## The spitter holds this far away and lobs at you instead of walking in.
@@ -29,6 +29,13 @@ const STORM_GLOW := Color(0.7, 0.85, 1.0)
 const STORM_HOLD_Z := -22.0
 const STORM_SWAY := 2.6
 const STORM_SWAY_SPEED := 0.7
+## The foreman works the road: hurls saws, drops crates, holds back.
+const FOREMAN_SKIN := Color(0.6, 0.42, 0.3)
+const HARD_HAT := Color(1.0, 0.8, 0.15)
+const VEST := Color(1.0, 0.45, 0.1)
+const FOREMAN_HOLD_Z := -23.0
+const FOREMAN_SWAY := 2.2
+const FOREMAN_SWAY_SPEED := 0.9
 
 var hp := 100.0
 var max_hp := 100.0
@@ -121,6 +128,32 @@ func setup(p_hp: float, p_kind: int = Kind.WALKER) -> void:
 			rod.position = Vector3(sin(a) * 0.5, 4.5, cos(a) * 0.5 + 0.2)
 			rod.rotation_degrees = Vector3(cos(a) * 25.0, 0.0, -sin(a) * 25.0)
 			_body.add_child(rod)
+	elif kind == Kind.FOREMAN:
+		# A hard hat, a hi-vis vest and a saw in one hand: it works the road.
+		_recolour(FOREMAN_SKIN)
+		var hat := Mats.ball(0.62, HARD_HAT)
+		hat.position = Vector3(0.0, 4.05, 0.2)
+		hat.scale = Vector3(1.0, 0.62, 1.0)
+		_body.add_child(Mats.ink(hat, 0.05))
+		var brim := Mats.torus(0.55, 0.78, HARD_HAT)
+		brim.position = Vector3(0.0, 3.85, 0.25)
+		_body.add_child(brim)
+		var vest := Mats.box(Vector3(1.9, 1.5, 1.2), VEST)
+		vest.position = Vector3(0.0, 2.4, 0.4)
+		_body.add_child(Mats.ink(vest, 0.05))
+		for y in [2.0, 2.8]:
+			var stripe := Mats.box(Vector3(1.95, 0.16, 1.25), Color(0.95, 0.95, 0.9), true)
+			stripe.position = Vector3(0.0, y, 0.4)
+			_body.add_child(stripe)
+		var blade := Mats.torus(0.25, 0.85, Saw.STEEL)
+		blade.position = Vector3(1.6, 2.4, 1.3)
+		blade.rotation_degrees.z = 90.0
+		_body.add_child(blade)
+		var edge := Mats.torus(0.83, 0.93, Saw.EDGE, true)
+		edge.material_override = Mats.glow(Saw.EDGE, 1.6)
+		edge.position = blade.position
+		edge.rotation_degrees.z = 90.0
+		_body.add_child(edge)
 
 
 ## Swap every skin-coloured part (inked or not) for another skin.
@@ -140,13 +173,25 @@ func is_storm() -> bool:
 	return kind == Kind.STORM
 
 
+func is_foreman() -> bool:
+	return kind == Kind.FOREMAN
+
+
+func kind_name() -> String:
+	return ["walker", "spitter", "storm", "foreman"][kind]
+
+
 ## Bosses that never walk up to you, and hold a distance instead.
 func holds_back() -> bool:
-	return is_spitter() or is_storm()
+	return is_spitter() or is_storm() or is_foreman()
 
 
 func hold_z() -> float:
-	return STORM_HOLD_Z if is_storm() else SPITTER_HOLD_Z
+	if is_storm():
+		return STORM_HOLD_Z
+	if is_foreman():
+		return FOREMAN_HOLD_Z
+	return SPITTER_HOLD_Z
 
 
 func is_core_hit(x: float) -> bool:
@@ -178,6 +223,8 @@ func _process(delta: float) -> void:
 		sway_x = sin(t * SPITTER_SWAY_SPEED + _phase * 0.5) * SPITTER_SWAY
 	elif is_storm():
 		sway_x = sin(t * STORM_SWAY_SPEED + _phase * 0.5) * STORM_SWAY
+	elif is_foreman():
+		sway_x = sin(t * FOREMAN_SWAY_SPEED + _phase * 0.5) * FOREMAN_SWAY
 	_core.position.x = core_x
 	_ring.position.x = core_x
 	_core.scale = Vector3.ONE * (1.0 + 0.15 * sin(t * 9.0))

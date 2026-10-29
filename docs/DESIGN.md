@@ -452,6 +452,19 @@ the bounty so the end-of-run coins are what is left. Gold on the panel,
 "NEED n COINS" when short. The bot buys soldiers under sixty and a
 power-up otherwise, when the bounty covers it.
 
+## The Foreman
+
+`Boss.Kind.FOREMAN` holds back at `FOREMAN_HOLD_Z` and sways like the
+spitter. `World._tick_boss` gives it two clocks instead of lightning:
+`FOREMAN_SAW_INTERVAL` (shorter when enraged) throws a saw from its
+feet aimed at where the squad is heading, a second one offset when
+enraged, through `spawn_saw(..., quiet)` so the road's own "SAW AHEAD"
+does not fire; `FOREMAN_CRATE_INTERVAL` drops a crate (`drop_crate`,
+mystery or a listed power-up) nine metres in front of it, into the
+same `_crates` list the road's crates use, so the pickup is the usual
+walk-through. `Difficulty.boss_kind` puts it on every fourth level and
+`boss_hp` scales it by `FOREMAN_HP_MULT`.
+
 ## Veterans
 
 `Veterans` (pure) is a roster of up to `MAX` named soldiers with a

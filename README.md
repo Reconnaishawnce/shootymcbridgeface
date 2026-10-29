@@ -166,8 +166,10 @@ the same key (see below).
   copy button too.
 - **Bosses** cycle: the walker that chews you once it arrives, the
   spitter that holds back and lobs globs at where you are heading (a red
-  ring marks where each lands: step out of it), and the storm that calls
-  lightning in lines across the road with one gap to find.
+  ring marks where each lands: step out of it), the storm that calls
+  lightning in lines across the road with one gap to find, and every
+  fourth level the foreman, who hurls saws down your lane and drops
+  crates between you.
 - **Thieves** sprint away from you toward the next gate and knock its
   better panel down if they get there. **Tanks** are slow bullet sponges
   that shield the gate behind them.

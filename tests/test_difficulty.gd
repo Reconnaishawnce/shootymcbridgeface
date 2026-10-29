@@ -54,8 +54,13 @@ func test_curves_are_bounded_and_increasing() -> void:
 
 
 func test_boss_curve() -> void:
-	# Three kinds cycle by level; each kind's health grows with the level.
-	for kind in [Boss.Kind.WALKER, Boss.Kind.SPITTER, Boss.Kind.STORM]:
+	# Four kinds cycle by level; each kind's health grows with the level.
+	check_eq(Difficulty.boss_kind(4), Boss.Kind.FOREMAN, "the foreman on level four")
+	check_eq(Difficulty.boss_kind(8), Boss.Kind.FOREMAN, "and every fourth after")
+	check_eq(Difficulty.boss_kind(3), Boss.Kind.STORM, "the storm keeps level three")
+	check_eq(Difficulty.boss_kind(2), Boss.Kind.SPITTER, "the spitter keeps level two")
+	check(Difficulty.FOREMAN_SAW_INTERVAL_ENRAGED < Difficulty.FOREMAN_SAW_INTERVAL, "angry means faster saws")
+	for kind in [Boss.Kind.WALKER, Boss.Kind.SPITTER, Boss.Kind.STORM, Boss.Kind.FOREMAN]:
 		var last := 0.0
 		for level in range(1, 20):
 			if Difficulty.boss_kind(level) != kind:

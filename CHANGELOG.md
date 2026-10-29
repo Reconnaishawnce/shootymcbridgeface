@@ -3,6 +3,18 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.37 (the Foreman)
+
+- A fourth boss, every fourth level: THE FOREMAN. Hard hat, hi-vis
+  vest, a saw in one hand. It hangs back and works the road: it hurls
+  buzz saws down your lane every few seconds, aimed where you are
+  heading, two at once when it is angry, and drops supply crates
+  between you every seven seconds. No lightning. The fight is dodge,
+  grab and shoot the core.
+- The boss cycle is now walker, spitter, storm, foreman; the foreman
+  carries 90% of a walker's health. The help page, the lessons and the
+  bot cover it.
+
 ## 0.36 (veterans)
 
 - Veterans. Beat a boss with anyone left and one survivor steps up with

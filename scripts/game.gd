@@ -338,6 +338,12 @@ func _build_scene() -> void:
 		hud.show_float("SAW AHEAD", false)
 		sfx.play("boss_roar", -12.0, 2.2))
 	world.saw_hit.connect(_on_saw_hit)
+	world.foreman_threw.connect(func(what: String) -> void:
+		if smoke:
+			print("SMOKE_FOREMAN ", JSON.stringify({"what": what, "level": world.level, "frame": _frames}))
+		sfx.play("throw" if what == "saw" else "crate", -4.0, 0.8)
+		if what == "saw":
+			hud.show_float("SAW!", false))
 	world.perk_felt.connect(_on_perk_felt)
 	world.supply_bought.connect(_on_supply_bought)
 	world.supply_refused.connect(func(cost: int) -> void:
@@ -1554,10 +1560,10 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 
 func _on_boss_spawned(boss: Boss) -> void:
 	if smoke:
-		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
+		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "kind": boss.kind_name(), "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
 	hud.show_boss(true)
 	hud.show_banner("BOSS", 1.2)
-	_teach(Lessons.boss_lesson(["walker", "spitter", "storm"][boss.kind]))
+	_teach(Lessons.boss_lesson(boss.kind_name()))
 	sfx.play("boss_roar")
 	_shake = 0.6
 
@@ -2062,6 +2068,18 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
+	# A saw rolling at us outranks everything, the boss included: step
+	# round it, and dash if it is close.
+	var saw := world.nearest_saw(18.0)
+	if saw != null and absf(saw.position.x - squad.position.x) < squad.reach() + 1.2:
+		var away := -2.6 if saw.position.x > 0.0 else 2.6
+		squad.target_x = clampf(saw.position.x + away, -squad.road_half + 0.5, squad.road_half - 0.5)
+		if saw.position.z > -5.0 and Progression.dash_enabled(world.level) and squad.can_dash():
+			if squad.dash(signf(away)):
+				_on_dash()
+		if _bot_spread:
+			squad.set_spread(0.6)
+		return
 	# Lightning ring on top of us: head for the nearest safe spot, and dash
 	# there if it is far.
 	if world.strike_threat_at(squad.position.x, squad.reach() + 0.6):
@@ -2101,12 +2119,6 @@ func _bot_steer() -> void:
 	var g_near := world.nearest_upcoming_gate()
 	if _bot_spread:
 		squad.set_spread(1.6 if (near != null and (g_near == null or near.position.z > g_near.position.z)) else 0.7)
-	# A saw rolling at us outranks everything: step round it.
-	var saw := world.nearest_saw(16.0)
-	if saw != null and absf(saw.position.x - squad.position.x) < squad.reach() + 1.2:
-		var away := -2.6 if saw.position.x > 0.0 else 2.6
-		squad.target_x = clampf(saw.position.x + away, -squad.road_half + 0.5, squad.road_half - 0.5)
-		return
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
 		if z.is_thief():
@@ -2176,6 +2188,13 @@ func _shots_walkthrough() -> void:
 		squad.set_count(8)
 		squad.set_spread(1.3)
 		await _capture("q6_veterans.png", 10)
+		var foreman := Boss.new()
+		foreman.setup(100.0, Boss.Kind.FOREMAN)
+		foreman.position = Vector3(0.0, 0.0, -12.0)
+		world.add_child(foreman)
+		world.spawn_saw(-1.5, -7.0, true)
+		await _capture("q7_foreman.png", 8)
+		foreman.queue_free()
 		_quit_with(0)
 		return
 	open_shop()

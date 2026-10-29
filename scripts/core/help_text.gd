@@ -79,7 +79,8 @@ static func sections() -> Array:
 			"At the end of every level the road slows and the boss comes. The WALKER marches up and chews your squad once it arrives. " +
 			"The SPITTER hangs back and lobs globs: you see each one leave the boss, its shadow crossing the road, and a red ring that closes in on where it lands. Only the ring is wet; step out of it. " +
 			"Lightning warns for %.1f seconds with a ring that fills up before the bolt lands, and only the ring is hit. The STORM hangs back and calls lightning in lines across the whole road with one gap: find the gap. " % Difficulty.STRIKE_WARNING +
-			"All of them drop red rings that turn into lightning bolts, call runners, and get angrier below half health. " +
+			"Every fourth level THE FOREMAN takes the road: it hangs back, hurls buzz saws down your lane (two when it is angry) and drops supply crates between you, so the fight is dodge, grab and shoot. " +
+			"All of them call runners and get angrier below half health; all but the foreman drop red rings that turn into lightning bolts. " +
 			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives." % int(Modifiers.get_value("normal", "horde_level"))},
 		{"title": "POWER-UPS", "body":
 			"BOMB: tap the bomb button to throw one; big blast, kills most things in it.\n" +

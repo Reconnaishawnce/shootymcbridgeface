@@ -42,6 +42,8 @@ const CATALOG := {
 		"body": "It hangs back and lobs globs. Watch the shadow crossing the road and the red ring closing in on where it lands. Only the ring is wet: step out of it. Its core sways with its whole body."},
 	"boss_storm": {"title": "THE STORM",
 		"body": "It calls lightning in lines across the whole road with one gap. Find the gap and fit through it; a tight formation helps."},
+	"boss_foreman": {"title": "THE FOREMAN",
+		"body": "It hangs back and works the road: it hurls buzz saws down your lane, two when it is angry, and drops supply crates between you. Dodge the saws, grab the crates, shoot the core."},
 	"horde": {"title": "THE HORDE",
 		"body": "A wall of zombies creeps up behind you while the road is stopped for the boss. Kill the boss fast, or it starts eating."},
 	"veterans": {"title": "VETERANS",
@@ -50,7 +52,7 @@ const CATALOG := {
 		"body": "Squad at zero? Once a run you can buy a few soldiers back for stars, if you decide in five seconds. Not in the daily or weekly."},
 }
 ## The order lessons are listed on the LEARN page.
-const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "horde", "veterans", "rally"]
+const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
 ## Seconds between two pop-ups, so a busy gate does not stack three.
 const COOLDOWN := 4.0
 

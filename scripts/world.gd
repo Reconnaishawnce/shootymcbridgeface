@@ -42,6 +42,8 @@ signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 signal saw_spawned
 signal saw_hit(hit: bool)
+## The foreman threw a saw or dropped a crate.
+signal foreman_threw(what: String)
 ## A perk just did something you could have missed: thick skin softened
 ## a bite by [param amount], the recruiter added [param amount].
 signal perk_felt(id: String, amount: int)
@@ -149,6 +151,8 @@ var _saw_plan: Array = []
 ## to the run's bounty.
 var supply_funds := 0
 var _saws: Array[Saw] = []
+var _foreman_saw_timer := 0.0
+var _foreman_crate_timer := 0.0
 var _bombs: Array[Bomb] = []
 ## Bosses get tougher as perks stack; the game keeps this current.
 var perk_count := 0
@@ -258,6 +262,8 @@ func start_level(n: int) -> void:
 	_latched.clear()
 	_strike_timer = 1.5
 	_adds_timer = Difficulty.BOSS_ADDS_INTERVAL
+	_foreman_saw_timer = Difficulty.FOREMAN_SAW_FIRST
+	_foreman_crate_timer = Difficulty.FOREMAN_CRATE_FIRST
 	level_started.emit(level)
 
 
@@ -1123,7 +1129,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			_storm_line(0.0)
 			if enraged:
 				_storm_line(Difficulty.STORM_SECOND_LINE_DELAY)
-	elif _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
+	elif _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0 and not boss.is_foreman():
 		_strike_timer = Difficulty.STRIKE_INTERVAL_ENRAGED if enraged else Difficulty.STRIKE_INTERVAL
 		var n := Difficulty.strikes_per_volley(level) + (1 if enraged else 0) + int(mod("strikes"))
 		for i in range(n):
@@ -1147,6 +1153,26 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			add_child(zb)
 			zombies.append(zb)
 	if boss.is_storm():
+		return
+	if boss.is_foreman():
+		# It starts work as soon as it is in range, still walking in.
+		if boss.position.z < BOSS_ENGAGE_Z + 1.0:
+			return
+		# Saws down your lane, aimed where you are heading; two when it is
+		# angry. Crates between you now and then: the fight pays.
+		_foreman_saw_timer -= delta * _pace()
+		if _foreman_saw_timer <= 0.0:
+			_foreman_saw_timer = Difficulty.FOREMAN_SAW_INTERVAL_ENRAGED if enraged else Difficulty.FOREMAN_SAW_INTERVAL
+			var aim := clampf(p_squad.position.x + p_squad.velocity_x * 1.2, -road_half + 0.6, road_half - 0.6)
+			spawn_saw(aim, boss.position.z + 1.5, true, Difficulty.FOREMAN_SAW_SPEED_BONUS)
+			if enraged:
+				spawn_saw(aim + (2.4 if aim < 0.0 else -2.4), boss.position.z + 1.5, true, Difficulty.FOREMAN_SAW_SPEED_BONUS)
+			foreman_threw.emit("saw")
+		_foreman_crate_timer -= delta * _pace()
+		if _foreman_crate_timer <= 0.0:
+			_foreman_crate_timer = Difficulty.FOREMAN_CRATE_INTERVAL
+			drop_crate(gen.rng.randf_range(-road_half + 1.0, road_half - 1.0), boss.position.z + 9.0)
+			foreman_threw.emit("crate")
 		return
 	if boss.is_spitter():
 		if boss.position.z < Boss.SPITTER_HOLD_Z - 0.5:
@@ -1352,12 +1378,23 @@ func _move_crates(delta: float, p_squad: Squad) -> void:
 			c.queue_free()
 
 
-func spawn_saw(x: float, z: float) -> void:
+func spawn_saw(x: float, z: float, quiet: bool = false, extra_speed: float = 0.0) -> void:
 	var s := Saw.new()
 	s.setup(clampf(x, -road_half + 0.6, road_half - 0.6), z)
+	s.own_speed = Saw.OWN_SPEED + extra_speed
 	add_child(s)
 	_saws.append(s)
-	saw_spawned.emit()
+	if not quiet:
+		saw_spawned.emit()
+
+
+## The foreman's crate: dropped on the road between it and the squad.
+func drop_crate(x: float, z: float) -> void:
+	var c := Crate.new()
+	c.setup(Powerups.MYSTERY if gen.rng.randf() < 0.5 else Powerups.ORDER[gen.rng.randi_range(0, Powerups.ORDER.size() - 1)])
+	c.position = Vector3(clampf(x, -road_half + 1.0, road_half - 1.0), 0.0, z)
+	add_child(c)
+	_crates.append(c)
 
 
 func nearest_saw(max_range: float) -> Saw:

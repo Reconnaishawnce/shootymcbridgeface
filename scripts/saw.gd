@@ -16,6 +16,8 @@ const WOBBLE := 0.7
 
 var base_x := 0.0
 var passed := false
+## The foreman's throws roll faster than a saw loose on the road.
+var own_speed := OWN_SPEED
 var _blade: Node3D
 var _t := randf() * TAU
 
@@ -48,6 +50,6 @@ func setup(p_x: float, z: float) -> void:
 ## Roll: the road's speed plus its own, spinning, wobbling across the lane.
 func tick(delta: float, road_speed: float, road_half: float) -> void:
 	_t += delta
-	position.z += (road_speed + OWN_SPEED) * delta
+	position.z += (road_speed + own_speed) * delta
 	position.x = clampf(base_x + sin(_t * 1.3) * WOBBLE, -road_half + 0.6, road_half - 0.6)
 	_blade.rotation.y -= delta * 16.0

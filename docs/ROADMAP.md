@@ -256,7 +256,9 @@ goes first because nothing else can be judged on a phone that crawls.
    time each mechanic appears, replayable with LEARN.
 7. Veterans (done): named survivors of each boss with a beret, a tag
    and a trait the squad feels; a heavy bite can take one by name.
-8. Next: a balance and feedback pass once the first phone reports
+8. The Foreman (done): a fourth boss that throws saws and drops crates,
+   so hazards and power-ups are part of the fight.
+9. Next: a balance and feedback pass once the first phone reports
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 

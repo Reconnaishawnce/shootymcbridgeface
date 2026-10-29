@@ -278,6 +278,8 @@ static func boss_hp(level: int, perk_count: int = 0) -> float:
 		base *= SPITTER_HP_MULT
 	elif boss_kind(level) == Boss.Kind.STORM:
 		base *= STORM_HP_MULT
+	elif boss_kind(level) == Boss.Kind.FOREMAN:
+		base *= FOREMAN_HP_MULT
 	return base * (1.0 + BOSS_HP_PER_PERK * float(perk_count))
 
 
@@ -325,7 +327,10 @@ static func spit_bite(squad_count: int) -> int:
 
 ## Bosses alternate: odd levels get the walker, even levels the spitter.
 ## Walker, spitter, storm, round and round.
+## Walker, spitter, storm, and every fourth level the foreman.
 static func boss_kind(level: int) -> int:
+	if level % 4 == 0:
+		return Boss.Kind.FOREMAN
 	match level % 3:
 		2:
 			return Boss.Kind.SPITTER
@@ -343,6 +348,15 @@ const STORM_SPACING := 2.0
 const STORM_GAP := 4.2
 const STORM_SECOND_LINE_DELAY := 0.9
 const STORM_HP_MULT := 0.85
+## The foreman: saws down your lane, crates between you, no lightning.
+const FOREMAN_HP_MULT := 0.9
+const FOREMAN_SAW_INTERVAL := 3.2
+const FOREMAN_SAW_INTERVAL_ENRAGED := 2.0
+const FOREMAN_SAW_FIRST := 1.5
+## Thrown saws come faster than the road's own.
+const FOREMAN_SAW_SPEED_BONUS := 3.5
+const FOREMAN_CRATE_INTERVAL := 5.0
+const FOREMAN_CRATE_FIRST := 2.0
 
 
 ## Bolt x positions for a line across a road of half-width [param half]

@@ -12,6 +12,7 @@ var fired := false
 var done := false
 var _age := 0.0
 var _ring: MeshInstance3D
+var _fill: MeshInstance3D
 var _bolt: MeshInstance3D
 
 
@@ -20,6 +21,11 @@ func setup(p_x: float) -> void:
 	position = Vector3(x, 0.05, -0.4)
 	_ring = Mats.torus(Difficulty.STRIKE_RADIUS - 0.2, Difficulty.STRIKE_RADIUS + 0.05, RING, true)
 	add_child(_ring)
+	# A disc that fills the ring as the bolt comes: a clock you can read.
+	_fill = Mats.sphere(Difficulty.STRIKE_RADIUS - 0.1, Color(RING.r, RING.g, RING.b, 0.4))
+	_fill.material_override = Mats.glow(Color(RING.r, RING.g, RING.b, 0.4), 0.8)
+	_fill.scale = Vector3(0.01, 0.02, 0.01)
+	add_child(_fill)
 	_bolt = Mats.box(Vector3(0.22, 9.0, 0.22), BOLT, true)
 	_bolt.position.y = 4.5
 	_bolt.visible = false
@@ -38,13 +44,16 @@ func tick(delta: float) -> bool:
 	if _age < 0.0:
 		return false
 	_ring.visible = not fired
+	_fill.visible = not fired
 	if not fired:
 		var u := clampf(_age / Difficulty.STRIKE_WARNING, 0.0, 1.0)
 		var pulse := 1.0 + 0.3 * sin(_age * 18.0 * (0.5 + u))
 		_ring.scale = Vector3(pulse, 1.0, pulse)
+		_fill.scale = Vector3(maxf(0.01, u), 0.02, maxf(0.01, u))
 		if _age >= Difficulty.STRIKE_WARNING:
 			fired = true
 			_ring.visible = false
+			_fill.visible = false
 			_bolt.visible = true
 			return true
 		return false

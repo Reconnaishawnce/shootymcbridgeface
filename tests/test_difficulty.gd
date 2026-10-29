@@ -294,3 +294,19 @@ func test_multi_lane_gates() -> void:
 	var rival := GateMath.add(6)
 	var e := gen.make_rival_expr(3, rival, 20)
 	check(GateMath.is_expr(e), "rival is a sum")
+
+
+func test_saws() -> void:
+	var d := Difficulty.new(7)
+	check(d.saws_for_level(1).is_empty(), "no saws on level one")
+	var one := d.saws_for_level(3)
+	check_eq(one.size(), 1, "one saw a level at first")
+	check_eq(d.saws_for_level(6).size(), 2, "two later")
+	for plan in one:
+		check(int(plan.index) >= 1 and int(plan.index) <= Difficulty.GATES_PER_LEVEL - 2, "never the opener or the last gate")
+		check(not Difficulty.is_fork_gate(int(plan.index)), "never inside the fork")
+		check(absf(float(plan.x)) <= 0.7, "on the road")
+	check(Difficulty.saw_distance(2) > Difficulty.gate_distance(2) and Difficulty.saw_distance(2) < Difficulty.wave_distance(2), "a saw sits between a gate and its wave")
+	check_eq(Difficulty.saw_bite(10), 3, "a floor of three")
+	check_eq(Difficulty.saw_bite(100), 12, "a slice of a big squad")
+	check(Difficulty.STRIKE_WARNING >= 1.2, "lightning gives you time")

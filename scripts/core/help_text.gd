@@ -61,10 +61,12 @@ static func sections() -> Array:
 			"Tanks are bullet sponges that shield whatever is behind them. Thieves sprint for the next gate and knock its number down, so shoot them first. " +
 			"Purple latchers, and from level %d any walker or runner that reaches you, cling to your flanks and eat a soldier every so often until you tap them or dash. " % Progression.CLING_LEVEL +
 			"On wide roads, flankers hop the curbs beside you. " +
+			"From level %d a buzz SAW rolls down the bridge at you now and then, wobbling across its lane: steer round it or dash through it, or it takes a slice (%d%% of the squad). It cuts zombies too. " % [Difficulty.SAW_LEVEL, int(Difficulty.SAW_BITE_FRACTION * 100.0)] +
 			"Zombies that get past you without being killed break your wave streak."},
 		{"title": "BOSSES", "body":
 			"At the end of every level the road slows and the boss comes. The WALKER marches up and chews your squad once it arrives. " +
-			"The SPITTER hangs back and lobs spit that you have to step out of. The STORM hangs back and calls lightning in lines across the whole road with one gap: find the gap. " +
+			"The SPITTER hangs back and lobs globs: you see each one leave the boss, its shadow crossing the road, and a red ring that closes in on where it lands. Only the ring is wet; step out of it. " +
+			"Lightning warns for %.1f seconds with a ring that fills up before the bolt lands, and only the ring is hit. The STORM hangs back and calls lightning in lines across the whole road with one gap: find the gap. " % Difficulty.STRIKE_WARNING +
 			"All of them drop red rings that turn into lightning bolts, call runners, and get angrier below half health. " +
 			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives." % int(Modifiers.get_value("normal", "horde_level"))},
 		{"title": "POWER-UPS", "body":

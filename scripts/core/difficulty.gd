@@ -282,7 +282,14 @@ static func boss_hp(level: int, perk_count: int = 0) -> float:
 
 
 ## Boss lightning: strikes land near the squad after a warning ring.
-const STRIKE_WARNING := 1.0
+const STRIKE_WARNING := 1.3
+## Buzz saws: loose on the bridge from this level, one a level, two
+## from SAW_TWO_LEVEL, each a little after a gate so the road is clear
+## to see it coming. A hit takes a slice, like a brute.
+const SAW_LEVEL := 2
+const SAW_TWO_LEVEL := 5
+const SAW_OFFSET := 8.0
+const SAW_BITE_FRACTION := 0.12
 const STRIKE_INTERVAL := 3.2
 const STRIKE_INTERVAL_ENRAGED := 2.0
 const STRIKE_BITE_FRACTION := 0.15
@@ -707,3 +714,28 @@ func crates_for_level(level: int) -> Array:
 
 static func crate_distance(index: int) -> float:
 	return gate_distance(index) + CRATE_OFFSET
+
+
+static func saw_distance(index: int) -> float:
+	return gate_distance(index) + SAW_OFFSET
+
+
+static func saw_bite(squad_count: int) -> int:
+	return maxi(3, int(float(squad_count) * SAW_BITE_FRACTION))
+
+
+## Where this level's saws roll in: gate indices (never the opener, never
+## a fork gate) and a lane position as a fraction of the road.
+func saws_for_level(level: int) -> Array:
+	if level < SAW_LEVEL:
+		return []
+	var out := []
+	var used := {}
+	var count := 2 if level >= SAW_TWO_LEVEL else 1
+	for i in range(count):
+		var index := rng.randi_range(1, GATES_PER_LEVEL - 2)
+		while used.has(index) or is_fork_gate(index):
+			index = 1 + (index % (GATES_PER_LEVEL - 2))
+		used[index] = true
+		out.append({"index": index, "x": rng.randf_range(-0.7, 0.7)})
+	return out

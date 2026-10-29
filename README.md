@@ -82,6 +82,8 @@ the same key (see below).
 - **Aim matters.** Unfocused fire sprays in a cone, so anything at range
   gets hit by luck. Held focus converges every round on the spot and hits
   harder.
+- **Saws.** From level 2 a buzz saw rolls down the bridge now and then.
+  Steer round it or dash through it; touching it takes a slice.
 - **Bosses fight back.** Red rings on the road warn of lightning for one
   second, then it lands; move or dash out. Bosses call runners every few
   seconds. Below half health they enrage: more rings, faster strikes, the

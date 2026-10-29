@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.32 (bosses you can dodge, buzz saws, soldiers over the side)
+
+Turn 3 of the second feedback arc.
+
+- Globs you can see coming. The spitter's globs are bigger and glow,
+  trail a tail, fly a little slower, and cast a shadow on the road that
+  shows where they are and how high. The red landing ring closes in as
+  the glob comes down. Only the ring is wet: the splash is half a metre
+  past it, not the whole formation's width, so stepping out of the ring
+  is enough.
+- Lightning that warns. The warning is 1.3 seconds, a disc fills the
+  ring as the bolt comes, and the bolt only hits inside the ring.
+- Buzz saws. From level 2 a toothed, hot-edged saw rolls down the
+  bridge at you now and then (two a level from level 5), wobbling
+  across its lane, a little faster than the road. Steer round it or dash
+  through it; touching it takes a slice (12% of the squad, three at
+  least, armour applies). It cuts zombies too. "SAW AHEAD" when one
+  appears.
+- Soldiers go over the side. A lost soldier is knocked up and out toward
+  the nearest curb, spinning, and falls past the edge of the bridge.
+- The bot steps round saws, and the help page explains all of it.
+
 ## 0.31 (fire modes and the bounty)
 
 Turn 2 of the second feedback arc: two ways to shoot, and coins for

@@ -315,6 +315,10 @@ func _build_scene() -> void:
 		hud.show_banner("SCOUTS OUT\nNEXT %d GATES REVEALED" % n, 1.4)
 		sfx.play("powerup", -4.0, 1.4))
 	world.bet_resolved.connect(_on_bet_resolved)
+	world.saw_spawned.connect(func() -> void:
+		hud.show_float("SAW AHEAD", false)
+		sfx.play("boss_roar", -12.0, 2.2))
+	world.saw_hit.connect(_on_saw_hit)
 	world.horde_bit.connect(_on_horde_bit)
 	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
 	world.powerups = powerups
@@ -1570,6 +1574,17 @@ func _on_shell_exploded(at: Vector3, kills: int) -> void:
 		_punch(1.5)
 
 
+func _on_saw_hit(hit: bool) -> void:
+	if smoke:
+		print("SMOKE_SAW ", JSON.stringify({"hit": hit, "level": world.level, "squad": squad.count, "frame": _frames}))
+	if hit:
+		sfx.play("explosion", -6.0, 1.3)
+		_shake = minf(1.0, _shake + 0.7)
+		hud.flash(0.2)
+	else:
+		sfx.play("throw", -8.0, 0.7)
+
+
 func _on_bet_placed() -> void:
 	hud.show_banner("BET ON!\nCLEAR THE WAVE, NO BITES", 1.4)
 	sfx.play("powerup", -4.0, 1.2)
@@ -1886,6 +1901,12 @@ func _bot_steer() -> void:
 	var g_near := world.nearest_upcoming_gate()
 	if _bot_spread:
 		squad.set_spread(1.6 if (near != null and (g_near == null or near.position.z > g_near.position.z)) else 0.7)
+	# A saw rolling at us outranks everything: step round it.
+	var saw := world.nearest_saw(16.0)
+	if saw != null and absf(saw.position.x - squad.position.x) < squad.reach() + 1.2:
+		var away := -2.6 if saw.position.x > 0.0 else 2.6
+		squad.target_x = clampf(saw.position.x + away, -squad.road_half + 0.5, squad.road_half - 0.5)
+		return
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
 		if z.is_thief():
@@ -2011,6 +2032,10 @@ func _shots_walkthrough() -> void:
 	hud.show_revive(3, 12, Revive.SOLDIERS, Revive.OFFER_SECONDS)
 	await _capture("5h_rally.png", 2)
 	hud.hide_revive()
+	world.spawn_saw(0.8, -12.0)
+	await _capture("5i_saw.png", 2)
+	squad.set_count(maxi(1, squad.count - 12))
+	await _capture("5j_tumble.png", 14)
 	world.horde_z = World.HORDE_REST_Z
 	world._place_horde()
 	for i in range(600):

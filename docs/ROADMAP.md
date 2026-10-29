@@ -236,10 +236,11 @@ goes first because nothing else can be judged on a phone that crawls.
    paid at the end; the formation button says what each mode is for;
    the shop repriced around it, so wide-and-rich and narrow-and-sure are
    both real plans.
-3. Bosses you can dodge, hazards, deaths: globs that fly visibly from
-   the boss with a shadow and land where the ring says, smaller splash,
-   longer warning on lightning; buzz saws that cross the bridge from
-   level 2; soldiers that tumble off the side when they die.
+3. Bosses you can dodge, hazards, deaths (done): globs that fly
+   visibly from the boss with a shadow and land where the ring says,
+   smaller splash, longer warning on lightning with a filling ring; buzz
+   saws that roll down the bridge from level 2; soldiers that tumble off
+   the side when they die.
 4. Gates that explain themselves: every perk gate panel says what the
    perk does, every pickup banners the effect, a perk strip in the HUD,
    and effects big enough to feel (thick skin shows every bite it

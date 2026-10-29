@@ -400,6 +400,29 @@ coins, and `Meta.CATALOG` prices are two and a half times higher, so an
 upgrade still costs about one good run. The bot drills when a heavy or
 the boss core is lined up and sprays otherwise, so both paths run in CI.
 
+## Dodging, saws and going over the side
+
+The complaint was fair: a glob or a bolt "dodged" still hit, because the
+hit test used the whole formation's reach plus a metre. Now a glob hits
+within `reach * 0.7 + Spit.SPLASH` of its landing spot and a bolt within
+`reach * 0.8 + STRIKE_RADIUS * 0.4`, so the ring on the road is the
+truth. Globs fly at 13 m/s, glow, trail beads, and drag a shadow across
+the road (`Spit._shadow`) while the landing ring closes from 1.9x to 1x;
+a strike's ring fills with a disc over `STRIKE_WARNING` (1.3 s).
+
+`Saw` is a hazard, not a zombie: planned per level like crates
+(`Difficulty.saws_for_level`, from `SAW_LEVEL`, two from
+`SAW_TWO_LEVEL`, never on the opener or inside the fork), spawned
+`SAW_OFFSET` past a gate, rolling at the road's speed plus its own and
+wobbling across its lane. `World._move_saws` cuts zombies in its path
+(they pay bounty) and, once per saw, tests the squad: a dash dodges, a
+shield blocks, otherwise `saw_bite` (12%, floor 3) through the armour.
+The bot steps round the nearest saw before anything else.
+
+Deaths: `Squad._tumble` reparents a lost soldier to the world, freezes
+its animation and tweens it up, out toward the nearest curb and down
+past the bridge, spinning, over 1.1 s, at most `MAX_TUMBLING` at once.
+
 ## The help page, records and the storm
 
 `HelpText.sections()` is the in-game HOW TO PLAY page: short sections a

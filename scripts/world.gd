@@ -40,6 +40,8 @@ signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
+signal saw_spawned
+signal saw_hit(hit: bool)
 
 enum Phase { GATES, BOSS, CLEAR }
 
@@ -136,6 +138,8 @@ var _adds_timer := Difficulty.BOSS_ADDS_INTERVAL
 var _latched: Array[Zombie] = []
 var _crates: Array[Crate] = []
 var _crate_plan: Array = []
+var _saw_plan: Array = []
+var _saws: Array[Saw] = []
 var _bombs: Array[Bomb] = []
 ## Bosses get tougher as perks stack; the game keeps this current.
 var perk_count := 0
@@ -233,6 +237,7 @@ func start_level(n: int) -> void:
 	_chew_timer = 0.0
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
+	_saw_plan = gen.saws_for_level(level) if gen != null else []
 	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
 	fork_side = 0
 	if squad != null:
@@ -279,6 +284,9 @@ func _clear_actors() -> void:
 	for c in _crates:
 		c.queue_free()
 	_crates.clear()
+	for s in _saws:
+		s.queue_free()
+	_saws.clear()
 	for b in _bombs:
 		b.queue_free()
 	_bombs.clear()
@@ -309,6 +317,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_zombies(delta, p_squad)
 	_move_boss(delta)
 	_move_spits(p_squad)
+	_move_saws(delta, p_squad)
 	_move_crates(delta, p_squad)
 	_move_bombs(p_squad)
 	_move_strikes(delta, p_squad)
@@ -591,6 +600,11 @@ func _spawn() -> void:
 	while _next_wave < limit and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
 		_spawn_wave(_next_wave, count)
 		_next_wave += 1
+	for plan in _saw_plan.duplicate():
+		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
+		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
+			spawn_saw(float(plan.x) * road_half, -(Difficulty.saw_distance(n) - level_distance))
+			_saw_plan.erase(plan)
 	for plan in _crate_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.crate_distance(n) - level_distance <= SPAWN_AHEAD:
@@ -1146,7 +1160,7 @@ func _move_spits(p_squad: Squad) -> void:
 		if not sp.landed():
 			continue
 		_spits.erase(sp)
-		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() + 1.0
+		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() * 0.7 + Spit.SPLASH
 		if hit and p_squad.is_invulnerable():
 			dodged.emit()
 			hit = false
@@ -1164,7 +1178,7 @@ func _move_spits(p_squad: Squad) -> void:
 func _move_strikes(delta: float, p_squad: Squad) -> void:
 	for st in _strikes.duplicate():
 		if st.tick(delta):
-			var hit := absf(st.x - p_squad.position.x) <= p_squad.reach() + Difficulty.STRIKE_RADIUS * 0.5
+			var hit := absf(st.x - p_squad.position.x) <= p_squad.reach() * 0.8 + Difficulty.STRIKE_RADIUS * 0.4
 			if hit and (p_squad.is_invulnerable()):
 				dodged.emit()
 				hit = false
@@ -1307,6 +1321,55 @@ func _move_crates(delta: float, p_squad: Squad) -> void:
 		elif c.position.z > DESPAWN_Z:
 			_crates.erase(c)
 			c.queue_free()
+
+
+func spawn_saw(x: float, z: float) -> void:
+	var s := Saw.new()
+	s.setup(clampf(x, -road_half + 0.6, road_half - 0.6), z)
+	add_child(s)
+	_saws.append(s)
+	saw_spawned.emit()
+
+
+func nearest_saw(max_range: float) -> Saw:
+	var best: Saw = null
+	for s in _saws:
+		if s.passed or s.position.z < -max_range:
+			continue
+		if best == null or s.position.z > best.position.z:
+			best = s
+	return best
+
+
+## Saws roll at the squad; one that reaches it takes a slice unless the
+## squad is dashing or shielded. They cut zombies on the way.
+func _move_saws(delta: float, p_squad: Squad) -> void:
+	for s in _saws.duplicate():
+		s.tick(delta, world_speed, road_half)
+		for z in zombies.duplicate():
+			if z.latched or absf(z.position.x - s.position.x) > Saw.RADIUS or absf(z.position.z - s.position.z) > 0.9:
+				continue
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			z.die()
+		if not s.passed and s.position.z >= -0.8:
+			s.passed = true
+			var hit := absf(s.position.x - p_squad.position.x) <= p_squad.reach() * 0.75 + 0.7
+			if hit and p_squad.is_invulnerable():
+				dodged.emit()
+				hit = false
+			elif hit and p_squad.is_shielded():
+				shield_blocked.emit()
+				hit = false
+			elif hit:
+				var bite := _bite(Difficulty.saw_bite(p_squad.count))
+				p_squad.add(-bite)
+				squad_bitten.emit(bite, true)
+			saw_hit.emit(hit)
+		if s.position.z > DESPAWN_Z:
+			_saws.erase(s)
+			s.queue_free()
 
 
 ## Lob a bomb from the squad. It detonates where it lands.

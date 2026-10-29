@@ -21,6 +21,8 @@ const TIER_COLORS := [Color(0.3, 0.6, 1.0), Color(1.0, 0.8, 0.2), Color(1.0, 0.3
 const FLAG_SLOTS := [Vector3(0.0, 0.0, 0.35), Vector3(-1.1, 0.0, 0.9), Vector3(1.1, 0.0, 0.9), Vector3(-0.7, 0.0, -0.9), Vector3(0.7, 0.0, -0.9)]
 ## Soldiers in the front rings get the detailed build.
 const DETAILED := 19
+## Soldiers mid-tumble at once; past that they just vanish in dust.
+const MAX_TUMBLING := 10
 const STEER_LERP := 16.0
 const MAX_SHOTS_PER_SECOND := 30.0
 const DPS_PER_SOLDIER := 2.5
@@ -47,6 +49,7 @@ var spread := 1.0
 ## flies dead ahead, harder and through one more body. The drill for
 ## what is in front of you; the sides of the road go unwatched.
 var straight := false
+var _tumbling := 0
 ## Run seconds, kept current by the game for timed power-ups.
 var now := 0.0
 ## Estimated sideways speed, for the spitter's lead.
@@ -467,13 +470,37 @@ func _sync_visuals() -> void:
 		_soldiers.append(s)
 	while _soldiers.size() > want:
 		var s: Soldier = _soldiers.pop_back()
-		if active and is_inside_tree() and world != null:
-			Fx.dust(world, s.global_position + Vector3(0.0, 0.3, 0.0), 5, 0.18)
-		s.queue_free()
+		if active and is_inside_tree() and world != null and _tumbling < MAX_TUMBLING:
+			_tumble(s)
+		else:
+			s.queue_free()
 	# A bigger squad may need a narrower spread to stay in the lane.
 	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, lane_half() - 0.1))
 	_layout()
 	_sync_army()
+
+
+## A lost soldier goes over the side: knocked up and out toward the
+## nearest curb, spinning, and down past the edge of the bridge.
+func _tumble(s: Soldier) -> void:
+	var gp := s.global_position
+	remove_child(s)
+	world.add_child(s)
+	s.global_position = gp
+	s.set_process(false)
+	_tumbling += 1
+	Fx.dust(world, gp + Vector3(0.0, 0.3, 0.0), 5, 0.18)
+	var side := signf(gp.x) if absf(gp.x) > 0.2 else (1.0 if randf() < 0.5 else -1.0)
+	var start := s.position
+	var tw := s.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(s, "position:x", start.x + side * randf_range(3.0, 4.5), 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(s, "position:z", start.z + randf_range(1.5, 3.0), 1.1)
+	tw.tween_method(func(u: float) -> void: s.position.y = start.y + 2.4 * u - 7.5 * u * u, 0.0, 1.0, 1.1)
+	tw.tween_property(s, "rotation", Vector3(randf_range(-6.0, 6.0), randf_range(-3.0, 3.0), side * randf_range(4.0, 8.0)), 1.1)
+	tw.chain().tween_callback(func() -> void:
+		_tumbling = maxi(0, _tumbling - 1)
+		s.queue_free())
 
 
 func _layout() -> void:

@@ -50,6 +50,9 @@ var spread := 1.0
 ## what is in front of you; the sides of the road go unwatched.
 var straight := false
 var _tumbling := 0
+## Named soldiers with traits; see Veterans. One per boss beaten.
+var veterans := Veterans.new()
+var _vet_revive_timer := 0.0
 ## Run seconds, kept current by the game for timed power-ups.
 var now := 0.0
 ## Estimated sideways speed, for the spitter's lead.
@@ -130,6 +133,8 @@ func reset(start_count: int = 1) -> void:
 	dash_ready_at = 0.0
 	invulnerable_until = 0.0
 	_revive_timer = 0.0
+	veterans = Veterans.new()
+	_vet_revive_timer = 0.0
 	if _dash_tween != null:
 		_dash_tween.kill()
 		_dash_tween = null
@@ -402,7 +407,7 @@ func is_medic() -> bool:
 
 ## Extra multiplier on what a brute or tank takes.
 func bite_mult() -> float:
-	return MEDIC_BITE_MULT if is_medic() else 1.0
+	return (MEDIC_BITE_MULT if is_medic() else 1.0) * veterans.bite_mult()
 
 
 func _fire_mult() -> float:
@@ -418,7 +423,7 @@ func _damage_mult() -> float:
 		m *= SHOTGUN_DAMAGE_MULT
 	elif is_medic():
 		m *= MEDIC_DAMAGE_MULT
-	return m
+	return m * veterans.damage_mult()
 
 
 ## Soldiers that count toward firepower. Past the cap, more soldiers are
@@ -478,6 +483,36 @@ func _sync_visuals() -> void:
 	spread = clampf(spread, Formation.SPREAD_MIN, Formation.max_spread_for(want, lane_half() - 0.1))
 	_layout()
 	_sync_army()
+	mark_veterans()
+
+
+## Veterans ride in the front ranks, behind the hero if there is one,
+## wearing their beret and name. Only touches a soldier whose mark is
+## wrong, so the crowd churn costs nothing.
+func mark_veterans() -> void:
+	var first := 1 if not hero_look.is_empty() else 0
+	for i in range(_soldiers.size()):
+		var s: Soldier = _soldiers[i]
+		var k := i - first
+		if k >= 0 and k < veterans.roster.size():
+			if s.veteran_name() != str(veterans.roster[k].name):
+				s.set_veteran(veterans.roster[k], k)
+		elif s.veteran_name() != "":
+			s.clear_veteran()
+
+
+## A veteran is lost: their soldier goes over the side by name, and the
+## crowd closes the gap.
+func lose_veteran(v: Dictionary) -> void:
+	for s in _soldiers:
+		if s.veteran_name() == str(v.name):
+			_soldiers.erase(s)
+			if is_inside_tree() and world != null and _tumbling < MAX_TUMBLING:
+				_tumble(s)
+			else:
+				s.queue_free()
+			break
+	_sync_visuals()
 
 
 ## A lost soldier goes over the side: knocked up and out toward the
@@ -598,6 +633,12 @@ func _process(delta: float) -> void:
 		_revive_timer += delta
 		if _revive_timer >= MEDIC_REVIVE_SECONDS:
 			_revive_timer -= MEDIC_REVIVE_SECONDS
+			add(1)
+	# Field medics: each one brings a soldier back every few seconds.
+	if veterans.medics() > 0:
+		_vet_revive_timer += delta * float(veterans.medics())
+		if _vet_revive_timer >= Veterans.MEDIC_SECONDS:
+			_vet_revive_timer -= Veterans.MEDIC_SECONDS
 			add(1)
 
 

@@ -434,6 +434,8 @@ func mod(key: String) -> float:
 ## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
 	var armor := meta.bite_mult() if meta != null else 1.0
+	if squad != null:
+		armor *= squad.veterans.bite_mult()
 	var base := maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
 	# Thick skin softens every heavy bite, and says so each time.
 	if perks != null and perks.stack("skin") > 0:

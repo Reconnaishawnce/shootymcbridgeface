@@ -3,6 +3,20 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.36 (veterans)
+
+- Veterans. Beat a boss with anyone left and one survivor steps up with
+  a name, a beret in their trait's colour and a name tag, riding in the
+  front ranks: DEADEYE (+8% damage for the whole squad), TOUGH (heavy
+  bites take 8% less), FIELD MEDIC (a soldier comes back every 8
+  seconds), LUCKY (+15% coins at the end). Up to three a run; they do
+  not carry over.
+- Losing one costs something you can see. Any heavy bite has a one in
+  five chance to take a veteran with it: "ADA IS DOWN", and ADA goes
+  over the side of the bridge by name.
+- The pause menu lists the veterans beside the perks; RECORDS counts
+  veterans made; a lesson explains them the first time one steps up.
+
 ## 0.35 (QA pass and the learning round)
 
 - QA on the running screen. The formation button's long labels ran off

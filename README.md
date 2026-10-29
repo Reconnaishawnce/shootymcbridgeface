@@ -85,6 +85,9 @@ the same key (see below).
 - **Aim matters.** Unfocused fire sprays in a cone, so anything at range
   gets hit by luck. Held focus converges every round on the spot and hits
   harder.
+- **Veterans.** Beat a boss and a survivor steps up with a name, a beret
+  and a trait the squad feels (deadeye, tough, field medic, lucky). A
+  heavy bite can take one with it, by name.
 - **Saws.** From level 2 a buzz saw rolls down the bridge now and then.
   Steer round it or dash through it; touching it takes a slice.
 - **Bosses fight back.** Red rings on the road warn of lightning for one

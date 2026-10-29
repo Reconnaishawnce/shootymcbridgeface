@@ -452,6 +452,23 @@ the bounty so the end-of-run coins are what is left. Gold on the panel,
 "NEED n COINS" when short. The bot buys soldiers under sixty and a
 power-up otherwise, when the bounty covers it.
 
+## Veterans
+
+`Veterans` (pure) is a roster of up to `MAX` named soldiers with a
+trait each: `promote` after a boss (a fresh name, a random trait),
+`roll_loss` on a heavy bite (`RISK`), and the multipliers the squad
+reads (`damage_mult`, `bite_mult`, `coin_mult`, `medics`). The squad
+owns it (`Squad.veterans`): `mark_veterans` dresses the front-rank
+soldiers (behind the hero) with `Soldier.set_veteran` (a beret in the
+trait colour and a name tag) and only touches a soldier whose mark is
+wrong, so the crowd's churn costs nothing; `lose_veteran` tumbles that
+soldier over the side by name and lets the crowd close the gap.
+`World._bite` reads the tough multiplier with the armour; the game
+promotes in `_on_boss_killed` (a banner two seconds after the clear),
+rolls losses in `_on_squad_bitten`, and multiplies the run's coins by
+the lucky veterans at the end. Veterans do not carry over: a run's
+story stays in the run.
+
 ## The learning round
 
 Text on the road is kept to what the eye needs; teaching happens in

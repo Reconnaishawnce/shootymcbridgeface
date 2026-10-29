@@ -125,6 +125,7 @@ var lessons_on := true
 var _learning := false
 var _lesson_open := false
 var _lesson_last := -100.0
+var _vets_made := 0
 var _smoke_retries := 0
 var _shake := 0.0
 var _drag_scale := 0.015
@@ -999,6 +1000,7 @@ func start_run(p_mode: String = "levels") -> void:
 	_second_wind_pending = false
 	_lesson_open = false
 	_lesson_last = -100.0
+	_vets_made = 0
 	_vehicles_formed = 0
 	waves_cleared = 0
 	perfect_gates = 0
@@ -1067,7 +1069,7 @@ func end_run() -> void:
 	_game_over_at = Time.get_ticks_msec()
 	_game_over_frame = _frames
 	Diag.mark("end_run:records")
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(bounty, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins")))
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(bounty, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult()))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
@@ -1123,6 +1125,7 @@ func end_run() -> void:
 		"s_grades": s_count, "stars_earned": stars_earned, "coins_earned": earned,
 		"best_level": 0 if world.endless else world.level, "endless_level": world.level if world.endless else 0,
 		"escapes": 1 if character_mode else 0, "vehicles": _vehicles_formed, "waves": waves_cleared,
+		"veterans": _vets_made,
 	}
 	var new_achievements: Array = []
 	var quests_done: Array = []
@@ -1533,6 +1536,16 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	hud.show_float("-%d" % bite, false)
 	if smoke:
 		print("SMOKE_BITE ", JSON.stringify({"level": world.level, "bite": bite, "left": squad.count, "frame": _frames}))
+	# A heavy bite can take a veteran with it. The loss is named.
+	if heavy and squad.count > 0:
+		var lost := squad.veterans.roll_loss(world.gen.rng)
+		if not lost.is_empty():
+			squad.lose_veteran(lost)
+			_refresh_pause_perks()
+			hud.show_banner("%s IS DOWN" % lost.name, 1.4)
+			sfx.play("wipe", -8.0, 1.2)
+			if smoke:
+				print("SMOKE_VETERAN_LOST ", JSON.stringify({"name": lost.name, "trait": lost.trait, "level": world.level, "frame": _frames}))
 	# A near miss: the bite left you with a handful. Let it land in slow motion.
 	if not smoke and squad.count > 0 and squad.count <= 4 and bite >= 2:
 		Engine.time_scale = 0.35
@@ -1572,6 +1585,20 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 		print("SMOKE_GRADE ", JSON.stringify({"level": level, "grade": letter, "boss_seconds": snappedf(_run_time - _boss_start, 0.1)}))
 	hud.show_boss(false)
 	hud.show_banner("LEVEL %d CLEAR   GRADE %s\n+%d" % [level, letter, b], 1.8)
+	# A survivor steps up: a name, a beret, a trait the squad feels.
+	if squad_left > 0 and not squad.veterans.is_full():
+		var v := squad.veterans.promote(world.gen.rng)
+		if not v.is_empty():
+			_vets_made += 1
+			squad.mark_veterans()
+			_refresh_pause_perks()
+			if smoke:
+				print("SMOKE_VETERAN ", JSON.stringify({"name": v.name, "trait": v.trait, "level": level, "frame": _frames}))
+			get_tree().create_timer(2.0).timeout.connect(func() -> void:
+				if state == State.RUNNING:
+					hud.show_banner("%s STEPS UP\n%s: %s" % [v.name, Veterans.title(v.trait), Veterans.description(v.trait)], 2.4)
+					sfx.play("rally", -2.0, 1.2)
+					_teach("veterans"))
 	if character_mode:
 		hud.show_float(Wardrobe.cheer_line(wardrobe.hero_name(), letter, level + bosses_killed), true)
 	squad.cheer()
@@ -1608,7 +1635,7 @@ func _on_perk_chosen(id: String) -> void:
 	perks.take(id)
 	world.perk_count = perks.total()
 	hud.show_banner(Perks.title(id) + ("  x%d" % perks.stack(id) if perks.stack(id) > 1 else ""), 1.0)
-	hud.set_perks(Perks.summary(perks.stacks))
+	_refresh_pause_perks()
 	sfx.play("gate_good")
 	_punch(3.0)
 
@@ -1624,6 +1651,18 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 	_punch(3.0)
 	if smoke:
 		print("SMOKE_SUPPLY ", JSON.stringify({"id": id, "amount": amount, "cost": cost, "left": bounty, "level": world.level, "frame": _frames}))
+
+
+## The pause menu's line: perks held, then the veterans by name.
+func _refresh_pause_perks() -> void:
+	var parts := []
+	var perk_text := Perks.summary(perks.stacks)
+	if perk_text != "":
+		parts.append(perk_text)
+	var vets := squad.veterans.summary()
+	if vets != "":
+		parts.append("VETERANS: " + vets)
+	hud.set_perks("\n".join(parts))
 
 
 ## A perk did its job: say so, every time, so the gate was worth it.
@@ -2129,6 +2168,14 @@ func _shots_walkthrough() -> void:
 		hud.show_lesson(Lessons.title("perk"), Lessons.perk_body(["rapid", "skin", "greed"]))
 		await _capture("q5_lesson.png", 5)
 		hud.hide_lesson()
+		# Three veterans in the front ranks of a small squad.
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 5
+		for i in range(3):
+			squad.veterans.promote(rng)
+		squad.set_count(8)
+		squad.set_spread(1.3)
+		await _capture("q6_veterans.png", 10)
 		_quit_with(0)
 		return
 	open_shop()

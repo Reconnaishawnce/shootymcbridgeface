@@ -44,11 +44,13 @@ const CATALOG := {
 		"body": "It calls lightning in lines across the whole road with one gap. Find the gap and fit through it; a tight formation helps."},
 	"horde": {"title": "THE HORDE",
 		"body": "A wall of zombies creeps up behind you while the road is stopped for the boss. Kill the boss fast, or it starts eating."},
+	"veterans": {"title": "VETERANS",
+		"body": "A survivor of every boss steps up with a name, a beret and a trait the whole squad feels: DEADEYE hits harder, TOUGH softens heavy bites, a FIELD MEDIC brings soldiers back, LUCKY pays more at the end. Up to three a run. A heavy bite can take one with it, so keep them out of the brutes."},
 	"rally": {"title": "RALLY",
 		"body": "Squad at zero? Once a run you can buy a few soldiers back for stars, if you decide in five seconds. Not in the daily or weekly."},
 }
 ## The order lessons are listed on the LEARN page.
-const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "horde", "rally"]
+const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "horde", "veterans", "rally"]
 ## Seconds between two pop-ups, so a busy gate does not stack three.
 const COOLDOWN := 4.0
 

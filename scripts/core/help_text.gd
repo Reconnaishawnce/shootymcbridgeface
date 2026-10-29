@@ -51,6 +51,10 @@ static func sections() -> Array:
 			"Every perk panel says what it does and how many of it you already hold, the banner on the way through says it again, and the strip under your stats lists everything you carry. " +
 			"When a perk does its job you see it: THICK SKIN tells you how many soldiers it just saved, RECRUITER shows its extra soldier at the gate, GREED shows on the bounty counter as it grows.\n" +
 			_perk_lines()},
+		{"title": "VETERANS", "body":
+			"Beat a boss with anyone left and one survivor becomes a VETERAN: a name, a beret in their trait's colour, and a trait the whole squad feels. " +
+			"DEADEYE: %s. TOUGH: %s. FIELD MEDIC: %s. LUCKY: %s. " % [Veterans.description("deadeye"), Veterans.description("tough"), Veterans.description("medic"), Veterans.description("lucky")] +
+			"Up to %d a run; they ride in the front ranks and do not carry over. Any heavy bite (brutes, tanks, bosses, lightning, spit, saws, the horde) has a %d%% chance to take a veteran with it, by name. Dodge, and you keep them." % [Veterans.MAX, int(Veterans.RISK * 100.0)]},
 		{"title": "THE CONVOY", "body":
 			"Soldiers can become vehicles. Once your squad is big enough, a gate offers an olive panel like JEEP -%d: walk through it and that many soldiers climb aboard. " % Convoy.cost("jeep") +
 			"A JEEP (%d soldiers, up to %d) rides on your flank with a mounted gun: fast, straight, through two zombies at a time. " % [Convoy.cost("jeep"), int(Convoy.spec("jeep").max)] +

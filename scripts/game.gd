@@ -175,6 +175,9 @@ func _ready() -> void:
 	revives = SaveData.load_revives()
 	lessons_seen = SaveData.load_lessons_seen()
 	lessons_on = SaveData.load_lessons_on()
+	lb = SaveData.load_leaderboard()
+	if not lb.has("id"):
+		lb.id = Leaderboard.new_id()
 	if modifier != "normal" and not _feature_open(modifier):
 		modifier = "normal"
 	_load_bests()
@@ -429,6 +432,13 @@ func _build_scene() -> void:
 	hud.pit_buy.connect(_pit_buy)
 	hud.pit_leave.connect(_pit_leave)
 	hud.retry_level_pressed.connect(_retry_level)
+	hud.leaderboard_opened.connect(open_leaderboard)
+	hud.lb_join.connect(_lb_join)
+	hud.lb_tab.connect(func(mode: String) -> void:
+		_lb_mode = mode
+		_lb_answer = {}
+		_lb_fetch())
+	hud.lb_forget.connect(_lb_forget)
 	hud.lesson_closed.connect(_close_lesson)
 	hud.learn_pressed.connect(start_learning_round)
 	hud.lessons_toggled.connect(func(on: bool) -> void:
@@ -675,6 +685,8 @@ func _send_report(note: String) -> void:
 func show_title() -> void:
 	state = State.TITLE
 	Diag.set_state("title")
+	if not smoke and _shots_dir == "":
+		_lb_send_pending()
 	sfx.set_music("calm")
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
@@ -1105,6 +1117,7 @@ func end_run() -> void:
 			is_best = out.new_best
 			SaveData.save_daily(daily_results)
 			SaveData.count_run()
+			_lb_submit_run("daily", daily_day, score, world.level, kills, peak_squad, int(_run_time))
 		shown_best = maxi(prev, score)
 	elif mode == "weekly":
 		var prev := int(weekly_results.get(week_number, {}).get("score", 0))
@@ -1114,6 +1127,7 @@ func end_run() -> void:
 			is_best = out.new_best
 			SaveData.save_weekly(weekly_results)
 			SaveData.count_run()
+			_lb_submit_run("weekly", week_number, score, world.level, kills, peak_squad, int(_run_time))
 		shown_best = maxi(prev, score)
 	else:
 		if not smoke:
@@ -1702,6 +1716,12 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 # --- the pit stop ----------------------------------------------------------
 
 var _pit_open := false
+## The leaderboard: {id, name, joined, pending}. See Leaderboard.
+var lb: Dictionary = {}
+var _lb_mode := "daily"
+var _lb_answer: Dictionary = {}
+var _lb_status := ""
+var _lb_busy := false
 ## One free retry of a level per run, with the squad you entered it with.
 var _level_retry_used := false
 var _level_entry_count := 1
@@ -1787,6 +1807,125 @@ func _retry_level() -> void:
 	hud.show_banner("LEVEL %d, AGAIN" % world.level, 1.4)
 	sfx.play("rally")
 	sfx.set_music("calm")
+
+
+# --- the leaderboard -------------------------------------------------------
+
+func _lb_period(mode: String) -> int:
+	var now := int(Time.get_unix_time_from_system())
+	return Daily.day_number(now) if mode == "daily" else Daily.week_number(now)
+
+
+func _lb_state() -> Dictionary:
+	var period := _lb_period(_lb_mode)
+	return {
+		"configured": Leaderboard.configured(), "joined": bool(lb.get("joined", false)),
+		"name": str(lb.get("name", "")), "mode": _lb_mode, "status": _lb_status, "answer": _lb_answer,
+		"period_label": ("DAILY #%d" % period) if _lb_mode == "daily" else ("WEEK #%d" % period),
+	}
+
+
+func open_leaderboard() -> void:
+	sfx.play("click")
+	_lb_status = ""
+	hud.show_leaderboard(_lb_state())
+	if Leaderboard.configured() and bool(lb.get("joined", false)):
+		_lb_fetch()
+
+
+func _lb_join(name: String) -> void:
+	var clean := Leaderboard.clean_name(name)
+	if clean == "":
+		_lb_status = "A name is 2 to 14 letters, digits, spaces, dashes or underscores."
+		hud.show_leaderboard(_lb_state())
+		sfx.play("gate_bad", -6.0)
+		return
+	lb.name = clean
+	lb.joined = true
+	SaveData.save_leaderboard(lb)
+	Diag.note("leaderboard_join")
+	sfx.play("gate_good", -4.0)
+	open_leaderboard()
+
+
+func _lb_forget() -> void:
+	sfx.play("click")
+	if Leaderboard.configured():
+		_lb_post("/forget", Leaderboard.forget_body(str(lb.id), LeaderboardConfig.SECRET), func(_ok: bool, _answer: Dictionary) -> void: pass)
+	lb = {"id": Leaderboard.new_id()}
+	SaveData.save_leaderboard(lb)
+	_lb_answer = {}
+	_lb_status = "Forgotten. A new id next time you join."
+	hud.show_leaderboard(_lb_state())
+
+
+## One request, one callback. Failures are quiet: the page says so.
+func _lb_post(path: String, body: Dictionary, done: Callable) -> void:
+	var req := HTTPRequest.new()
+	req.timeout = Leaderboard.TIMEOUT
+	add_child(req)
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
+		var answer: Dictionary = parsed if parsed is Dictionary else {}
+		done.call(result == HTTPRequest.RESULT_SUCCESS and code == 200 and bool(answer.get("ok", false)), answer))
+	var err := req.request(LeaderboardConfig.URL.trim_suffix("/") + path, ["Content-Type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(body))
+	if err != OK:
+		req.queue_free()
+		done.call(false, {})
+
+
+func _lb_fetch() -> void:
+	if _lb_busy or not Leaderboard.configured():
+		return
+	_lb_busy = true
+	_lb_status = "Loading..."
+	hud.show_leaderboard(_lb_state())
+	var req := HTTPRequest.new()
+	req.timeout = Leaderboard.TIMEOUT
+	add_child(req)
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		_lb_busy = false
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
+		if parsed is Dictionary and code == 200 and bool(parsed.get("ok", false)):
+			_lb_answer = parsed
+			_lb_status = ""
+		else:
+			_lb_answer = {}
+			_lb_status = "Could not reach the board. Check the connection and try again."
+		if hud._lb_card.visible:
+			hud.show_leaderboard(_lb_state()))
+	var err := req.request(Leaderboard.board_url(LeaderboardConfig.URL, _lb_mode, _lb_period(_lb_mode), str(lb.id)))
+	if err != OK:
+		req.queue_free()
+		_lb_busy = false
+		_lb_status = "Could not reach the board."
+		hud.show_leaderboard(_lb_state())
+
+
+## A finished daily or weekly run goes up, if the player joined. A run
+## that cannot be sent now waits in the save and goes on the next title.
+func _lb_submit_run(mode: String, period: int, p_score: int, level: int, p_kills: int, peak: int, seconds: int) -> void:
+	if not bool(lb.get("joined", false)) or not Leaderboard.configured():
+		return
+	var p := Leaderboard.payload(str(lb.id), str(lb.name), mode, period, p_score, level, p_kills, peak, seconds)
+	lb.pending = Leaderboard.signed(p, LeaderboardConfig.SECRET)
+	SaveData.save_leaderboard(lb)
+	_lb_send_pending()
+
+
+func _lb_send_pending() -> void:
+	if not lb.has("pending") or not Leaderboard.configured():
+		return
+	var body: Dictionary = lb.pending
+	_lb_post("/submit", body, func(ok: bool, answer: Dictionary) -> void:
+		Diag.note("leaderboard_submit", {"ok": ok, "rank": answer.get("rank", null), "error": answer.get("error", "")})
+		if ok or str(answer.get("error", "")) != "":
+			lb.erase("pending")
+			SaveData.save_leaderboard(lb)
+			if ok and answer.get("rank", null) != null and state == State.GAME_OVER:
+				hud.toast("Leaderboard: rank %d" % int(answer.rank)))
 
 
 ## The pause menu's line: perks held, then the veterans by name.
@@ -2347,6 +2486,11 @@ func _shots_walkthrough() -> void:
 		hud.show_running()
 		await _capture("q10_bay.png", 5)
 		bay.queue_free()
+		show_title()
+		hud.show_leaderboard({"configured": true, "joined": false, "name": "", "mode": "daily", "status": "", "answer": {}, "period_label": "DAILY #12"})
+		await _capture("q11_lb_join.png", 5)
+		hud.show_leaderboard({"configured": true, "joined": true, "name": "Ada", "mode": "daily", "status": "", "period_label": "DAILY #12", "answer": {"ok": true, "total": 3, "rows": [{"rank": 1, "name": "Bo", "score": 21400, "level": 4}, {"rank": 2, "name": "Ada", "score": 18920, "level": 4}, {"rank": 3, "name": "Kit", "score": 9000, "level": 3}], "you": {"rank": 2, "score": 18920, "level": 4}}})
+		await _capture("q12_lb_board.png", 5)
 		_quit_with(0)
 		return
 	open_shop()

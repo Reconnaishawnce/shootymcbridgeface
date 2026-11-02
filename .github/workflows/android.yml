@@ -65,6 +65,24 @@ jobs:
           unzip -q /tmp/templates.tpz 'templates/android_*' 'templates/linux_release.x86_64' 'templates/version.txt' -d /tmp/tpl
           mv /tmp/tpl/templates/* "$dest/"
 
+      - name: Leaderboard Worker tests
+        shell: bash
+        run: node leaderboard/test.mjs
+
+      - name: Leaderboard server and signing secret
+        shell: bash
+        env:
+          LB_URL: ${{ secrets.LEADERBOARD_URL }}
+          LB_SECRET: ${{ secrets.LEADERBOARD_SECRET }}
+        run: |
+          if [ -n "${LB_URL:-}" ] && [ -n "${LB_SECRET:-}" ]; then
+            sed -i "s|^const URL := \"\"|const URL := \"${LB_URL}\"|" scripts/core/leaderboard_config.gd
+            sed -i "s|^const SECRET := \"\"|const SECRET := \"${LB_SECRET}\"|" scripts/core/leaderboard_config.gd
+            echo "Leaderboard: configured for ${LB_URL}"
+          else
+            echo "::notice::No LEADERBOARD_URL / LEADERBOARD_SECRET secrets: this build has no leaderboard."
+          fi
+
       - name: Verify (import, unit tests, smoke-play)
         shell: bash
         run: scripts/ci/check.sh ~/godot-bin/godot

@@ -452,6 +452,26 @@ the bounty so the end-of-run coins are what is left. Gold on the panel,
 "NEED n COINS" when short. The bot buys soldiers under sixty and a
 power-up otherwise, when the bounty covers it.
 
+## The leaderboard
+
+Daily and weekly only: one shared seed, no upgrades, so a score is
+comparable and a claim is checkable. `leaderboard/worker.js` is the
+whole server (a Cloudflare Worker and a KV namespace): `/submit`
+checks the HMAC signature (a secret only CI and the Worker hold,
+stamped into `LeaderboardConfig` at export), the period (current, or
+the previous one within a short grace), plausibility caps per level
+(score, kills, time, peak), a clean name, a per-address rate limit,
+then keeps the best score per player per period in a top-200 list;
+`/board` returns the top 50 and the viewer's rank, hiding shadowed
+players from everyone but themselves; `/forget` deletes a player.
+`node leaderboard/test.mjs` exercises all of it against a fake KV and
+runs in CI. On the game side `Leaderboard` (pure) builds and signs the
+payload with the engine's `HMACContext` (the test pins the digest to
+node's), the game submits after a daily or weekly run and keeps a
+pending submission in the save until it goes, and `Hud.show_leaderboard`
+is the opt-in, the board and FORGET ME. A build without the secrets is
+not configured and sends nothing.
+
 ## The economy, the pit stop, agro, the retry
 
 `Economy` is the brake. The bounty is linear in kills, so an 85-level

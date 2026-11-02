@@ -57,4 +57,5 @@ static func title_buttons(runs: int, hard_unlocked: bool, character_mode: bool) 
 		"quests": runs >= 1,
 		"weekly": runs >= 2,
 		"road": runs >= 1,
+		"leaderboard": runs >= 2,
 	}

@@ -262,8 +262,11 @@ goes first because nothing else can be judged on a phone that crawls.
    home with diminishing returns, a 500-soldier bridge, pit stops that
    sell this run's gear, bombs that aim themselves, agro on the
    comeback, a stronger jeep, a tip and one level retry on the wipe.
-10. Next: a balance and feedback pass on the new economy; a leaderboard
-   is designed but needs a backend (see the notes in the chat).
+10. The leaderboard (done): daily and weekly boards on a Cloudflare
+    Worker with signed, plausibility-checked submissions; opt-in under
+    a chosen name; FORGET ME.
+11. Next: a balance and feedback pass on the new economy and the first
+    week of the board.
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 

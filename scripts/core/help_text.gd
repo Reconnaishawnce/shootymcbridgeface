@@ -131,6 +131,9 @@ static func sections() -> Array:
 			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
 			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +
 			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play."},
+		{"title": "LEADERBOARD", "body":
+			"The LEADERBOARD is under MORE. Daily and weekly scores only, because everyone plays the same road there, under a name you pick. " +
+			"Nothing else leaves the phone: a random id, your name, the score, the level, the kills and the run time. FORGET ME wipes it all. A local build without a server shows no board."},
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]

@@ -42,6 +42,10 @@ signal lessons_toggled(on: bool)
 signal pit_buy(id: String)
 signal pit_leave
 signal retry_level_pressed
+signal leaderboard_opened
+signal lb_join(name: String)
+signal lb_tab(mode: String)
+signal lb_forget
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -162,6 +166,9 @@ var _lesson_body: Label
 var _learn_button: Button
 var _settings_lessons: Button
 var _pit_card: Control
+var _lb_card: Control
+var _lb_box: VBoxContainer
+var _lb_button: Button
 var _pit_box: VBoxContainer
 var _fork_box: Control
 var _hint: Label
@@ -453,6 +460,8 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
+	_lb_card = _scroll_card(root, "LEADERBOARD", func() -> void: shop_closed.emit())
+	_lb_box = _lb_card.get_meta("box")
 	_pit_card = _scroll_card(root, "PIT STOP", func() -> void: pit_leave.emit())
 	_pit_box = _pit_card.get_meta("box")
 	var leave: Button = _pit_card.get_child(_pit_card.get_child_count() - 1)
@@ -756,6 +765,10 @@ func _build_title(root: Control) -> void:
 	_road_button.pressed.connect(func() -> void: road_opened.emit())
 	_road_button.visible = false
 	box.add_child(_road_button)
+	_lb_button = _button("LEADERBOARD", 34)
+	_lb_button.pressed.connect(func() -> void: leaderboard_opened.emit())
+	_lb_button.visible = false
+	box.add_child(_lb_button)
 	var more_help := _button("HOW TO PLAY", 34)
 	more_help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(more_help)
@@ -812,6 +825,90 @@ func hide_revive() -> void:
 	_revive_card.visible = false
 
 
+## The leaderboard page. [param st] keys: configured, joined, name,
+## mode, status, answer (the Worker's board, or {}), period_label.
+func show_leaderboard(st: Dictionary) -> void:
+	_hide_cards()
+	_lb_card.visible = true
+	for child in _lb_box.get_children():
+		_lb_box.remove_child(child)
+		child.queue_free()
+	if not bool(st.get("configured", false)):
+		var l := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD
+		l.custom_minimum_size.x = 600.0
+		l.text = "This build has no leaderboard server. Releases from the GitHub page do."
+		_lb_box.add_child(l)
+		return
+	if not bool(st.get("joined", false)):
+		var head := _label(28, HORIZONTAL_ALIGNMENT_CENTER)
+		head.text = "JOIN THE BOARD"
+		head.add_theme_color_override("font_color", COIN)
+		_lb_box.add_child(head)
+		var blurb := _label(21, HORIZONTAL_ALIGNMENT_CENTER)
+		blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
+		blurb.custom_minimum_size.x = 600.0
+		blurb.text = "Daily and weekly scores only, under a name you pick. Nothing else leaves the phone: a random id, your name, the score, the level, the kills and the run time. FORGET ME wipes it all whenever you like."
+		blurb.modulate = Color(0.85, 0.85, 0.9)
+		_lb_box.add_child(blurb)
+		var name_edit := LineEdit.new()
+		name_edit.placeholder_text = "Your name on the board"
+		name_edit.max_length = Leaderboard.NAME_MAX
+		name_edit.text = str(st.get("name", ""))
+		name_edit.custom_minimum_size = Vector2(520.0, 56.0)
+		name_edit.add_theme_font_size_override("font_size", 24)
+		_lb_box.add_child(name_edit)
+		var join := _button("JOIN", 34)
+		join.pressed.connect(func() -> void: lb_join.emit(name_edit.text))
+		_lb_box.add_child(join)
+		var status := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+		status.text = str(st.get("status", ""))
+		status.add_theme_color_override("font_color", COIN)
+		_lb_box.add_child(status)
+		return
+	var tabs := HBoxContainer.new()
+	tabs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	tabs.add_theme_constant_override("separation", 10)
+	_lb_box.add_child(tabs)
+	for mode in Leaderboard.MODES:
+		var b := _button(mode.to_upper(), 26)
+		b.custom_minimum_size = Vector2(200.0, 56.0)
+		b.toggle_mode = true
+		b.button_pressed = mode == str(st.get("mode", "daily"))
+		b.pressed.connect(func() -> void: lb_tab.emit(mode))
+		tabs.add_child(b)
+	var period := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+	period.text = str(st.get("period_label", ""))
+	period.add_theme_color_override("font_color", COIN)
+	_lb_box.add_child(period)
+	var answer: Dictionary = st.get("answer", {})
+	var status := _label(21, HORIZONTAL_ALIGNMENT_CENTER)
+	status.text = str(st.get("status", ""))
+	status.modulate = Color(0.85, 0.85, 0.9)
+	_lb_box.add_child(status)
+	if not answer.is_empty():
+		var you := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
+		you.text = Leaderboard.you_text(answer)
+		_lb_box.add_child(you)
+		var rows := Leaderboard.rows_text(answer)
+		if rows.is_empty():
+			var none := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+			none.text = "Nobody yet. Play today's run."
+			_lb_box.add_child(none)
+		for line in rows:
+			var l := _label(22, HORIZONTAL_ALIGNMENT_LEFT)
+			l.text = str(line)
+			_lb_box.add_child(l)
+	var who := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	who.text = "\nYou are %s on the board." % str(st.get("name", ""))
+	who.modulate = Color(0.75, 0.75, 0.8)
+	_lb_box.add_child(who)
+	var forget := _button("FORGET ME", 24)
+	forget.pressed.connect(func() -> void: lb_forget.emit())
+	_lb_box.add_child(forget)
+
+
 ## The pit stop: this run's gear for this run's bounty. Rebuilt per show.
 func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
 	_pit_card.move_to_front()
@@ -863,6 +960,7 @@ func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
 
 func hide_pitstop() -> void:
 	_pit_card.visible = false
+	_lb_card.visible = false
 
 
 ## The trophy road: where you stand, the next milestone, the track.
@@ -1350,7 +1448,8 @@ func show_title(t: Dictionary) -> void:
 	_endless_button.visible = bool(buttons.get("endless", true))
 	_quests_button.visible = bool(buttons.get("quests", true))
 	_road_button.visible = bool(buttons.get("road", false))
-	_more_button.visible = _records_button.visible or _quests_button.visible or _road_button.visible
+	_lb_button.visible = bool(buttons.get("leaderboard", false))
+	_more_button.visible = _records_button.visible or _quests_button.visible or _road_button.visible or _lb_button.visible
 	if not bool(buttons.get("hints", true)):
 		mode_hint = ""
 	_goal.text = str(t.get("goal", ""))

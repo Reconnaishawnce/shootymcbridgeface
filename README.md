@@ -160,6 +160,9 @@ the same key (see below).
   on the ROAD page.
 - **Rally**: squad at zero? Once a run, five seconds to buy 8 soldiers
   back for a few stars. Not in the daily or weekly.
+- **Leaderboard**: under MORE, for the daily and the weekly, under a
+  name you pick. Opt-in; FORGET ME wipes you. Setting up the free server
+  is in `leaderboard/README.md`.
 - **Weekly**: on the daily card. One road for everyone all week, on hard,
   no upgrades. Best of the week counts and pays two extra stars.
 - **Daily**: the same gates for everyone on a given UTC day, no upgrades,
@@ -222,6 +225,7 @@ unit tests cover.
 | `docs/DESIGN.md` | Design pillars, mechanics, and the idea backlog |
 | `docs/ROADMAP.md` | What each build run delivers |
 | `.github/workflows/android.yml` | Build, test, export, release |
+| `leaderboard/` | The Cloudflare Worker that runs the daily and weekly boards, with its tests |
 
 ## Signing
 

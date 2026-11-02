@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.39 (the leaderboard)
+
+- A leaderboard for the daily and the weekly, under MORE. Join under a
+  name you pick; a finished daily or weekly run goes up signed, and the
+  page shows today's and this week's top 50 with your rank. FORGET ME
+  wipes your id and rows. Nothing else leaves the phone, and a build
+  without a server (a local build) says so and sends nothing.
+- The server is one Cloudflare Worker and one KV namespace, in
+  `leaderboard/`, with its own tests (`node leaderboard/test.mjs`, run
+  in CI). It checks a per-build signature, the period, and whether the
+  game could have produced the numbers, rate-limits by address, keeps
+  the best score per player per period, and can shadow a cheater.
+  Setup is in `leaderboard/README.md`: two repository secrets and the
+  Worker's URL.
+
 ## 0.38 (the pit stop, the economy, agro, a level again)
 
 From the phone screenshots: an endless run to level 85 with a peak

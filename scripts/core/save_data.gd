@@ -223,6 +223,17 @@ static func save_season(d: Dictionary) -> void:
 	_write(STATS, "season", d)
 
 
+## The leaderboard: an anonymous id, a chosen name, the opt-in, and a
+## submission that could not be sent yet.
+static func load_leaderboard() -> Dictionary:
+	var v = _read(SETTINGS, "leaderboard", {})
+	return v if v is Dictionary else {}
+
+
+static func save_leaderboard(d: Dictionary) -> void:
+	_write(SETTINGS, "leaderboard", d)
+
+
 static func load_lessons_seen() -> Array:
 	var v = _read(STATS, "lessons_seen", [])
 	return v if v is Array else []

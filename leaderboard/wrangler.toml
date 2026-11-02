@@ -1,0 +1,11 @@
+# Deploy with: npx wrangler deploy (from this folder), after
+#   npx wrangler kv namespace create BOARD   (paste the id below)
+#   npx wrangler secret put SIGNING_SECRET   (the same value as the
+#   repository secret LEADERBOARD_SECRET)
+name = "shootymcbridgeface-leaderboard"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "BOARD"
+id = "PASTE_YOUR_KV_NAMESPACE_ID"

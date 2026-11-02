@@ -3,6 +3,43 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.38 (the pit stop, the economy, agro, a level again)
+
+From the phone screenshots: an endless run to level 85 with a peak
+squad of 34,616 and 83,876 coins in one sitting. The game had stopped
+being a game long before that.
+
+- Two kinds of money, said plainly. The BOUNTY is the run's money,
+  spent on the road; COINS are the save's money. What is left of the
+  bounty converts at the end: one for one up to 500, then with
+  diminishing returns (84,000 bounty is about 5,400 coins, 1,000 is
+  about 680). The daily and weekly still pay none.
+- The bridge holds 500 soldiers. A squad cannot shoot a multiplier
+  panel past x3 once it has 150 soldiers, or past x2 once it has 300,
+  so x0.5 panels no longer become x5 for a thousand-strong column.
+- The PIT STOP. From level 2 a gold bay sits on the right side of the
+  road once a level, after the sixth gate. Steer onto it and the road
+  waits while you spend the bounty on this run's gear: SHARPER ROUNDS
+  (+12% damage, up to five), FASTER RIFLES (+12% fire rate, up to five),
+  FLAK JACKETS (-10% on heavy bites, up to three), a BOMB (25), FIELD
+  DRESSING (a tenth of the squad back on their feet). Prices climb per
+  stack; nothing outlives the run. The bot pulls in when it has money.
+- Bombs aim themselves at the boss or the nearest brute or tank in
+  reach, the blast is a little wider, and the bomb button pulses when
+  there is something worth throwing at.
+- AGRO. A second wind or a rally now brings ten seconds of fury: double
+  fire rate, double damage, nothing bites, the screen edges burn and the
+  boss music plays. Then back to normal.
+- The JEEP earns its twenty soldiers: 85 damage a second (was 50), 150
+  health (was 90), through three zombies (was two).
+- Stuck on a level? The results card gives one TIP picked from how the
+  run ended (the boss you met, the bomb you never threw, the big squad
+  that did not kill), and once a run RETRY LEVEL N starts that level
+  again from its first gate with the squad you entered it with, perks,
+  bounty and convoy intact. Levels mode only.
+- Lessons and the help page cover the pit stop, the two currencies,
+  agro and the retry.
+
 ## 0.37 (the Foreman)
 
 - A fourth boss, every fourth level: THE FOREMAN. Hard hat, hi-vis

@@ -110,7 +110,9 @@ the same key (see below).
   75, 150 and 300 soldiers the squad raises flags and glows.
 - A quiet procedural score sits under the run and builds from calm to
   tense to the boss. Music and sound toggle separately in the pause menu.
-- **Tap** to retry after a wipe. The **II** button pauses; so does the
+- **Wiped out?** The card gives a tip, and once a run you can retry the
+  level you died on with the squad you entered it with. **Tap** to
+  start over. The **II** button pauses; so does the
   Android back button or leaving the app.
 - Blue panels help, red panels hurt, grey panels are hidden until you get
   close or put a bullet into them.
@@ -176,10 +178,12 @@ the same key (see below).
 - **Squads**: rifles (balanced), shotguns (three pellets, more damage),
   medics (less damage, a revived soldier every three seconds, brutes bite
   for less). The latter two are shop unlocks.
-- **Coins and shop**: every kill pays a bounty by kind (walkers 1, brutes
-  3, tanks 5...), bosses 25, gates 2; a counter shows it growing. GOLD
-  supply panels sell soldiers or a power-up for bounty right at the
-  gate; what you spend there you do not take home. The shop
+- **Two kinds of money**: the bounty is the run's (every kill pays it;
+  spend it at gold supply panels and at the PIT STOP, a bay on the right
+  side of the road once a level that sells this run's gear). Coins are
+  the save's: what is left of the bounty converts at the end, one for
+  one up to 500 and with diminishing returns beyond. The bridge holds
+  500 soldiers. The shop
   on the title screen sells nine permanent upgrades, including the shotgun
   and medic squads.
 - Score is metres travelled plus ten per kill plus a bonus per level

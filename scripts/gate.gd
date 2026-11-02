@@ -61,8 +61,8 @@ func update_hot(t: float) -> void:
 
 
 ## Returns true when the hit stepped the panel's value up.
-func register_hit(index: int, damage: float, step_cost: float) -> bool:
-	var steps := GateMath.register_hit(panels[index], damage, step_cost)
+func register_hit(index: int, damage: float, step_cost: float, mul_cap: float = GateMath.MUL_CAP) -> bool:
+	var steps := GateMath.register_hit(panels[index], damage, step_cost, mul_cap)
 	_views[index].refresh(panels[index])
 	if steps > 0:
 		steps_up[index] += steps

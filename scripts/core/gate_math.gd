@@ -248,7 +248,7 @@ static func _first_add(panel: GatePanel) -> int:
 ## (usually 0 or 1; a heavy bullet can climb several at once).
 ## Callers pass a step cost scaled to the squad's damage output, so farming a
 ## gate yields about one step per second of committed fire at any squad size.
-static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> int:
+static func register_hit(panel: GatePanel, damage: float, step_cost: float, mul_cap: float = MUL_CAP) -> int:
 	panel.revealed = true
 	if step_cost <= 0.0 or panel.kind in [Kind.POWER, Kind.BET, Kind.VEHICLE]:
 		return 0
@@ -265,7 +265,7 @@ static func register_hit(panel: GatePanel, damage: float, step_cost: float) -> i
 				# A deal shot up gets cheaper, never below free.
 				panel.value = minf(panel.value + 1.0, 0.0) if panel.kind != Kind.ADD else panel.value + 1.0
 			Kind.MUL:
-				panel.value = minf(panel.value + MUL_STEP, MUL_CAP)
+				panel.value = minf(panel.value + MUL_STEP, mul_cap)
 			Kind.EXPR:
 				var i := _first_add(panel)
 				panel.ops[i][1] = float(panel.ops[i][1]) + 1.0

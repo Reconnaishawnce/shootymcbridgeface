@@ -8,12 +8,17 @@ const CATALOG := {
 	"slow": {"name": "SLOW-MO", "desc": "The road crawls for six seconds.", "seconds": 6.0},
 	"shield": {"name": "SHIELD", "desc": "Nothing bites for six seconds.", "seconds": 6.0},
 	"frenzy": {"name": "FRENZY", "desc": "Double fire rate for six seconds.", "seconds": 6.0},
+	# Not a road power-up: the comeback's fury, granted by a second wind
+	# or a rally. Never a mystery result.
+	"agro": {"name": "AGRO", "desc": "Ten seconds of fury: double fire, double damage, nothing bites.", "seconds": 10.0},
 }
 const ORDER := ["bomb", "slow", "shield", "frenzy"]
 const MYSTERY := "mystery"
 const MAX_BOMBS := 3
 const SLOW_FACTOR := 0.45
 const FRENZY_MULT := 2.0
+const AGRO_FIRE_MULT := 2.0
+const AGRO_DAMAGE_MULT := 2.0
 
 var bombs := 0
 ## id -> time (run seconds) the effect ends.
@@ -77,11 +82,18 @@ func world_speed_mult(now: float) -> float:
 
 
 func fire_rate_mult(now: float) -> float:
-	return FRENZY_MULT if active("frenzy", now) else 1.0
+	var m := FRENZY_MULT if active("frenzy", now) else 1.0
+	if active("agro", now):
+		m *= AGRO_FIRE_MULT
+	return m
+
+
+func damage_mult(now: float) -> float:
+	return AGRO_DAMAGE_MULT if active("agro", now) else 1.0
 
 
 func shielded(now: float) -> bool:
-	return active("shield", now)
+	return active("shield", now) or active("agro", now)
 
 
 func reset() -> void:

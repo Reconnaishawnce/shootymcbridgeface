@@ -39,6 +39,9 @@ signal crash_dismissed
 signal lesson_closed
 signal learn_pressed
 signal lessons_toggled(on: bool)
+signal pit_buy(id: String)
+signal pit_leave
+signal retry_level_pressed
 signal locker_opened
 signal locker_closed
 signal locker_tab(cat: String)
@@ -143,6 +146,8 @@ var _over_card: Control
 var _over_title: Label
 var _over_lines: Label
 var _over_prompt: Label
+var _over_tip: Label
+var _over_retry: Button
 
 var _pause_card: Control
 var _sound_button: Button
@@ -156,6 +161,8 @@ var _lesson_title: Label
 var _lesson_body: Label
 var _learn_button: Button
 var _settings_lessons: Button
+var _pit_card: Control
+var _pit_box: VBoxContainer
 var _fork_box: Control
 var _hint: Label
 var _hint_tween: Tween
@@ -380,6 +387,7 @@ func _init() -> void:
 	_bomb_button.offset_top = -92.0
 	_bomb_button.offset_bottom = -24.0
 	_bomb_button.add_theme_color_override("font_color", COIN)
+	_bomb_button.pivot_offset = Vector2(100.0, 34.0)
 	_bomb_button.pressed.connect(func() -> void: bomb_pressed.emit())
 	_bomb_button.visible = false
 	root.add_child(_bomb_button)
@@ -445,6 +453,10 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
+	_pit_card = _scroll_card(root, "PIT STOP", func() -> void: pit_leave.emit())
+	_pit_box = _pit_card.get_meta("box")
+	var leave: Button = _pit_card.get_child(_pit_card.get_child_count() - 1)
+	leave.text = "LEAVE  ·  BACK ON THE ROAD"
 	_road_card = _scroll_card(root, "TROPHY ROAD", func() -> void: shop_closed.emit())
 	_road_box = _road_card.get_meta("box")
 	_build_revive(root)
@@ -800,6 +812,59 @@ func hide_revive() -> void:
 	_revive_card.visible = false
 
 
+## The pit stop: this run's gear for this run's bounty. Rebuilt per show.
+func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
+	_pit_card.move_to_front()
+	_pit_card.visible = true
+	for child in _pit_box.get_children():
+		_pit_box.remove_child(child)
+		child.queue_free()
+	var head := _label(30, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = "BOUNTY  %d" % funds
+	head.add_theme_color_override("font_color", COIN)
+	_pit_box.add_child(head)
+	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	blurb.text = "Gear for this run, paid from this run's bounty. The road waits."
+	blurb.modulate = Color(0.8, 0.8, 0.86)
+	_pit_box.add_child(blurb)
+	for id in PitStop.ORDER:
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 14)
+		row.custom_minimum_size = Vector2(620.0, 0.0)
+		var text := VBoxContainer.new()
+		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.custom_minimum_size.x = 440.0
+		text.add_theme_constant_override("separation", 0)
+		var name := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
+		var n := pit.stack(id)
+		name.text = "%s   %d/%d" % [PitStop.title(id), n, int(PitStop.ITEMS[id]["max"])] if int(PitStop.ITEMS[id]["max"]) < 99 else PitStop.title(id)
+		text.add_child(name)
+		var desc := _label(19, HORIZONTAL_ALIGNMENT_LEFT)
+		desc.modulate = Color(0.85, 0.85, 0.9)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc.custom_minimum_size.x = 440.0
+		if pit.is_maxed(id):
+			desc.text = "%s\n%s" % [PitStop.description(id), PitStop.effect_text(id, n, count)]
+		elif int(PitStop.ITEMS[id]["max"]) < 99:
+			desc.text = "%s\n%s  >  %s" % [PitStop.description(id), PitStop.effect_text(id, n, count), PitStop.effect_text(id, n + 1, count)]
+		else:
+			desc.text = "%s\n%s" % [PitStop.description(id), PitStop.effect_text(id, n + 1, count)]
+		text.add_child(desc)
+		row.add_child(text)
+		var buy := _button("MAX" if pit.is_maxed(id) else "%d" % pit.cost(id), 24)
+		buy.custom_minimum_size = Vector2(150.0, 52.0)
+		buy.disabled = not pit.can_buy(id, funds)
+		buy.pressed.connect(func() -> void: pit_buy.emit(id))
+		row.add_child(buy)
+		_pit_box.add_child(row)
+
+
+func hide_pitstop() -> void:
+	_pit_card.visible = false
+
+
 ## The trophy road: where you stand, the next milestone, the track.
 func show_road(trophies: int, rows: Array, unlocks: Dictionary) -> void:
 	_hide_cards()
@@ -1065,6 +1130,14 @@ func _build_over(root: Control) -> void:
 	_over_lines.custom_minimum_size.x = 560.0
 	_over_lines.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(_over_lines)
+	_over_tip = _label(21, HORIZONTAL_ALIGNMENT_CENTER)
+	_over_tip.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_over_tip.custom_minimum_size.x = 560.0
+	_over_tip.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7))
+	box.add_child(_over_tip)
+	_over_retry = _button("RETRY THIS LEVEL  ·  once a run", 28)
+	_over_retry.pressed.connect(func() -> void: retry_level_pressed.emit())
+	box.add_child(_over_retry)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_prompt)
 	_over_copy = _button("COPY RESULT", 28)
@@ -1165,6 +1238,17 @@ func set_bombs(n: int) -> void:
 	_bomb_button.text = "BOMB x%d" % n
 
 
+## The button asks for the throw when a heavy or the boss is in reach.
+func set_bomb_hint(on: bool) -> void:
+	if on:
+		var t := Time.get_ticks_msec() * 0.001
+		_bomb_button.scale = Vector2.ONE * (1.0 + 0.06 * sin(t * 10.0))
+		_bomb_button.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
+	else:
+		_bomb_button.scale = Vector2.ONE
+		_bomb_button.add_theme_color_override("font_color", COIN)
+
+
 ## A teaching line that holds for a while, then fades.
 func show_hint(text: String, seconds: float = 3.2) -> void:
 	if text == "":
@@ -1237,6 +1321,7 @@ func _hide_cards() -> void:
 	_more_card.visible = false
 	_road_card.visible = false
 	_crash_card.visible = false
+	_pit_card.visible = false
 	hide_revive()
 
 
@@ -1531,7 +1616,8 @@ func show_game_over(r: Dictionary) -> void:
 		where = "%s   ·   %s" % [Modifiers.title(modifier), where]
 	if grades != "":
 		where += "\nGrades  %s" % grades
-	var coins_line := "no coins in the daily" if mode == "daily" else ("no coins in the weekly" if mode == "weekly" else "+%d coins" % coins_earned)
+	var run_bounty := int(r.get("bounty", 0))
+	var coins_line := "no coins in the daily" if mode == "daily" else ("no coins in the weekly" if mode == "weekly" else ("bounty %d  >  +%d coins" % [run_bounty, coins_earned] if run_bounty > Economy.GOLD_LINEAR else "+%d coins" % coins_earned))
 	if stars_earned > 0:
 		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
 	if locker_nudge:
@@ -1575,7 +1661,13 @@ func show_game_over(r: Dictionary) -> void:
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal
 	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
-	_over_prompt.text = "TAP TO RETRY"
+	var tip := str(r.get("tip", ""))
+	_over_tip.text = "TIP: " + tip if tip != "" else ""
+	_over_tip.visible = tip != ""
+	var retry_level := int(r.get("retry_level", 0))
+	_over_retry.visible = retry_level > 0
+	_over_retry.text = "RETRY LEVEL %d  ·  once a run" % retry_level
+	_over_prompt.text = "TAP TO START OVER" if retry_level > 0 else "TAP TO RETRY"
 	_pulse_prompt()
 	if is_best:
 		flash(0.5)

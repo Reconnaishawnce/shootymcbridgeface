@@ -5,7 +5,7 @@ extends Node3D
 
 const FLIGHT := 0.55
 const RANGE := 13.0
-const RADIUS := 5.0
+const RADIUS := 5.5
 const COLOR := Color(0.12, 0.12, 0.14)
 const FUSE := Color(1.0, 0.6, 0.1)
 
@@ -22,9 +22,9 @@ func _init() -> void:
 	add_child(_fuse)
 
 
-func launch(from: Vector3) -> void:
+func launch(from: Vector3, to: Vector3 = Vector3.INF) -> void:
 	start = from
-	target = Vector3(from.x, 0.3, from.z - RANGE)
+	target = Vector3(from.x, 0.3, from.z - RANGE) if to == Vector3.INF else Vector3(to.x, 0.3, to.z)
 	position = from
 
 

@@ -44,6 +44,8 @@ signal saw_spawned
 signal saw_hit(hit: bool)
 ## The foreman threw a saw or dropped a crate.
 signal foreman_threw(what: String)
+## The squad steered onto the pit stop bay.
+signal pit_stop_reached
 ## A perk just did something you could have missed: thick skin softened
 ## a bite by [param amount], the recruiter added [param amount].
 signal perk_felt(id: String, amount: int)
@@ -152,6 +154,8 @@ var _saw_plan: Array = []
 var supply_funds := 0
 var _saws: Array[Saw] = []
 var _foreman_saw_timer := 0.0
+var _bay: PitBay = null
+var _bay_due := false
 var _foreman_crate_timer := 0.0
 var _bombs: Array[Bomb] = []
 ## Bosses get tougher as perks stack; the game keeps this current.
@@ -251,6 +255,7 @@ func start_level(n: int) -> void:
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	_saw_plan = gen.saws_for_level(level) if gen != null else []
+	_bay_due = PitStop.has_bay(level)
 	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
 	fork_side = 0
 	if squad != null:
@@ -265,6 +270,19 @@ func start_level(n: int) -> void:
 	_foreman_saw_timer = Difficulty.FOREMAN_SAW_FIRST
 	_foreman_crate_timer = Difficulty.FOREMAN_CRATE_FIRST
 	level_started.emit(level)
+
+
+## The same level from its first gate: the road cleared, the horde at
+## rest, nothing from the wipe left on it.
+func restart_level(n: int) -> void:
+	_clear_actors()
+	for b in bullets.get_children():
+		b.queue_free()
+	frozen = false
+	world_speed = Difficulty.world_speed(n)
+	horde_z = HORDE_REST_Z
+	_place_horde()
+	start_level(n)
 
 
 func _clear_actors() -> void:
@@ -302,6 +320,9 @@ func _clear_actors() -> void:
 	for s in _saws:
 		s.queue_free()
 	_saws.clear()
+	if _bay != null and is_instance_valid(_bay):
+		_bay.queue_free()
+	_bay = null
 	for b in _bombs:
 		b.queue_free()
 	_bombs.clear()
@@ -333,6 +354,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_boss(delta)
 	_move_spits(p_squad)
 	_move_saws(delta, p_squad)
+	_move_bay(delta, p_squad)
 	_move_crates(delta, p_squad)
 	_move_bombs(p_squad)
 	_move_strikes(delta, p_squad)
@@ -546,13 +568,13 @@ func try_hit(b: Bullet) -> bool:
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
 			var dmg := b.damage * (Progression.HOT_MULT if g.is_hot(i, now) else 1.0)
-			if g.register_hit(i, dmg, _step_cost()):
+			if g.register_hit(i, dmg, _step_cost(), Economy.mul_cap_for(squad.count if squad != null else 0)):
 				gate_stepped.emit(g, i)
 			return true
 	for rg in route_gates:
 		if rg.passed or rg.position.z < z_lo or rg.position.z > z_hi or not rg.covers_x(b.position.x):
 			continue
-		rg.register_hit(b.damage * (Progression.HOT_MULT if rg.is_hot(now) else 1.0), _step_cost())
+		rg.register_hit(b.damage * (Progression.HOT_MULT if rg.is_hot(now) else 1.0), _step_cost(), Economy.mul_cap_for(squad.count if squad != null else 0))
 		return true
 	return false
 
@@ -624,6 +646,15 @@ func _spawn() -> void:
 	while _next_wave < limit and Difficulty.wave_distance(_next_wave) - level_distance <= SPAWN_AHEAD:
 		_spawn_wave(_next_wave, count)
 		_next_wave += 1
+	if _bay_due:
+		var bay_n := PitStop.BAY_GATE_INDEX + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
+		var bay_d := Difficulty.gate_distance(bay_n) + PitStop.BAY_OFFSET
+		if bay_d - level_distance <= SPAWN_AHEAD:
+			_bay_due = false
+			_bay = PitBay.new()
+			_bay.setup(road_half - Progression.LANE_W * 0.5, Progression.LANE_W)
+			_bay.position.z = -(bay_d - level_distance)
+			add_child(_bay)
 	for plan in _saw_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
@@ -1438,12 +1469,55 @@ func _move_saws(delta: float, p_squad: Squad) -> void:
 			s.queue_free()
 
 
+func nearest_bay() -> PitBay:
+	if _bay != null and is_instance_valid(_bay) and not _bay.passed:
+		return _bay
+	return null
+
+
+## The bay scrolls with the road; the squad on it as it passes is a stop.
+func _move_bay(delta: float, p_squad: Squad) -> void:
+	if _bay == null or not is_instance_valid(_bay):
+		return
+	_bay.position.z += world_speed * delta
+	if not _bay.passed and _bay.position.z >= -0.5:
+		_bay.passed = true
+		if _bay.covers_x(p_squad.position.x):
+			pit_stop_reached.emit()
+	if _bay.position.z > DESPAWN_Z:
+		_bay.queue_free()
+		_bay = null
+
+
 ## Lob a bomb from the squad. It detonates where it lands.
 func throw_bomb(from_x: float) -> void:
 	var b := Bomb.new()
 	add_child(b)
-	b.launch(Vector3(from_x, 1.0, -0.5))
+	# Aimed at the thing worth a bomb: the boss, or the nearest heavy
+	# within range; straight ahead otherwise.
+	var to := bomb_target()
+	if to == Vector3.INF:
+		b.launch(Vector3(from_x, 1.0, -0.5))
+	else:
+		b.launch(Vector3(from_x, 1.0, -0.5), to)
 	_bombs.append(b)
+
+
+## Where a bomb should go, or INF when nothing heavy is in reach.
+func bomb_target() -> Vector3:
+	var best := Vector3.INF
+	var best_z := -(Bomb.RANGE + 6.0)
+	if boss != null and boss.alive and boss.position.z > -(Bomb.RANGE + 8.0):
+		return Vector3(boss.position.x + boss.core_x, 0.0, maxf(boss.position.z, -(Bomb.RANGE + 4.0)))
+	for z in zombies:
+		if (z.brute or z.is_tank()) and not z.latched and z.position.z > best_z and z.position.z < -1.0:
+			best_z = z.position.z
+			best = Vector3(z.position.x, 0.0, z.position.z)
+	return best
+
+
+func bomb_worth_throwing() -> bool:
+	return bomb_target() != Vector3.INF
 
 
 func _move_bombs(p_squad: Squad) -> void:

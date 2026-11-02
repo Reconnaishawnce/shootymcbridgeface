@@ -83,7 +83,7 @@ static func sections() -> Array:
 			"All of them call runners and get angrier below half health; all but the foreman drop red rings that turn into lightning bolts. " +
 			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives." % int(Modifiers.get_value("normal", "horde_level"))},
 		{"title": "POWER-UPS", "body":
-			"BOMB: tap the bomb button to throw one; big blast, kills most things in it.\n" +
+			"BOMB: tap the bomb button to throw one. It aims itself at the boss or the nearest brute or tank in reach, and the button pulses when there is something worth it. Big blast, kills most things in it.\n" +
 			"SLOW-MO: the road and the zombies slow down for a while.\n" +
 			"SHIELD: nothing bites you until it runs out.\n" +
 			"FRENZY: your guns fire much faster.\n" +
@@ -93,10 +93,16 @@ static func sections() -> Array:
 			"Kills within %.1f seconds of each other chain into a combo. Every %d kills in a chain raises the multiplier, up to x%.0f. " % [Combo.WINDOW, Combo.STEP, Combo.MAX_MULT] +
 			"Score is mostly distance, plus kills times the multiplier, PERFECT gates, cleared waves, and a bonus for each boss. " +
 			"Every level you clear gets a GRADE from S to D for perfect gates, soldiers kept and how fast the boss went down. S pays %d points, down to nothing for a D." % Grades.bonus("S")},
+		{"title": "TWO KINDS OF MONEY", "body":
+			"The BOUNTY is this run's money. Every zombie you kill pays it: walkers and runners %d, thieves and latchers %d, brutes %d, tanks %d; bosses %d and every gate %d. The counter under the level shows it growing. " % [Bounty.for_kind("normal"), Bounty.for_kind("thief"), Bounty.for_kind("brute"), Bounty.for_kind("tank"), Bounty.BOSS, Bounty.GATE] +
+			"You can spend it on the road, at GOLD supply panels and at the PIT STOP, on gear that lasts the run. " +
+			"COINS are your save's money. At the end of a run what is left of the bounty turns into coins: one for one up to %d, then with diminishing returns, so a monster run pays well but not without end. Coins buy the SHOP's upgrades, which last forever. " % Economy.GOLD_LINEAR +
+			"The bridge holds %d soldiers at most, and a big squad cannot shoot a multiplier panel as high as a small one can.\n" % Economy.SQUAD_CAP},
+		{"title": "PIT STOP", "body":
+			"From level %d a gold bay sits on the right side of the road once a level. Steer onto it and the road waits while you spend this run's bounty on this run's gear: " % PitStop.PIT_LEVEL +
+			"%s (%s), %s (%s), %s (%s), %s, %s. Each costs more the more you hold. Nothing here outlives the run." % [PitStop.title("rounds"), PitStop.effect_text("rounds", 1), PitStop.title("rifles"), PitStop.effect_text("rifles", 1), PitStop.title("armor"), PitStop.effect_text("armor", 1), PitStop.title("bomb"), PitStop.title("dressing")]},
 		{"title": "COINS AND THE SHOP", "body":
-			"Every zombie you kill pays a bounty in coins: walkers and runners %d, thieves and latchers %d, brutes %d, tanks %d. Bosses pay %d and every gate %d. The counter under the level shows the run's bounty growing. " % [Bounty.for_kind("normal"), Bounty.for_kind("thief"), Bounty.for_kind("brute"), Bounty.for_kind("tank"), Bounty.BOSS, Bounty.GATE] +
-			"So a wide squad that mows the whole road earns more than a narrow one that drills, and the shop is where the bounty goes. " +
-			"The SHOP sells permanent upgrades, and each one tells you what it does now and what the next level does: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers, extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
+			"The SHOP sells permanent upgrades, and each one tells you what it does now and what the next level does: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers and ten seconds of AGRO (double fire, double damage, nothing bites), extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
 			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades."},
 		{"title": "STARS AND THE LOCKER", "body":
 			"Stars are the other currency. A run pays one star per boss, one per four perfect gates, and one for getting through at least three gates. " +
@@ -116,9 +122,11 @@ static func sections() -> Array:
 			"Every run adds trophies and nothing takes them away: %d for every level you reach, more for good grades, double on hard, triple on nightmare. " % Road.PER_LEVEL +
 			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"])] +
 			"Every %d is a checkpoint: where you stand for good." % Road.CHECKPOINT},
+		{"title": "STUCK ON A LEVEL", "body":
+			"Wiped out? The results card gives you one TIP about how it went, and once a run you can RETRY the level you died on, from its first gate, with the squad you walked into it with. Everything else (perks, bounty, the convoy) stays. The daily, the weekly and endless have no retry."},
 		{"title": "RALLY", "body":
 			"When the squad hits zero, once a run, a RALLY offer appears for five seconds: %d soldiers back, a shield, the clingers shaken off, for a few stars (%d the first time in a day, then %d, then %d). " % [Revive.SOLDIERS, Revive.PRICES[0], Revive.PRICES[1], Revive.PRICES[2]] +
-			"Take it or let them go. Not in the daily or the weekly, where everyone shares one road. SECOND WIND from the shop is the free version and fires first."},
+			"Take it or let them go, and either way the comeback brings ten seconds of AGRO: double fire, double damage, nothing bites. Not in the daily or the weekly, where everyone shares one road. SECOND WIND from the shop is the free version and fires first."},
 		{"title": "QUESTS AND THE SEASON", "body":
 			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
 			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +

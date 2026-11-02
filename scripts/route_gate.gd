@@ -45,8 +45,8 @@ func update_hot(t: float) -> void:
 	_view.set_hot(not passed and is_hot(t))
 
 
-func register_hit(damage: float, step_cost: float) -> bool:
-	var steps := GateMath.register_hit(panel, damage, step_cost)
+func register_hit(damage: float, step_cost: float, mul_cap: float = GateMath.MUL_CAP) -> bool:
+	var steps := GateMath.register_hit(panel, damage, step_cost, mul_cap)
 	_view.refresh(panel)
 	if steps > 0:
 		steps_up += steps

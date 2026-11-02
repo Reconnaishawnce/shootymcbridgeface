@@ -114,6 +114,7 @@ var _smoke_retry := false
 ## --smoke-wipe-at=N: the bot loses its whole squad at frame N, so the
 ## results screen and the restart are exercised whatever the balance.
 var _smoke_wipe_at := 0
+var _smoke_wiped := false
 var _warming := false
 var _fps_frames := 0
 var _fps_since := 0.0
@@ -345,6 +346,7 @@ func _build_scene() -> void:
 		if what == "saw":
 			hud.show_float("SAW!", false))
 	world.perk_felt.connect(_on_perk_felt)
+	world.pit_stop_reached.connect(_on_pit_stop)
 	world.supply_bought.connect(_on_supply_bought)
 	world.supply_refused.connect(func(cost: int) -> void:
 		hud.show_float("NEED %d COINS" % cost, false)
@@ -424,6 +426,9 @@ func _build_scene() -> void:
 		Diag.note("safe_graphics", {"on": on})
 		sfx.play("click"))
 	hud.report_pressed.connect(_send_report)
+	hud.pit_buy.connect(_pit_buy)
+	hud.pit_leave.connect(_pit_leave)
+	hud.retry_level_pressed.connect(_retry_level)
 	hud.lesson_closed.connect(_close_lesson)
 	hud.learn_pressed.connect(start_learning_round)
 	hud.lessons_toggled.connect(func(on: bool) -> void:
@@ -518,6 +523,9 @@ func _check_lessons() -> void:
 		return
 	var saw := world.nearest_saw(26.0)
 	if saw != null and _teach("saw"):
+		return
+	var bay := world.nearest_bay()
+	if bay != null and bay.position.z > -32.0 and _teach("pitstop"):
 		return
 
 
@@ -1007,6 +1015,12 @@ func start_run(p_mode: String = "levels") -> void:
 	_lesson_open = false
 	_lesson_last = -100.0
 	_vets_made = 0
+	_pit_open = false
+	_level_retry_used = false
+	_retry_pending = false
+	_count_at_boss = 0
+	_bites_heavy = 0
+	_straight_used = false
 	_vehicles_formed = 0
 	waves_cleared = 0
 	perfect_gates = 0
@@ -1033,6 +1047,7 @@ func start_run(p_mode: String = "levels") -> void:
 	squad.now = 0.0
 	world.now = 0.0
 	squad.reset(run_meta.start_squad())
+	_level_entry_count = squad.count
 	# Reset before RUNNING: a road snapping back to two lanes must not
 	# banner, chime or glide the camera like a mid-run widening.
 	world.reset(run_seed)
@@ -1075,7 +1090,8 @@ func end_run() -> void:
 	_game_over_at = Time.get_ticks_msec()
 	_game_over_frame = _frames
 	Diag.mark("end_run:records")
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Meta.coins_for_run(bounty, bosses_killed, gates_passed)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult()))
+	var run_bounty := Meta.coins_for_run(bounty, bosses_killed, gates_passed)
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult()))
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
@@ -1210,12 +1226,20 @@ func end_run() -> void:
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.show_game_over({
 		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
-		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned,
+		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned, "bounty": run_bounty,
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
 		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
 		"trophies_earned": trophies_earned, "road_rewards": road_rewards,
+		"tip": Tips.for_wipe({
+			"level": world.level, "in_boss": world.phase == World.Phase.BOSS,
+			"boss_kind": world.boss.kind_name() if world.boss != null else "walker",
+			"count_at_boss": _count_at_boss, "peak": peak_squad, "kills": kills,
+			"bombs_left": powerups.bombs, "had_vehicles": _vehicles_formed > 0,
+			"bites_heavy": _bites_heavy, "straight_used": _straight_used,
+		}),
+		"retry_level": world.level if (mode == "levels" and world.level >= 2 and not _level_retry_used and not smoke) else 0,
 	})
 	Diag.note("end_run_done", {"ms": Time.get_ticks_msec() - t0, "level": world.level, "score": score, "mode": mode})
 	Diag.mark("end_run:shown")
@@ -1338,13 +1362,21 @@ func _tick_run(delta: float) -> void:
 	hud.set_danger(danger)
 	hud.set_formation(squad.formation_name())
 	hud.set_dash(Progression.dash_enabled(world.level), squad.can_dash())
+	hud.set_bomb_hint(powerups.bombs > 0 and world.bomb_worth_throwing())
+	if squad.straight:
+		_straight_used = true
 	var powers := []
-	for id in Powerups.ORDER:
+	for id in Powerups.CATALOG:
 		if id != "bomb" and powerups.active(id, _run_time):
 			powers.append("%s %ds" % [Powerups.title(id), int(ceil(powerups.remaining(id, _run_time)))])
 	hud.set_powers("   ".join(powers))
+	# Agro: the screen edges burn red and the boss music plays.
+	var agro := powerups.active("agro", _run_time)
+	if agro:
+		danger = maxf(danger, 0.6)
+		hud.set_danger(danger)
 	# Music follows the room: boss, trouble, or the road.
-	if world.phase == World.Phase.BOSS:
+	if world.phase == World.Phase.BOSS or agro:
 		sfx.set_music("boss")
 	elif danger > 0.0 or world.level >= 3 or mode == "endless":
 		sfx.set_music("tense")
@@ -1542,6 +1574,8 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	hud.show_float("-%d" % bite, false)
 	if smoke:
 		print("SMOKE_BITE ", JSON.stringify({"level": world.level, "bite": bite, "left": squad.count, "frame": _frames}))
+	if heavy:
+		_bites_heavy += 1
 	# A heavy bite can take a veteran with it. The loss is named.
 	if heavy and squad.count > 0:
 		var lost := squad.veterans.roll_loss(world.gen.rng)
@@ -1563,6 +1597,7 @@ func _on_boss_spawned(boss: Boss) -> void:
 		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "kind": boss.kind_name(), "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
 	hud.show_boss(true)
 	hud.show_banner("BOSS", 1.2)
+	_count_at_boss = squad.count
 	_teach(Lessons.boss_lesson(boss.kind_name()))
 	sfx.play("boss_roar")
 	_shake = 0.6
@@ -1631,7 +1666,12 @@ func _on_level_started(level: int) -> void:
 	_horde_warned = false
 	if not world.endless:
 		var carried := Difficulty.carry_over(squad.count, run_meta.start_squad())
+		if _retry_pending:
+			# The level again, with the squad you walked into it with.
+			_retry_pending = false
+			carried = maxi(_level_entry_count, run_meta.start_squad())
 		squad.redeploy(carried)
+		_level_entry_count = squad.count
 		if run_meta.level("start") > 0 and carried == run_meta.start_squad():
 			hud.show_float("RECRUITS  %d" % carried, true)
 		sfx.play("spawn")
@@ -1657,6 +1697,96 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 	_punch(3.0)
 	if smoke:
 		print("SMOKE_SUPPLY ", JSON.stringify({"id": id, "amount": amount, "cost": cost, "left": bounty, "level": world.level, "frame": _frames}))
+
+
+# --- the pit stop ----------------------------------------------------------
+
+var _pit_open := false
+## One free retry of a level per run, with the squad you entered it with.
+var _level_retry_used := false
+var _level_entry_count := 1
+var _retry_pending := false
+var _count_at_boss := 0
+var _bites_heavy := 0
+var _straight_used := false
+
+
+func _on_pit_stop() -> void:
+	if state != State.RUNNING:
+		return
+	if smoke:
+		# The bot buys what it can afford, best first, and rolls on.
+		var bought := []
+		for id in ["rounds", "rifles", "bomb", "armor"]:
+			while squad.pit.can_buy(id, bounty) and bought.size() < 3:
+				_pit_buy(id)
+				bought.append(id)
+		print("SMOKE_PIT ", JSON.stringify({"bought": bought, "left": bounty, "level": world.level, "frame": _frames}))
+		return
+	_pit_open = true
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
+	get_tree().paused = true
+	Diag.set_state("pit_stop")
+	Diag.note("pit_stop", {"bounty": bounty, "level": world.level})
+	hud.show_pitstop(squad.pit, bounty, squad.count)
+	sfx.play("crate", -4.0, 1.1)
+
+
+func _pit_buy(id: String) -> void:
+	var left := squad.pit.buy(id, bounty)
+	if left == bounty:
+		sfx.play("gate_bad", -6.0)
+		return
+	bounty = left
+	world.supply_funds = bounty
+	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
+	match id:
+		"bomb":
+			powerups.grant("bomb", _run_time)
+			hud.set_bombs(powerups.bombs)
+		"dressing":
+			squad.add(PitStop.dressing_for(squad.count))
+			squad.rally()
+	Diag.note("pit_buy", {"id": id, "left": bounty})
+	if not smoke:
+		sfx.play("gate_good", -4.0)
+		hud.show_pitstop(squad.pit, bounty, squad.count)
+
+
+func _pit_leave() -> void:
+	if not _pit_open:
+		return
+	_pit_open = false
+	hud.hide_pitstop()
+	get_tree().paused = false
+	Diag.set_state("running")
+	sfx.play("click")
+	hud.show_banner("BACK ON THE ROAD", 0.8)
+
+
+## The level again, once a run: the road cleared, the squad you entered
+## with, everything else as it was.
+func _retry_level() -> void:
+	if state != State.GAME_OVER or _level_retry_used or mode != "levels" or world.level < 2:
+		return
+	_level_retry_used = true
+	_retry_pending = true
+	state = State.RUNNING
+	Diag.set_state("running")
+	Diag.note("retry_level", {"level": world.level})
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
+	squad.active = true
+	squad.visible = true
+	hud.show_running()
+	hud.set_bombs(powerups.bombs)
+	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
+	_refresh_pause_perks()
+	world.restart_level(world.level)
+	hud.show_banner("LEVEL %d, AGAIN" % world.level, 1.4)
+	sfx.play("rally")
+	sfx.set_music("calm")
 
 
 ## The pause menu's line: perks held, then the veterans by name.
@@ -1907,6 +2037,8 @@ func _on_wiped_out() -> void:
 		return
 	if _lesson_open:
 		_close_lesson()
+	if _pit_open:
+		_pit_leave()
 	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
 		_second_wind_used = true
 		_second_wind_pending = true
@@ -1955,9 +2087,9 @@ func _on_revive_accepted() -> void:
 	hud.hide_revive()
 	get_tree().paused = false
 	squad.set_count(Revive.SOLDIERS)
-	powerups.grant("shield", _run_time)
+	powerups.grant("agro", _run_time)
 	world.shake_off()
-	hud.show_banner("RALLY!\n%d SOLDIERS BACK" % Revive.SOLDIERS, 1.6)
+	hud.show_banner("RALLY!\n%d SOLDIERS BACK   ·   AGRO!" % Revive.SOLDIERS, 1.8)
 	hud.flash(0.6)
 	sfx.play("rally")
 	squad.rally()
@@ -1982,9 +2114,9 @@ func _second_wind() -> void:
 	if smoke:
 		print("SMOKE_WIND ", JSON.stringify({"level": world.level, "frame": _frames}))
 	squad.set_count(Meta.SECOND_WIND_SOLDIERS)
-	powerups.grant("shield", _run_time)
+	powerups.grant("agro", _run_time)
 	world.shake_off()
-	hud.show_banner("SECOND WIND!\n%d SOLDIERS BACK" % Meta.SECOND_WIND_SOLDIERS, 1.6)
+	hud.show_banner("SECOND WIND!\n%d SOLDIERS BACK   ·   AGRO!" % Meta.SECOND_WIND_SOLDIERS, 1.8)
 	hud.flash(0.6)
 	sfx.play("rally")
 	squad.rally()
@@ -2010,7 +2142,8 @@ func _smoke_tick() -> void:
 	if _quitting:
 		return
 	if _frames < _smoke_frames and state == State.RUNNING:
-		if _smoke_wipe_at > 0 and _frames >= _smoke_wipe_at and _smoke_retries == 0:
+		if _smoke_wipe_at > 0 and _frames >= _smoke_wipe_at and not _smoke_wiped:
+			_smoke_wiped = true
 			print("SMOKE_WIPE ", JSON.stringify({"frame": _frames, "level": world.level}))
 			squad.set_count(0)
 			return
@@ -2119,6 +2252,11 @@ func _bot_steer() -> void:
 	var g_near := world.nearest_upcoming_gate()
 	if _bot_spread:
 		squad.set_spread(1.6 if (near != null and (g_near == null or near.position.z > g_near.position.z)) else 0.7)
+	# Money in hand and a pit stop coming: pull in.
+	var bay := world.nearest_bay()
+	if bay != null and bay.position.z > -26.0 and world.supply_funds >= 60:
+		squad.target_x = bay.position.x
+		return
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
 		if z.is_thief():
@@ -2195,6 +2333,20 @@ func _shots_walkthrough() -> void:
 		world.spawn_saw(-1.5, -7.0, true)
 		await _capture("q7_foreman.png", 8)
 		foreman.queue_free()
+		squad.pit.buy("rounds", 1000)
+		hud.show_pitstop(squad.pit, 312, 40)
+		await _capture("q8_pitstop.png", 5)
+		hud.hide_pitstop()
+		hud.show_game_over({"score": 4210, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "tip": Tips.for_wipe({"in_boss": true, "boss_kind": "foreman"}), "retry_level": 3, "goal": "Form a JEEP: reach 32 soldiers and take the olive panel."})
+		await _capture("q9_wipe_retry.png", 5)
+		world.spawn_saw(0.0, -40.0, true)
+		var bay := PitBay.new()
+		bay.setup(squad.road_half - Progression.LANE_W * 0.5, Progression.LANE_W)
+		bay.position.z = -9.0
+		world.add_child(bay)
+		hud.show_running()
+		await _capture("q10_bay.png", 5)
+		bay.queue_free()
 		_quit_with(0)
 		return
 	open_shop()

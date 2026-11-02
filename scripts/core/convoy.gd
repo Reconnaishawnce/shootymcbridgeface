@@ -7,9 +7,9 @@ extends RefCounted
 
 const SPECS := {
 	"jeep": {
-		"name": "JEEP", "cost": 20, "hp": 90.0, "max": 2, "level": 1,
-		"dps": 50.0, "shots": 8.0, "pierce": 2,
-		"blurb": "A mounted gun: fast, straight, through two zombies at a time.",
+		"name": "JEEP", "cost": 20, "hp": 150.0, "max": 2, "level": 1,
+		"dps": 85.0, "shots": 9.0, "pierce": 3,
+		"blurb": "A mounted gun: fast, straight, through three zombies at a time, and it never dies to a nibble.",
 	},
 	"tank": {
 		"name": "TANK", "cost": 60, "hp": 220.0, "max": 1, "level": 2,

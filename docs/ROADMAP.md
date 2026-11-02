@@ -258,7 +258,12 @@ goes first because nothing else can be judged on a phone that crawls.
    and a trait the squad feels; a heavy bite can take one by name.
 8. The Foreman (done): a fourth boss that throws saws and drops crates,
    so hazards and power-ups are part of the fight.
-9. Next: a balance and feedback pass once the first phone reports
+9. The pit stop and the economy (done): bounty on the road, coins at
+   home with diminishing returns, a 500-soldier bridge, pit stops that
+   sell this run's gear, bombs that aim themselves, agro on the
+   comeback, a stronger jeep, a tip and one level retry on the wipe.
+10. Next: a balance and feedback pass on the new economy; a leaderboard
+   is designed but needs a backend (see the notes in the chat).
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 

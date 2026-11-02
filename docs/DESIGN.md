@@ -452,6 +452,38 @@ the bounty so the end-of-run coins are what is left. Gold on the panel,
 "NEED n COINS" when short. The bot buys soldiers under sixty and a
 power-up otherwise, when the bounty covers it.
 
+## The economy, the pit stop, agro, the retry
+
+`Economy` is the brake. The bounty is linear in kills, so an 85-level
+endless run reached 84,000; `coins_for_bounty` converts one for one to
+`GOLD_LINEAR` and then at `GOLD_EXPONENT`, so that run pays about
+5,400 coins and a normal one is untouched. `cap_squad` holds the squad
+to `SQUAD_CAP` in `Squad.set_count`, and `mul_cap_for` is handed to
+`GateMath.register_hit` by the world, so a shot multiplier stops at x3
+for a mid squad and x2 for a big one: the x0.5-to-x5 exploit that fed
+the compounding is closed.
+
+`PitStop` (pure) is this run's shop: stacks, prices that climb per
+stack, the multipliers the squad reads (`Squad.pit`). `PitBay` is the
+gold strip on the right lane, spawned once a level from `PIT_LEVEL`
+after `BAY_GATE_INDEX`; `World._move_bay` fires `pit_stop_reached`
+when the squad is on it as it passes, the game pauses the tree under
+`Hud.show_pitstop`, purchases come off the bounty (and `supply_funds`),
+LEAVE resumes. The bot pulls in with money in hand and buys best-first.
+
+Agro is a `Powerups` entry no mystery can roll: `fire_rate_mult` and
+`damage_mult` double, `shielded` is true, the game paints the danger
+edge and plays the boss music while it runs; a second wind and a rally
+grant it. Bombs: `World.bomb_target` picks the boss or the nearest
+heavy within range, `Bomb.launch` takes that point, and the HUD's bomb
+button pulses on `bomb_worth_throwing`.
+
+`Tips.for_wipe` picks one line from how the run ended. The retry:
+`World.restart_level` clears the road and starts the level again;
+`Game._retry_level` sets `_retry_pending` so `_on_level_started`
+redeploys `_level_entry_count` instead of the carry-over. Once a run,
+levels mode only.
+
 ## The Foreman
 
 `Boss.Kind.FOREMAN` holds back at `FOREMAN_HOLD_Z` and sways like the

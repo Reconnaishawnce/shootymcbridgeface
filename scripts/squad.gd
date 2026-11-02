@@ -52,6 +52,8 @@ var straight := false
 var _tumbling := 0
 ## Named soldiers with traits; see Veterans. One per boss beaten.
 var veterans := Veterans.new()
+## This run's pit-stop gear; see PitStop.
+var pit := PitStop.new()
 var _vet_revive_timer := 0.0
 ## Run seconds, kept current by the game for timed power-ups.
 var now := 0.0
@@ -135,6 +137,7 @@ func reset(start_count: int = 1) -> void:
 	_revive_timer = 0.0
 	veterans = Veterans.new()
 	_vet_revive_timer = 0.0
+	pit = PitStop.new()
 	if _dash_tween != null:
 		_dash_tween.kill()
 		_dash_tween = null
@@ -374,7 +377,7 @@ func redeploy(start_count: int) -> void:
 
 func set_count(n: int) -> void:
 	var was := count
-	count = maxi(0, n)
+	count = Economy.cap_squad(n)
 	_sync_visuals()
 	count_changed.emit(count)
 	# Only on the way down to zero: two bites in one frame are one wipe.
@@ -407,14 +410,14 @@ func is_medic() -> bool:
 
 ## Extra multiplier on what a brute or tank takes.
 func bite_mult() -> float:
-	return (MEDIC_BITE_MULT if is_medic() else 1.0) * veterans.bite_mult()
+	return (MEDIC_BITE_MULT if is_medic() else 1.0) * veterans.bite_mult() * pit.bite_mult()
 
 
 func _fire_mult() -> float:
 	var m := perks.fire_rate_mult() if perks != null else 1.0
 	if powerups != null:
 		m *= powerups.fire_rate_mult(now)
-	return m
+	return m * pit.fire_mult()
 
 
 func _damage_mult() -> float:
@@ -423,7 +426,9 @@ func _damage_mult() -> float:
 		m *= SHOTGUN_DAMAGE_MULT
 	elif is_medic():
 		m *= MEDIC_DAMAGE_MULT
-	return m * veterans.damage_mult()
+	if powerups != null:
+		m *= powerups.damage_mult(now)
+	return m * veterans.damage_mult() * pit.damage_mult()
 
 
 ## Soldiers that count toward firepower. Past the cap, more soldiers are

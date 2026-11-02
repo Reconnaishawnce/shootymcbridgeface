@@ -34,6 +34,8 @@ const CATALOG := {
 		"body": "Gold panels sell soldiers or a power-up for coins out of this run's bounty, paid right at the gate. What you spend here you do not take home to the shop. Too little bounty and nothing happens."},
 	"vehicle": {"title": "THE CONVOY",
 		"body": "Olive panels turn soldiers into a vehicle: a JEEP for 20, a TANK for 60, bigger things later. It rides with you from level to level with its own gun and health bar, until something heavy wrecks it."},
+	"pitstop": {"title": "PIT STOP",
+		"body": "A gold bay on the right side of the road. Steer onto it and the road waits while you spend this run's bounty on this run's gear: sharper rounds, faster rifles, flak jackets, bombs, soldiers. What you spend here you do not take home."},
 	"saw": {"title": "SAWS",
 		"body": "A buzz saw is rolling down the bridge at you. Steer round it or dash through it; touching it takes a slice of the squad. It cuts zombies too."},
 	"boss_walker": {"title": "THE WALKER",
@@ -52,7 +54,7 @@ const CATALOG := {
 		"body": "Squad at zero? Once a run you can buy a few soldiers back for stars, if you decide in five seconds. Not in the daily or weekly."},
 }
 ## The order lessons are listed on the LEARN page.
-const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
+const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "pitstop", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
 ## Seconds between two pop-ups, so a busy gate does not stack three.
 const COOLDOWN := 4.0
 

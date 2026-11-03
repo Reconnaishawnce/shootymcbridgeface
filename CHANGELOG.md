@@ -3,6 +3,27 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.41 (a leaderboard that closes, a pit lane, a shop with pictures)
+
+- Fixed: the LEADERBOARD page could not be dismissed. BACK showed the
+  home screen under it and the next answer from the server drew the
+  page over it again. Every card now goes through one hide list, BACK
+  returns to the wipe card or the home screen it came from, a late
+  answer cannot redraw a page that has closed, and the phone's back
+  button closes any open page. The smoke bot checks this on every
+  build.
+- The pit stop is a pit lane. PIT LANE AHEAD flashes, the camera backs
+  off and pans right, and a ramp with yellow chevrons peels off past a
+  red-and-white pit wall to a garage with its door up, tyre stacks, a
+  pump, floodlights, bunting and a crew that waves you in; a second
+  ramp brings you back. The shoulder's wrecks clear for it. Parked at
+  the garage, the gear is a sheet over the bottom of the screen with
+  the garage and the crew still moving above it.
+- The SHOP is a wall of tiles: a drawn picture of each upgrade that
+  idles (bombs spark, the eye blinks, the heart beats), gold level
+  pips, what it does now and next, the price, a glow on what you can
+  afford, and a bounce when you buy. The pit stop uses the same tiles.
+
 ## 0.40 (the leaderboard up front, a real lay-by)
 
 - LEADERBOARD sits on the home screen under the mode row, beside LEARN

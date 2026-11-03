@@ -265,7 +265,10 @@ goes first because nothing else can be judged on a phone that crawls.
 10. The leaderboard (done): daily and weekly boards on a Cloudflare
     Worker with signed, plausibility-checked submissions; opt-in under
     a chosen name; FORGET ME.
-11. Next: a balance and feedback pass on the new economy and the first
+11. The 0.41 fixes (done): the leaderboard page that would not close,
+    the pit lane with the camera that pulls back for it, the shop as
+    tiles with drawn pictures.
+12. Next: a balance and feedback pass on the new economy and the first
     week of the board.
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).

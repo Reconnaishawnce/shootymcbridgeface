@@ -35,7 +35,7 @@ const CATALOG := {
 	"vehicle": {"title": "THE CONVOY",
 		"body": "Olive panels turn soldiers into a vehicle: a JEEP for 20, a TANK for 60, bigger things later. It rides with you from level to level with its own gun and health bar, until something heavy wrecks it."},
 	"pitstop": {"title": "PIT STOP",
-		"body": "A lay-by opens off the right side of the road: the curb drops and a tarmac apron runs beside you. Steer off the road onto it as it passes and the road waits while you spend this run's bounty on this run's gear, and the pit crew clears the road ahead for you. What you spend here you do not take home."},
+		"body": "A pit lane pulls off the right side of the road: a ramp with yellow chevrons, a pit wall, a garage and a crew waving you in. Steer right onto the ramp and ride the lane to the garage. The road waits while you spend this run's bounty on this run's gear, and the crew clears the road ahead for you. What you spend here you do not take home."},
 	"saw": {"title": "SAWS",
 		"body": "A buzz saw is rolling down the bridge at you. Steer round it or dash through it; touching it takes a slice of the squad. It cuts zombies too."},
 	"boss_walker": {"title": "THE WALKER",

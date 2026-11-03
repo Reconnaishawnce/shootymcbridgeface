@@ -43,6 +43,8 @@ signal pit_buy(id: String)
 signal pit_leave
 signal retry_level_pressed
 signal leaderboard_opened
+## BACK on the leaderboard page.
+signal lb_closed
 signal lb_join(name: String)
 signal lb_tab(mode: String)
 signal lb_forget
@@ -167,12 +169,20 @@ var _learn_button: Button
 var _settings_lessons: Button
 var _pit_card: Control
 var _lb_card: Control
+## Every full-screen card; _hide_cards hides them all, so a new one can
+## never be left on top of the next screen.
+var _cards: Array[Control] = []
 var _lb_box: VBoxContainer
 var _lb_button: Button
 var _lb_title_button: Button
 var _lb_teaser: Label
 var _over_lb: Button
-var _pit_box: VBoxContainer
+var _pit_tiles: Dictionary = {}
+## Bombs in the belt, so the button can come back after the pit sheet.
+var _bombs_held := 0
+var _pit_head: Label
+var _pit_sub: Label
+var _pit_funds: Label
 var _fork_box: Control
 var _hint: Label
 var _hint_tween: Tween
@@ -463,12 +473,9 @@ func _init() -> void:
 	_build_title(root)
 	_build_settings(root)
 	_build_locker(root)
-	_lb_card = _scroll_card(root, "LEADERBOARD", func() -> void: shop_closed.emit())
+	_lb_card = _scroll_card(root, "LEADERBOARD", func() -> void: lb_closed.emit())
 	_lb_box = _lb_card.get_meta("box")
-	_pit_card = _scroll_card(root, "PIT STOP", func() -> void: pit_leave.emit())
-	_pit_box = _pit_card.get_meta("box")
-	var leave: Button = _pit_card.get_child(_pit_card.get_child_count() - 1)
-	leave.text = "LEAVE  ·  BACK ON THE ROAD"
+	_build_pit(root)
 	_road_card = _scroll_card(root, "TROPHY ROAD", func() -> void: shop_closed.emit())
 	_road_box = _road_card.get_meta("box")
 	_build_revive(root)
@@ -932,58 +939,99 @@ func show_leaderboard(st: Dictionary) -> void:
 	_lb_box.add_child(forget)
 
 
-## The pit stop: this run's gear for this run's bounty. Rebuilt per show.
+## The pit stop: a sheet over the bottom of the screen, the garage and
+## its crew still in view above it. Tiles for this run's gear, paid
+## from this run's bounty, and one big button back to the road.
+func _build_pit(root: Control) -> void:
+	_pit_card = Control.new()
+	_pit_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pit_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pit_card.visible = false
+	root.add_child(_pit_card)
+	_cards.append(_pit_card)
+	_pit_head = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	_pit_head.text = "PIT STOP"
+	_pin(_pit_card, _pit_head, 0.5, 0.3, Vector2(600.0, 60.0))
+	_pit_sub = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_pit_sub.add_theme_color_override("font_color", COIN)
+	_pin(_pit_card, _pit_sub, 0.5, 0.345, Vector2(640.0, 36.0))
+	var sheet := PanelContainer.new()
+	sheet.add_theme_stylebox_override("panel", _flat(Color(0.05, 0.06, 0.09, 0.9), 26, Color(1.0, 0.85, 0.3, 0.5), 3))
+	sheet.anchor_left = 0.0
+	sheet.anchor_right = 1.0
+	sheet.anchor_top = 0.375
+	sheet.anchor_bottom = 1.0
+	sheet.offset_left = 12.0
+	sheet.offset_right = -12.0
+	sheet.offset_top = 0.0
+	sheet.offset_bottom = -12.0
+	_pit_card.add_child(sheet)
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", 8)
+	sheet.add_child(v)
+	_pit_funds = _label(28, HORIZONTAL_ALIGNMENT_CENTER)
+	_pit_funds.add_theme_color_override("font_color", COIN)
+	v.add_child(_pit_funds)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(grid)
+	for id in PitStop.ORDER:
+		var tile := _tile(id, id, func() -> void: pit_buy.emit(id))
+		var panel: PanelContainer = tile.panel
+		panel.custom_minimum_size = Vector2(312.0, 0.0)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(panel)
+		_pit_tiles[id] = tile
+	var leave := _button("BACK ON THE ROAD", 30)
+	leave.custom_minimum_size = Vector2(0.0, 66.0)
+	leave.add_theme_color_override("font_color", COIN)
+	leave.pressed.connect(func() -> void: pit_leave.emit())
+	v.add_child(leave)
+
+
 func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
 	_pit_card.move_to_front()
 	_pit_card.visible = true
-	for child in _pit_box.get_children():
-		_pit_box.remove_child(child)
-		child.queue_free()
-	var head := _label(30, HORIZONTAL_ALIGNMENT_CENTER)
-	head.text = "BOUNTY  %d" % funds
-	head.add_theme_color_override("font_color", COIN)
-	_pit_box.add_child(head)
-	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Gear for this run, paid from this run's bounty. The road waits."
-	blurb.modulate = Color(0.8, 0.8, 0.86)
-	_pit_box.add_child(blurb)
+	_formation_button.visible = false
+	_bomb_button.visible = false
+	_bounty_row.visible = false
+	_pit_sub.text = "The crew has you. The road waits."
+	_pit_funds.text = "BOUNTY  %d   ·   gear for this run only" % funds
 	for id in PitStop.ORDER:
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 14)
-		row.custom_minimum_size = Vector2(620.0, 0.0)
-		var text := VBoxContainer.new()
-		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		text.custom_minimum_size.x = 440.0
-		text.add_theme_constant_override("separation", 0)
-		var name := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
 		var n := pit.stack(id)
-		name.text = "%s   %d/%d" % [PitStop.title(id), n, int(PitStop.ITEMS[id]["max"])] if int(PitStop.ITEMS[id]["max"]) < 99 else PitStop.title(id)
-		text.add_child(name)
-		var desc := _label(19, HORIZONTAL_ALIGNMENT_LEFT)
-		desc.modulate = Color(0.85, 0.85, 0.9)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-		desc.custom_minimum_size.x = 440.0
-		if pit.is_maxed(id):
-			desc.text = "%s\n%s" % [PitStop.description(id), PitStop.effect_text(id, n, count)]
-		elif int(PitStop.ITEMS[id]["max"]) < 99:
-			desc.text = "%s\n%s  >  %s" % [PitStop.description(id), PitStop.effect_text(id, n, count), PitStop.effect_text(id, n + 1, count)]
-		else:
-			desc.text = "%s\n%s" % [PitStop.description(id), PitStop.effect_text(id, n + 1, count)]
-		text.add_child(desc)
-		row.add_child(text)
-		var buy := _button("MAX" if pit.is_maxed(id) else "%d" % pit.cost(id), 24)
-		buy.custom_minimum_size = Vector2(150.0, 52.0)
-		buy.disabled = not pit.can_buy(id, funds)
-		buy.pressed.connect(func() -> void: pit_buy.emit(id))
-		row.add_child(buy)
-		_pit_box.add_child(row)
-
+		var max_n := int(PitStop.ITEMS[id]["max"])
+		var effect := "%s\n%s" % [PitStop.ITEMS[id]["desc"], PitStop.effect_text(id, 1, count)]
+		if n > 0 and max_n < 99:
+			effect = "%s now  >  %s" % [PitStop.effect_text(id, n, count), PitStop.effect_text(id, n + 1, count)]
+		_fill_tile(_pit_tiles[id], PitStop.title(id), n, max_n, effect, pit.cost(id), pit.is_maxed(id), pit.can_buy(id, funds), "")
 
 func hide_pitstop() -> void:
 	_pit_card.visible = false
+	if _pause_button.visible:
+		_formation_button.visible = true
+		_bounty_row.visible = true
+		_bomb_button.visible = _bombs_held > 0
+
+
+func close_leaderboard() -> void:
 	_lb_card.visible = false
+
+
+func leaderboard_open() -> bool:
+	return _lb_card.visible
+
+
+func title_open() -> bool:
+	return _title_card.visible
 
 
 ## The trophy road: where you stand, the next milestone, the track.
@@ -1137,39 +1185,112 @@ func _build_locker(root: Control) -> void:
 	box.add_child(back)
 
 
+## The shop: a grid of tiles, each with its picture, its level pips,
+## what it does now and next, and a price. Tiles you can afford glow.
 func _build_shop(root: Control) -> void:
 	_shop_card = _scroll_card(root, "SHOP", func() -> void: shop_closed.emit())
 	var box: VBoxContainer = _shop_card.get_meta("box")
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 10)
 	_shop_coins = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
 	_shop_coins.add_theme_color_override("font_color", COIN)
 	box.add_child(_shop_coins)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(grid)
 	for id in Meta.ORDER:
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 14)
-		row.custom_minimum_size = Vector2(620.0, 0.0)
-		var text := VBoxContainer.new()
-		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		text.custom_minimum_size.x = 440.0
-		text.add_theme_constant_override("separation", 0)
-		var name := _label(26, HORIZONTAL_ALIGNMENT_LEFT)
-		text.add_child(name)
-		var desc := _label(19, HORIZONTAL_ALIGNMENT_LEFT)
-		desc.modulate = Color(0.85, 0.85, 0.9)
-		desc.text = Meta.description(id)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-		desc.custom_minimum_size.x = 440.0
-		text.add_child(desc)
-		row.add_child(text)
-		var buy := _button("BUY", 24)
-		buy.custom_minimum_size = Vector2(150.0, 52.0)
-		buy.pressed.connect(func() -> void: buy_pressed.emit(id))
-		row.add_child(buy)
-		box.add_child(row)
-		_shop_rows[id] = {"name": name, "buy": buy, "desc": desc}
+		var tile := _tile(id, id, func() -> void: buy_pressed.emit(id))
+		grid.add_child(tile.panel)
+		_shop_rows[id] = tile
 
+
+## One tile for a thing to buy: picture, name, level pips, effect line,
+## price button. [param kind] picks the picture.
+func _tile(id: String, kind: String, on_buy: Callable) -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _flat(GLASS, 18))
+	panel.custom_minimum_size = Vector2(318.0, 0.0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.set_meta("id", id)
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_theme_constant_override("separation", 2)
+	panel.add_child(v)
+	var icon := ShopIcon.new()
+	icon.setup(kind, Vector2(270.0, 104.0))
+	v.add_child(icon)
+	var name := _label(23, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(name)
+	var pips := HBoxContainer.new()
+	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pips.alignment = BoxContainer.ALIGNMENT_CENTER
+	pips.add_theme_constant_override("separation", 5)
+	v.add_child(pips)
+	var effect := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
+	effect.modulate = Color(0.85, 0.85, 0.9)
+	effect.autowrap_mode = TextServer.AUTOWRAP_WORD
+	effect.custom_minimum_size = Vector2(270.0, 72.0)
+	v.add_child(effect)
+	var buy := _button("BUY", 24)
+	buy.custom_minimum_size = Vector2(200.0, 50.0)
+	buy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	buy.pressed.connect(on_buy)
+	v.add_child(buy)
+	return {"panel": panel, "icon": icon, "name": name, "pips": pips, "effect": effect, "buy": buy}
+
+
+## Fills a tile: [param n] of [param max_n] pips lit (none drawn past
+## 8), the effect line, the price or MAX, and the glow when affordable.
+func _fill_tile(tile: Dictionary, title: String, n: int, max_n: int, effect: String, price: int, maxed: bool, affordable: bool, unit: String) -> void:
+	var name: Label = tile.name
+	name.text = title
+	var pips: HBoxContainer = tile.pips
+	for child in pips.get_children():
+		pips.remove_child(child)
+		child.queue_free()
+	if max_n <= 8:
+		for i in range(max_n):
+			var pip := ColorRect.new()
+			pip.custom_minimum_size = Vector2(22.0, 8.0)
+			pip.color = COIN if i < n else Color(1.0, 1.0, 1.0, 0.18)
+			pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			pips.add_child(pip)
+	else:
+		var held := _label(16, HORIZONTAL_ALIGNMENT_CENTER)
+		held.text = ("x%d" % n) if n > 0 else " "
+		held.add_theme_color_override("font_color", COIN)
+		pips.add_child(held)
+	var eff: Label = tile.effect
+	eff.text = effect
+	var buy: Button = tile.buy
+	var icon: ShopIcon = tile.icon
+	if maxed:
+		buy.text = "MAX"
+		buy.disabled = true
+		icon.lit = true
+	else:
+		buy.text = "%d %s" % [price, unit]
+		buy.disabled = not affordable
+		icon.lit = affordable
+	var panel: PanelContainer = tile.panel
+	panel.add_theme_stylebox_override("panel", _flat(GLASS, 18, COIN if (affordable and not maxed) else Color(1, 1, 1, 0.12), 3 if (affordable and not maxed) else 2))
+
+
+## The bounce when a tile's thing is bought.
+func shop_bought(id: String) -> void:
+	var tile: Dictionary = _shop_rows.get(id, _pit_tiles.get(id, {}))
+	if tile.is_empty():
+		return
+	var icon: ShopIcon = tile.icon
+	icon.pop()
+	var panel: PanelContainer = tile.panel
+	panel.pivot_offset = panel.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(panel, "scale", Vector2(1.06, 1.06), 0.1).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _build_daily(root: Control) -> void:
 	_daily_card = _card(root)
@@ -1359,6 +1480,7 @@ func set_bounty(n: int, show: bool = true) -> void:
 
 
 func set_bombs(n: int) -> void:
+	_bombs_held = n
 	_bomb_button.visible = n > 0 and _pause_button.visible
 	_bomb_button.text = "BOMB x%d" % n
 
@@ -1447,6 +1569,9 @@ func _hide_cards() -> void:
 	_road_card.visible = false
 	_crash_card.visible = false
 	_pit_card.visible = false
+	_lb_card.visible = false
+	for c in _cards:
+		c.visible = false
 	hide_revive()
 
 
@@ -1682,23 +1807,12 @@ func show_shop(meta: Meta, coins: int) -> void:
 	_shop_card.visible = true
 	_shop_coins.text = "%d COINS" % coins
 	for id in Meta.ORDER:
-		var row: Dictionary = _shop_rows[id]
 		var lvl := meta.level(id)
-		row.name.text = "%s   %d/%d" % [Meta.title(id), lvl, Meta.max_level(id)]
 		var now := Meta.effect_text(id, lvl)
-		var desc: Label = row.desc
-		if meta.is_maxed(id):
-			desc.text = "%s\n%s" % [Meta.description(id), now]
-		else:
-			desc.text = "%s\n%s  >  %s" % [Meta.description(id), now, Meta.effect_text(id, lvl + 1)]
-		var buy: Button = row.buy
-		if meta.is_maxed(id):
-			buy.text = "MAX"
-			buy.disabled = true
-		else:
-			buy.text = "%d" % meta.cost(id)
-			buy.disabled = not meta.can_buy(id, coins)
-
+		var effect := now if meta.is_maxed(id) else "%s  >  %s" % [now, Meta.effect_text(id, lvl + 1)]
+		if lvl == 0 and not meta.is_maxed(id):
+			effect = "%s\n%s" % [Meta.description(id), Meta.effect_text(id, 1)]
+		_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), effect, meta.cost(id), meta.is_maxed(id), meta.can_buy(id, coins), "COINS")
 
 func show_running() -> void:
 	_hide_cards()
@@ -1986,6 +2100,7 @@ func _scroll_card(parent: Control, title: String, on_back: Callable) -> Control:
 	back.pressed.connect(on_back)
 	card.add_child(back)
 	card.set_meta("box", box)
+	_cards.append(card)
 	return card
 
 

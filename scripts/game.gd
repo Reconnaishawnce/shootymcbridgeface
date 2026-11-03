@@ -44,6 +44,11 @@ var squad_type := "rifle"
 
 var camera: Camera3D
 var _cam_rig: Node3D
+## Where the camera sits on the rig, and how far it backs off along its
+## own line of sight while the pit lane is open (0 to 1).
+const CAM_HOME := Vector3(0.0, 11.0, 9.0)
+const CAM_BACK := Vector3(0.0, 2.6, 3.8)
+var _cam_pull := 0.0
 var _sun: DirectionalLight3D
 var _env: Environment
 var _vignette: ColorRect
@@ -226,6 +231,7 @@ func _ready() -> void:
 		await _warm_up()
 	show_title()
 	if smoke:
+		_smoke_lb_check()
 		start_run("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels")))
 	elif _shots_dir != "":
 		_shots_walkthrough()
@@ -295,7 +301,7 @@ func _build_scene() -> void:
 	_cam_rig = Node3D.new()
 	add_child(_cam_rig)
 	camera = Camera3D.new()
-	camera.position = Vector3(0.0, 11.0, 9.0)
+	camera.position = CAM_HOME
 	camera.fov = 55.0
 	_cam_rig.add_child(camera)
 	camera.look_at(Vector3(0.0, 0.0, -7.0))
@@ -350,6 +356,9 @@ func _build_scene() -> void:
 			hud.show_float("SAW!", false))
 	world.perk_felt.connect(_on_perk_felt)
 	world.pit_stop_reached.connect(_on_pit_stop)
+	world.pit_lane_opened.connect(func() -> void:
+		if not smoke:
+			hud.show_banner("PIT LANE AHEAD\nSTEER RIGHT TO PULL IN", 1.5))
 	world.supply_bought.connect(_on_supply_bought)
 	world.supply_refused.connect(func(cost: int) -> void:
 		hud.show_float("NEED %d COINS" % cost, false)
@@ -439,6 +448,7 @@ func _build_scene() -> void:
 		_lb_answer = {}
 		_lb_fetch())
 	hud.lb_forget.connect(_lb_forget)
+	hud.lb_closed.connect(_lb_close)
 	hud.lesson_closed.connect(_close_lesson)
 	hud.learn_pressed.connect(start_learning_round)
 	hud.lessons_toggled.connect(func(on: bool) -> void:
@@ -978,6 +988,7 @@ func buy_upgrade(id: String) -> void:
 	SaveData.save_upgrades(meta.levels)
 	sfx.play("gate_good", -4.0)
 	hud.show_shop(meta, coins)
+	hud.shop_bought(id)
 
 
 func toggle_squad() -> void:
@@ -991,6 +1002,8 @@ func toggle_squad() -> void:
 
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
+	_cam_pull = 0.0
+	camera.position = CAM_HOME
 	run_seed = _smoke_seed if smoke else randi()
 	# The daily: one seed for everyone, no upgrades, rifles.
 	run_meta = Meta.new() if mode in ["daily", "weekly"] else meta
@@ -1239,7 +1252,7 @@ func end_run() -> void:
 		SaveData.save_wardrobe(wardrobe.to_dict())
 	Diag.mark("end_run:card")
 	hud.update_stats(squad.count, world.level, total_distance, score)
-	hud.show_game_over({
+	_last_over = {
 		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
 		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned, "bounty": run_bounty,
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
@@ -1256,7 +1269,8 @@ func end_run() -> void:
 		}),
 		"retry_level": world.level if (mode == "levels" and world.level >= 2 and not _level_retry_used and not smoke) else 0,
 		"leaderboard": (mode == "daily" or mode == "weekly") and Leaderboard.configured(),
-	})
+	}
+	hud.show_game_over(_last_over)
 	Diag.note("end_run_done", {"ms": Time.get_ticks_msec() - t0, "level": world.level, "score": score, "mode": mode})
 	Diag.mark("end_run:shown")
 	if character_mode:
@@ -1295,6 +1309,13 @@ func quit_to_title() -> void:
 
 func _notification(what: int) -> void:
 	# Phone went to the home screen, or the back button was pressed.
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and _back_out():
+		return
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST and state == State.TITLE and hud.title_open():
+		# Back on the bare home screen leaves the game, as phones expect.
+		Diag.note("back_quit")
+		get_tree().quit()
+		return
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if state == State.RUNNING and not get_tree().paused:
 			pause_game()
@@ -1346,7 +1367,12 @@ func _tick_run(delta: float) -> void:
 	world.now = _run_time
 	# Sway: the rig drifts a little toward the squad and leans into a turn.
 	var k := 1.0 - exp(-4.0 * delta)
-	_cam_rig.position.x = lerpf(_cam_rig.position.x, squad.position.x * 0.12, k)
+	# The pit lane: the camera backs off and pans right so the lane, the
+	# garage and the squad in it are all on screen.
+	var pan := world.bay_pan_x()
+	_cam_pull = lerpf(_cam_pull, 1.0 if pan > 0.0 else 0.0, 1.0 - exp(-2.0 * delta))
+	camera.position = CAM_HOME + CAM_BACK * _cam_pull
+	_cam_rig.position.x = lerpf(_cam_rig.position.x, squad.position.x * 0.12 + pan * _cam_pull, k)
 	_cam_rig.rotation.z = lerpf(_cam_rig.rotation.z, clampf(-squad.velocity_x * 0.006, -0.05, 0.05), k)
 	# A held touch follows its clinger; once it dies, the hold is over.
 	for idx in _cling_touch.keys():
@@ -1725,6 +1751,12 @@ var _lb_mode := "daily"
 var _lb_answer: Dictionary = {}
 var _lb_status := ""
 var _lb_busy := false
+## Which fetch is current; an older answer that lands late is dropped.
+var _lb_serial := 0
+## The page was opened from the wipe card: BACK returns there.
+var _lb_from_over := false
+## The last wipe card, so BACK from the leaderboard can show it again.
+var _last_over: Dictionary = {}
 var _lb_teaser_at := -1000.0
 ## One free retry of a level per run, with the squad you entered it with.
 var _level_retry_used := false
@@ -1778,6 +1810,7 @@ func _pit_buy(id: String) -> void:
 	if not smoke:
 		sfx.play("gate_good", -4.0)
 		hud.show_pitstop(squad.pit, bounty, squad.count)
+		hud.shop_bought(id)
 
 
 func _pit_leave() -> void:
@@ -1838,9 +1871,40 @@ func _lb_state() -> Dictionary:
 func open_leaderboard() -> void:
 	sfx.play("click")
 	_lb_status = ""
+	_lb_from_over = state == State.GAME_OVER
+	Diag.set_state("leaderboard")
 	hud.show_leaderboard(_lb_state())
 	if Leaderboard.configured() and bool(lb.get("joined", false)):
 		_lb_fetch()
+
+
+## BACK: the page goes, and the screen under it comes back.
+func _lb_close() -> void:
+	sfx.play("click")
+	hud.close_leaderboard()
+	if _lb_from_over and state == State.GAME_OVER and not _last_over.is_empty():
+		Diag.set_state("game_over")
+		hud.show_game_over(_last_over)
+	else:
+		show_title()
+
+
+## The phone's back button, with a page over the home screen or the
+## wipe card: close the page, nothing more. Returns true when it did.
+func _back_out() -> bool:
+	if hud.leaderboard_open():
+		_lb_close()
+		return true
+	if _lesson_open:
+		_close_lesson()
+		return true
+	if _pit_open:
+		_pit_leave()
+		return true
+	if state == State.TITLE and not hud.title_open() and not get_tree().paused:
+		show_title()
+		return true
+	return false
 
 
 func _lb_join(name: String) -> void:
@@ -1886,8 +1950,10 @@ func _lb_post(path: String, body: Dictionary, done: Callable) -> void:
 
 
 func _lb_fetch() -> void:
-	if _lb_busy or not Leaderboard.configured():
+	if not Leaderboard.configured():
 		return
+	_lb_serial += 1
+	var serial := _lb_serial
 	_lb_busy = true
 	_lb_status = "Loading..."
 	hud.show_leaderboard(_lb_state())
@@ -1896,6 +1962,8 @@ func _lb_fetch() -> void:
 	add_child(req)
 	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
 		req.queue_free()
+		if serial != _lb_serial:
+			return
 		_lb_busy = false
 		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
 		if parsed is Dictionary and code == 200 and bool(parsed.get("ok", false)):
@@ -1904,7 +1972,7 @@ func _lb_fetch() -> void:
 		else:
 			_lb_answer = {}
 			_lb_status = "Could not reach the board. Check the connection and try again."
-		if hud._lb_card.visible:
+		if hud.leaderboard_open():
 			hud.show_leaderboard(_lb_state()))
 	var err := req.request(Leaderboard.board_url(LeaderboardConfig.URL, _lb_mode, _lb_period(_lb_mode), str(lb.id)))
 	if err != OK:
@@ -2312,6 +2380,16 @@ func _on_music_toggled(on: bool) -> void:
 
 # --- smoke and screenshots ------------------------------------------------
 
+## The leaderboard page must open over the home screen and go away on
+## BACK (0.40 left it on top of everything). Runs headless.
+func _smoke_lb_check() -> void:
+	hud.show_leaderboard({"configured": true, "joined": true, "name": "Bot", "mode": "daily", "status": "", "period_label": "DAILY #1", "answer": {}})
+	var opened: bool = hud.leaderboard_open() and not hud.title_open()
+	_lb_close()
+	var closed: bool = not hud.leaderboard_open() and hud.title_open() and state == State.TITLE
+	print("SMOKE_LB ", JSON.stringify({"opened": opened, "closed": closed}))
+
+
 func _smoke_tick() -> void:
 	if _quitting:
 		return
@@ -2428,7 +2506,7 @@ func _bot_steer() -> void:
 		squad.set_spread(1.6 if (near != null and (g_near == null or near.position.z > g_near.position.z)) else 0.7)
 	# Money in hand and a pit stop coming: pull in.
 	var bay := world.nearest_bay()
-	if bay != null and bay.position.z > -26.0 and world.supply_funds >= 60:
+	if bay != null and bay.position.z > PitBay.lane_opens_at() + 2.0 and world.supply_funds >= 60:
 		squad.target_x = bay.outer_x() - 1.0
 		return
 	# A thief about to reach a gate outranks everything else.
@@ -2508,9 +2586,30 @@ func _shots_walkthrough() -> void:
 		await _capture("q7_foreman.png", 8)
 		foreman.queue_free()
 		squad.pit.buy("rounds", 1000)
-		hud.show_pitstop(squad.pit, 312, 40)
+		# Parked at the garage: the lane beside the squad, the camera
+		# backed off and panned the way the run does it.
+		var parked := PitBay.new()
+		parked.setup(world.road_half)
+		parked.position.z = 0.0
+		world.add_child(parked)
+		squad.set_count(24)
+		squad.set_spread(1.2)
+		squad.set_lane(-world.road_half, parked.outer_x())
+		squad.target_x = parked.outer_x() - 1.0
+		squad.position.x = squad.target_x
+		camera.position = CAM_HOME + CAM_BACK
+		_cam_rig.position.x = PitBay.pan_for(world.road_half)
+		hud.show_running()
+		await _capture("q8a_parked.png", 8)
+		hud.show_pitstop(squad.pit, 312, 24)
 		await _capture("q8_pitstop.png", 5)
 		hud.hide_pitstop()
+		parked.queue_free()
+		squad.set_lane(-world.road_half, world.road_half)
+		squad.target_x = 0.0
+		squad.position.x = 0.0
+		camera.position = CAM_HOME
+		_cam_rig.position.x = 0.0
 		hud.show_game_over({"score": 4210, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "tip": Tips.for_wipe({"in_boss": true, "boss_kind": "foreman"}), "retry_level": 3, "goal": "Form a JEEP: reach 32 soldiers and take the olive panel."})
 		await _capture("q9_wipe_retry.png", 5)
 		world.spawn_saw(0.0, -40.0, true)
@@ -2528,6 +2627,10 @@ func _shots_walkthrough() -> void:
 		await _capture("q11_lb_join.png", 5)
 		hud.show_leaderboard({"configured": true, "joined": true, "name": "Ada", "mode": "daily", "status": "", "period_label": "DAILY #12", "answer": {"ok": true, "total": 3, "rows": [{"rank": 1, "name": "Bo", "score": 21400, "level": 4}, {"rank": 2, "name": "Ada", "score": 18920, "level": 4}, {"rank": 3, "name": "Kit", "score": 9000, "level": 3}], "you": {"rank": 2, "score": 18920, "level": 4}}})
 		await _capture("q12_lb_board.png", 5)
+		_lb_close()
+		await _capture("q14_lb_closed.png", 5)
+		open_shop()
+		await _capture("q15_shop.png", 8)
 		_quit_with(0)
 		return
 	open_shop()

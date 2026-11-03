@@ -485,17 +485,48 @@ the compounding is closed.
 
 `PitStop` (pure) is this run's shop: stacks, prices that climb per
 stack, the multipliers the squad reads (`Squad.pit`). `PitBay` is a
-lay-by off the right side of the road, spawned once a level from
-`PIT_LEVEL` after `BAY_GATE_INDEX`. The curbs are ten-metre segments
-that scroll and wrap, and the right one hides where the bay says
-(`opens_curb_at`). While the bay is beside the squad `World._move_bay`
-opens the squad's lane out to `outer_x` (never inside a fork), fires
-`pit_stop_reached` when the squad is on the apron as the bay passes,
+pit lane off the right side of the road, spawned once a level from
+`PIT_LEVEL` after `BAY_GATE_INDEX`: an entry ramp with chevrons, a
+22-metre lane behind a red-and-white pit wall, a garage with its door
+up, tyre stacks, a pump, floodlights that blink in turn, bunting, a
+crew that waves (it runs `PROCESS_MODE_ALWAYS`, so it keeps moving
+under the paused shop), and an exit ramp. The curbs are ten-metre
+segments that scroll and wrap, and the right one hides where the bay
+says (`opens_curb_at`); the right shoulder's wrecks hide likewise
+(`clears_shoulder`). Why the lane cannot sit further out: the portrait
+camera sees about four metres either side of the squad, so a lane
+beyond the shoulder would be off screen where it matters. Instead the
+camera moves: while the lane is open `World.bay_pan_x` is non-zero and
+`Game._tick_run` backs the camera off along its own line of sight
+(`CAM_BACK`) and pans the rig right, so the road, the lane, the garage
+and the squad are all in frame; it eases back when the lane closes.
+From `PitBay.lane_opens_at` ahead until the exit ramp has passed,
+`World._move_bay` opens the squad's lane out to `outer_x` (never
+inside a fork), emits `pit_lane_opened` for the banner, fires
+`pit_stop_reached` when the squad is on the lane as the garage passes,
 then closes the lane and brings a straggler back. Entering pays twice:
-the game pauses the tree under `Hud.show_pitstop` for the gear, and
-`clear_next_wave` removes every zombie ahead, unpaid, so the stop is
-also a breather. The bot pulls in with money in hand and buys
-best-first.
+the game pauses the tree under `Hud.show_pitstop`, a bottom sheet of
+tiles with the garage still in view above it, and `clear_next_wave`
+removes every zombie ahead, unpaid, so the stop is also a breather.
+The bot pulls in with money in hand and buys best-first.
+
+The SHOP and the pit sheet share `Hud._tile`: a glass panel with a
+`ShopIcon` (a Control that draws the thing in code, idles with a bob,
+sparks, blinks, and `pop`s when bought), the name, level pips, an
+effect line and a price button; `_fill_tile` lights the border when the
+thing is affordable. There are no textures in the game, so pictures are
+drawn, and drawing only runs while a tile is visible.
+
+Every full-screen card built by `Hud._scroll_card` (and the pit sheet)
+registers in `Hud._cards`, and `_hide_cards` hides them all: 0.40's
+leaderboard page stayed on top of the home screen because it was the
+one card `_hide_cards` did not know. The leaderboard's BACK emits
+`lb_closed`; `Game._lb_close` returns to the wipe card it was opened
+from (`_last_over`) or the title, fetches carry a serial so a late
+answer cannot redraw a page that has moved on, the phone's back button
+closes an open page (`quit_on_go_back` is off; on the bare home screen
+it quits), and the smoke bot opens and closes the page headless
+(`SMOKE_LB`), which `check.sh` requires.
 
 Agro is a `Powerups` entry no mystery can roll: `fire_rate_mult` and
 `damage_mult` double, `shielded` is true, the game paints the danger

@@ -46,6 +46,8 @@ signal saw_hit(hit: bool)
 signal foreman_threw(what: String)
 ## The squad steered onto the pit stop bay.
 signal pit_stop_reached
+## The pit lane's ramp is ahead and the squad may steer onto it.
+signal pit_lane_opened
 ## A perk just did something you could have missed: thick skin softened
 ## a bite by [param amount], the recruiter added [param amount].
 signal perk_felt(id: String, amount: int)
@@ -1472,6 +1474,14 @@ func _move_saws(delta: float, p_squad: Squad) -> void:
 			s.queue_free()
 
 
+## How far right the camera should pan while the pit lane is open; 0
+## when it is not.
+func bay_pan_x() -> float:
+	if _bay_lane_open and _bay != null and is_instance_valid(_bay):
+		return PitBay.pan_for(_bay.road_edge)
+	return 0.0
+
+
 func nearest_bay() -> PitBay:
 	if _bay != null and is_instance_valid(_bay) and not _bay.passed:
 		return _bay
@@ -1491,15 +1501,17 @@ func _move_bay(delta: float, p_squad: Squad) -> void:
 			_close_bay_lane(p_squad)
 		return
 	_bay.position.z += world_speed * delta
-	var beside := _bay.position.z > -28.0 and _bay.position.z < 3.0 and not _bay.passed
+	var beside := _bay.position.z > PitBay.lane_opens_at() and _bay.position.z < 3.0 and not _bay.passed
 	if beside and not _bay_lane_open and fork_side == 0:
 		_bay_lane_open = true
 		p_squad.set_lane(-p_squad.road_half, _bay.outer_x())
+		pit_lane_opened.emit()
 	if not _bay.passed and _bay.position.z >= -0.5:
 		_bay.passed = true
 		if _bay.covers_x(p_squad.position.x):
 			pit_stop_reached.emit()
-	if _bay.passed and _bay_lane_open and _bay.position.z > 2.0:
+	# The exit ramp has gone by: back onto the road.
+	if _bay.passed and _bay_lane_open and _bay.position.z > PitBay.LENGTH * 0.5 + PitBay.RAMP_LENGTH - 2.0:
 		_close_bay_lane(p_squad)
 	if _bay.position.z > DESPAWN_Z:
 		_bay.queue_free()
@@ -1668,6 +1680,7 @@ func _build_dressing() -> void:
 			# Lamp posts: a pole, an arm over the road, a glowing head.
 			var p := Node3D.new()
 			p.position = Vector3(side * (road_half + 0.65), 0.0, 8.0 - i * 12.0)
+			p.set_meta("side", side)
 			var pole := Mats.box(Vector3(0.22, 4.2, 0.22), POST)
 			pole.position.y = 2.1
 			p.add_child(pole)
@@ -1709,6 +1722,7 @@ func _build_scenery() -> void:
 			var kind := rng.randi_range(0, 2)
 			var piece := Node3D.new()
 			piece.position = Vector3(x, 0.0, z)
+			piece.set_meta("side", side)
 			piece.rotation.y = rng.randf_range(-0.6, 0.6)
 			match kind:
 				0:
@@ -1775,6 +1789,9 @@ func _scroll_dressing(delta: float) -> void:
 		p.position.z += world_speed * delta
 		if p.position.z > 12.0:
 			p.position.z -= 16.0 * 12.0
+		# No lamp post stands in the pit lane.
+		if float(p.get_meta("side", 0.0)) > 0.0:
+			p.visible = _bay == null or not is_instance_valid(_bay) or not _bay.opens_curb_at(p.position.z)
 	for c in _curbs:
 		c.position.z += world_speed * delta
 		if c.position.z > 10.0:
@@ -1786,3 +1803,6 @@ func _scroll_dressing(delta: float) -> void:
 		sc.position.z += world_speed * delta
 		if sc.position.z > 14.0:
 			sc.position.z -= SCENERY_SPAN
+		# The right shoulder is cleared where the pit stop stands.
+		if float(sc.get_meta("side", 0.0)) > 0.0:
+			sc.visible = _bay == null or not is_instance_valid(_bay) or not _bay.clears_shoulder(sc.position.z)

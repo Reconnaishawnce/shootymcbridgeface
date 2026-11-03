@@ -182,9 +182,10 @@ the same key (see below).
   medics (less damage, a revived soldier every three seconds, brutes bite
   for less). The latter two are shop unlocks.
 - **Two kinds of money**: the bounty is the run's (every kill pays it;
-  spend it at gold supply panels and at the PIT STOP, a lay-by that
-  opens off the right side of the road once a level: steer off onto it,
-  buy this run's gear, and the pit crew clears the road ahead). Coins are
+  spend it at gold supply panels and at the PIT STOP, a pit lane that
+  pulls off the right side of the road once a level: steer onto the
+  ramp, buy this run's gear at the garage, and the pit crew clears the
+  road ahead). Coins are
   the save's: what is left of the bounty converts at the end, one for
   one up to 500 and with diminishing returns beyond. The bridge holds
   500 soldiers. The shop

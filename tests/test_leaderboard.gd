@@ -21,4 +21,5 @@ func test_names_ids_and_signing() -> void:
 	check(rows.size() == 1 and rows[0].begins_with("1.  Bo"), "a row")
 	check(Leaderboard.you_text({}).contains("not on this board"), "no rank yet")
 	check(Leaderboard.you_text({"you": {"rank": 2, "score": 7000}, "total": 9}).contains("rank 2 of 9"), "your rank")
-	check(not Leaderboard.configured(), "a local build is not configured")
+	# A local build has neither; a CI build has both. Never one without the other.
+	check((LeaderboardConfig.URL == "") == (LeaderboardConfig.SECRET == ""), "the server and the secret come together")

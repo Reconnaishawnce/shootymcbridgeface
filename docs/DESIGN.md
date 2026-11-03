@@ -484,12 +484,18 @@ for a mid squad and x2 for a big one: the x0.5-to-x5 exploit that fed
 the compounding is closed.
 
 `PitStop` (pure) is this run's shop: stacks, prices that climb per
-stack, the multipliers the squad reads (`Squad.pit`). `PitBay` is the
-gold strip on the right lane, spawned once a level from `PIT_LEVEL`
-after `BAY_GATE_INDEX`; `World._move_bay` fires `pit_stop_reached`
-when the squad is on it as it passes, the game pauses the tree under
-`Hud.show_pitstop`, purchases come off the bounty (and `supply_funds`),
-LEAVE resumes. The bot pulls in with money in hand and buys best-first.
+stack, the multipliers the squad reads (`Squad.pit`). `PitBay` is a
+lay-by off the right side of the road, spawned once a level from
+`PIT_LEVEL` after `BAY_GATE_INDEX`. The curbs are ten-metre segments
+that scroll and wrap, and the right one hides where the bay says
+(`opens_curb_at`). While the bay is beside the squad `World._move_bay`
+opens the squad's lane out to `outer_x` (never inside a fork), fires
+`pit_stop_reached` when the squad is on the apron as the bay passes,
+then closes the lane and brings a straggler back. Entering pays twice:
+the game pauses the tree under `Hud.show_pitstop` for the gear, and
+`clear_next_wave` removes every zombie ahead, unpaid, so the stop is
+also a breather. The bot pulls in with money in hand and buys
+best-first.
 
 Agro is a `Powerups` entry no mystery can roll: `fire_rate_mult` and
 `damage_mult` double, `shielded` is true, the game paints the danger

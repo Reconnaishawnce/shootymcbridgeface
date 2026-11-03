@@ -169,6 +169,9 @@ var _pit_card: Control
 var _lb_card: Control
 var _lb_box: VBoxContainer
 var _lb_button: Button
+var _lb_title_button: Button
+var _lb_teaser: Label
+var _over_lb: Button
 var _pit_box: VBoxContainer
 var _fork_box: Control
 var _hint: Label
@@ -677,10 +680,25 @@ func _build_title(root: Control) -> void:
 	_weekly_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
 	modes.add_child(_weekly_button)
-	# Under the modes: the learning round, its own small button.
+	# Under the modes: the leaderboard, up front like any game, and the
+	# learning round beside it; then one line on who leads today.
+	var second := HBoxContainer.new()
+	second.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	second.alignment = BoxContainer.ALIGNMENT_CENTER
+	second.add_theme_constant_override("separation", 12)
+	_pin(t, second, 0.5, 0.635, Vector2(520.0, 50.0))
+	_lb_title_button = _chip("LEADERBOARD", 24)
+	_lb_title_button.custom_minimum_size = Vector2(230.0, 50.0)
+	_lb_title_button.add_theme_color_override("font_color", COIN)
+	_lb_title_button.pressed.connect(func() -> void: leaderboard_opened.emit())
+	second.add_child(_lb_title_button)
 	_learn_button = _chip("LEARN THE ROAD", 22)
+	_learn_button.custom_minimum_size = Vector2(200.0, 50.0)
 	_learn_button.pressed.connect(func() -> void: learn_pressed.emit())
-	_pin(t, _learn_button, 0.5, 0.635, Vector2(220.0, 46.0))
+	second.add_child(_learn_button)
+	_lb_teaser = _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	_lb_teaser.add_theme_color_override("font_color", Color(1.0, 0.95, 0.75))
+	_pin(t, _lb_teaser, 0.5, 0.675, Vector2(640.0, 34.0))
 
 	# Top left: the wallet, and a + that opens the shop.
 	var wallet := VBoxContainer.new()
@@ -823,6 +841,11 @@ func hide_revive() -> void:
 		_revive_tween.kill()
 		_revive_tween = null
 	_revive_card.visible = false
+
+
+func set_lb_teaser(text: String) -> void:
+	_lb_teaser.text = text
+	_lb_teaser.visible = text != ""
 
 
 ## The leaderboard page. [param st] keys: configured, joined, name,
@@ -1238,6 +1261,10 @@ func _build_over(root: Control) -> void:
 	box.add_child(_over_retry)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_prompt)
+	_over_lb = _button("LEADERBOARD", 28)
+	_over_lb.add_theme_color_override("font_color", COIN)
+	_over_lb.pressed.connect(func() -> void: leaderboard_opened.emit())
+	box.add_child(_over_lb)
 	_over_copy = _button("COPY RESULT", 28)
 	_over_copy.pressed.connect(func() -> void: copy_pressed.emit())
 	box.add_child(_over_copy)
@@ -1449,6 +1476,8 @@ func show_title(t: Dictionary) -> void:
 	_quests_button.visible = bool(buttons.get("quests", true))
 	_road_button.visible = bool(buttons.get("road", false))
 	_lb_button.visible = bool(buttons.get("leaderboard", false))
+	_lb_title_button.visible = bool(buttons.get("leaderboard", false))
+	_lb_teaser.visible = _lb_title_button.visible and _lb_teaser.text != ""
 	_more_button.visible = _records_button.visible or _quests_button.visible or _road_button.visible or _lb_button.visible
 	if not bool(buttons.get("hints", true)):
 		mode_hint = ""
@@ -1765,6 +1794,7 @@ func show_game_over(r: Dictionary) -> void:
 	_over_tip.visible = tip != ""
 	var retry_level := int(r.get("retry_level", 0))
 	_over_retry.visible = retry_level > 0
+	_over_lb.visible = bool(r.get("leaderboard", false))
 	_over_retry.text = "RETRY LEVEL %d  ·  once a run" % retry_level
 	_over_prompt.text = "TAP TO START OVER" if retry_level > 0 else "TAP TO RETRY"
 	_pulse_prompt()

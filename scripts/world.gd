@@ -164,6 +164,8 @@ var _dashes: Array[Node3D] = []
 var _posts: Array[Node3D] = []
 var _road: MeshInstance3D
 var _curbs: Array[MeshInstance3D] = []
+const CURB_SEGMENTS := 26
+const CURB_SEGMENT_LENGTH := 10.0
 var _lane_tween: Tween
 
 
@@ -223,8 +225,8 @@ func _apply_road_width(h: float) -> void:
 		squad.set_road_half(h - EDGE)
 	if _road != null:
 		_road.scale.x = (h * 2.0 + 0.6) / 7.2
-	for i in range(_curbs.size()):
-		_curbs[i].position.x = (-1.0 if i == 0 else 1.0) * (h + 0.65)
+	for c in _curbs:
+		c.position.x = float(c.get_meta("side", 1.0)) * (h + 0.65)
 	for i in range(_posts.size()):
 		var side := -1.0 if i % 2 == 0 else 1.0
 		_posts[i].position.x = side * (h + 0.65)
@@ -256,6 +258,7 @@ func start_level(n: int) -> void:
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	_saw_plan = gen.saws_for_level(level) if gen != null else []
 	_bay_due = PitStop.has_bay(level)
+	_bay_lane_open = false
 	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
 	fork_side = 0
 	if squad != null:
@@ -652,7 +655,7 @@ func _spawn() -> void:
 		if bay_d - level_distance <= SPAWN_AHEAD:
 			_bay_due = false
 			_bay = PitBay.new()
-			_bay.setup(road_half - Progression.LANE_W * 0.5, Progression.LANE_W)
+			_bay.setup(road_half)
 			_bay.position.z = -(bay_d - level_distance)
 			add_child(_bay)
 	for plan in _saw_plan.duplicate():
@@ -1475,18 +1478,67 @@ func nearest_bay() -> PitBay:
 	return null
 
 
-## The bay scrolls with the road; the squad on it as it passes is a stop.
+## The lay-by scrolls with the road. While it is beside the squad the
+## right edge of the road opens: the squad may steer off onto the apron,
+## and the squad on the apron as the bay passes is a stop. Afterwards
+## the edge closes and anyone off the road is brought back.
+var _bay_lane_open := false
+
+
 func _move_bay(delta: float, p_squad: Squad) -> void:
 	if _bay == null or not is_instance_valid(_bay):
+		if _bay_lane_open:
+			_close_bay_lane(p_squad)
 		return
 	_bay.position.z += world_speed * delta
+	var beside := _bay.position.z > -28.0 and _bay.position.z < 3.0 and not _bay.passed
+	if beside and not _bay_lane_open and fork_side == 0:
+		_bay_lane_open = true
+		p_squad.set_lane(-p_squad.road_half, _bay.outer_x())
 	if not _bay.passed and _bay.position.z >= -0.5:
 		_bay.passed = true
 		if _bay.covers_x(p_squad.position.x):
 			pit_stop_reached.emit()
+	if _bay.passed and _bay_lane_open and _bay.position.z > 2.0:
+		_close_bay_lane(p_squad)
 	if _bay.position.z > DESPAWN_Z:
 		_bay.queue_free()
 		_bay = null
+
+
+func _close_bay_lane(p_squad: Squad) -> void:
+	_bay_lane_open = false
+	if fork_side == 0:
+		p_squad.set_lane(-p_squad.road_half, p_squad.road_half)
+	if p_squad.target_x > p_squad.road_half:
+		p_squad.target_x = p_squad.road_half - 0.5
+
+
+## The pit crew clears the next wave ahead (the nearest one, or the
+## nearest knot of strays), without pay. Returns how many went.
+func clear_next_wave() -> int:
+	var nearest_wave := -1
+	var nearest_z := -1000.0
+	for z in zombies:
+		if z.latched or z.position.z > -3.0:
+			continue
+		if z.position.z > nearest_z:
+			nearest_z = z.position.z
+			nearest_wave = z.wave_id
+	var n := 0
+	for z in zombies.duplicate():
+		if z.latched or z.position.z > -3.0:
+			continue
+		var same_wave: bool = nearest_wave >= 0 and z.wave_id == nearest_wave
+		var same_knot: bool = nearest_wave < 0 and z.position.z > nearest_z - 12.0
+		if not (same_wave or same_knot):
+			continue
+		if z.wave_id >= 0:
+			_wave_voided[z.wave_id] = true
+		zombies.erase(z)
+		z.consume()
+		n += 1
+	return n
 
 
 ## Lob a bomb from the squad. It detonates where it lands.
@@ -1593,11 +1645,15 @@ func _build_dressing() -> void:
 	var ground := Mats.gbox(Vector3(140.0, 0.2, 300.0), GROUND, 0.18, 0.4, 2)
 	ground.position = Vector3(0.0, -0.22, -110.0)
 	add_child(ground)
+	# Curbs in ten-metre segments that scroll and wrap, so a lay-by can
+	# open a gap in one as it goes by.
 	for side in [-1.0, 1.0]:
-		var curb := Mats.gbox(Vector3(0.7, 0.45, 260.0), CURB, 0.5, 0.25, 3)
-		curb.position = Vector3(side * (road_half + 0.65), 0.1, -100.0)
-		add_child(curb)
-		_curbs.append(curb)
+		for i in range(CURB_SEGMENTS):
+			var curb := Mats.gbox(Vector3(0.7, 0.45, CURB_SEGMENT_LENGTH), CURB, 0.5, 0.25, 3)
+			curb.position = Vector3(side * (road_half + 0.65), 0.1, 10.0 - CURB_SEGMENT_LENGTH * 0.5 - float(i) * CURB_SEGMENT_LENGTH)
+			curb.set_meta("side", side)
+			add_child(curb)
+			_curbs.append(curb)
 	_build_scenery()
 	# Enough dashed lines for the widest road; unused ones hide under the road.
 	for line in range(Progression.MAX_LANES - 1):
@@ -1719,6 +1775,13 @@ func _scroll_dressing(delta: float) -> void:
 		p.position.z += world_speed * delta
 		if p.position.z > 12.0:
 			p.position.z -= 16.0 * 12.0
+	for c in _curbs:
+		c.position.z += world_speed * delta
+		if c.position.z > 10.0:
+			c.position.z -= CURB_SEGMENTS * CURB_SEGMENT_LENGTH
+		# The right curb opens beside the lay-by.
+		if float(c.get_meta("side", 1.0)) > 0.0:
+			c.visible = _bay == null or not is_instance_valid(_bay) or not _bay.opens_curb_at(c.position.z)
 	for sc in _scenery:
 		sc.position.z += world_speed * delta
 		if sc.position.z > 14.0:

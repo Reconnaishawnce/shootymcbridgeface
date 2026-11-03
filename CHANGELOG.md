@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.40 (the leaderboard up front, a real lay-by)
+
+- LEADERBOARD sits on the home screen under the mode row, beside LEARN
+  THE ROAD, with one line under it: who leads today's daily and where
+  you stand (or an invitation to join). The wipe card after a daily or
+  weekly run has a LEADERBOARD button.
+- The pit stop is a real lay-by now. The curb drops beside it (curbs are
+  ten-metre segments that scroll, so one can open) and a tarmac apron
+  with cones runs off the right side of the road. While it is beside
+  you the road's right edge is open: steer off onto the apron as it
+  passes and the road waits. When you leave, the pit crew has cleared
+  the road ahead: every zombie between you and the far spawn line is
+  gone, unpaid. The edge closes behind you and anyone still off the
+  road is brought back.
+
 ## 0.39 (the leaderboard)
 
 - A leaderboard for the daily and the weekly, under MORE. Join under a

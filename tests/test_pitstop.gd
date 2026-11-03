@@ -23,3 +23,10 @@ func test_prices_and_effects() -> void:
 	check(not PitStop.has_bay(1) and PitStop.has_bay(2), "from level two")
 	for id in PitStop.ORDER:
 		check(PitStop.title(id) != "" and PitStop.description(id) != "", "every item explains itself: %s" % id)
+
+
+func test_bay_is_off_the_fork_and_the_lane_opens() -> void:
+	check(not Difficulty.is_fork_gate(PitStop.BAY_GATE_INDEX), "the lay-by never sits inside the fork")
+	check(PitBay.apron_covers(3.4, 3.0) and not PitBay.apron_covers(2.5, 3.0), "on the apron means past the road's edge")
+	check(PitBay.outer_for(3.0) > 3.0 + 2.0, "the lane opens well past the curb")
+	check(PitBay.curb_open_at(0.0) and not PitBay.curb_open_at(20.0), "the curb opens beside it only")

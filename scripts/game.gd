@@ -687,6 +687,7 @@ func show_title() -> void:
 	Diag.set_state("title")
 	if not smoke and _shots_dir == "":
 		_lb_send_pending()
+		_lb_teaser()
 	sfx.set_music("calm")
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
@@ -1254,6 +1255,7 @@ func end_run() -> void:
 			"bites_heavy": _bites_heavy, "straight_used": _straight_used,
 		}),
 		"retry_level": world.level if (mode == "levels" and world.level >= 2 and not _level_retry_used and not smoke) else 0,
+		"leaderboard": (mode == "daily" or mode == "weekly") and Leaderboard.configured(),
 	})
 	Diag.note("end_run_done", {"ms": Time.get_ticks_msec() - t0, "level": world.level, "score": score, "mode": mode})
 	Diag.mark("end_run:shown")
@@ -1716,12 +1718,14 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 # --- the pit stop ----------------------------------------------------------
 
 var _pit_open := false
+var _pit_cleared := 0
 ## The leaderboard: {id, name, joined, pending}. See Leaderboard.
 var lb: Dictionary = {}
 var _lb_mode := "daily"
 var _lb_answer: Dictionary = {}
 var _lb_status := ""
 var _lb_busy := false
+var _lb_teaser_at := -1000.0
 ## One free retry of a level per run, with the squad you entered it with.
 var _level_retry_used := false
 var _level_entry_count := 1
@@ -1734,6 +1738,7 @@ var _straight_used := false
 func _on_pit_stop() -> void:
 	if state != State.RUNNING:
 		return
+	var cleared := world.clear_next_wave()
 	if smoke:
 		# The bot buys what it can afford, best first, and rolls on.
 		var bought := []
@@ -1741,8 +1746,9 @@ func _on_pit_stop() -> void:
 			while squad.pit.can_buy(id, bounty) and bought.size() < 3:
 				_pit_buy(id)
 				bought.append(id)
-		print("SMOKE_PIT ", JSON.stringify({"bought": bought, "left": bounty, "level": world.level, "frame": _frames}))
+		print("SMOKE_PIT ", JSON.stringify({"bought": bought, "left": bounty, "cleared": cleared, "level": world.level, "frame": _frames}))
 		return
+	_pit_cleared = cleared
 	_pit_open = true
 	Engine.time_scale = 1.0
 	_slowmo_until = 0.0
@@ -1782,7 +1788,11 @@ func _pit_leave() -> void:
 	get_tree().paused = false
 	Diag.set_state("running")
 	sfx.play("click")
-	hud.show_banner("BACK ON THE ROAD", 0.8)
+	if _pit_cleared > 0:
+		hud.show_banner("THE PIT CREW CLEARED THE ROAD\n%d ZOMBIES GONE" % _pit_cleared, 1.6)
+	else:
+		hud.show_banner("BACK ON THE ROAD", 0.8)
+	_pit_cleared = 0
 
 
 ## The level again, once a run: the road cleared, the squad you entered
@@ -1902,6 +1912,31 @@ func _lb_fetch() -> void:
 		_lb_busy = false
 		_lb_status = "Could not reach the board."
 		hud.show_leaderboard(_lb_state())
+
+
+## One line on the home screen: who leads today, and where you stand.
+func _lb_teaser() -> void:
+	if not Leaderboard.configured():
+		hud.set_lb_teaser("")
+		return
+	if not bool(lb.get("joined", false)):
+		hud.set_lb_teaser("DAILY #%d   ·   join the board and play" % _lb_period("daily"))
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	if now - _lb_teaser_at < 60.0:
+		return
+	_lb_teaser_at = now
+	var req := HTTPRequest.new()
+	req.timeout = Leaderboard.TIMEOUT
+	add_child(req)
+	var period := _lb_period("daily")
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
+		if parsed is Dictionary and code == 200 and bool(parsed.get("ok", false)):
+			hud.set_lb_teaser(Leaderboard.teaser(parsed, period)))
+	if req.request(Leaderboard.board_url(LeaderboardConfig.URL, "daily", period, str(lb.id))) != OK:
+		req.queue_free()
 
 
 ## A finished daily or weekly run goes up, if the player joined. A run
@@ -2394,7 +2429,7 @@ func _bot_steer() -> void:
 	# Money in hand and a pit stop coming: pull in.
 	var bay := world.nearest_bay()
 	if bay != null and bay.position.z > -26.0 and world.supply_funds >= 60:
-		squad.target_x = bay.position.x
+		squad.target_x = bay.outer_x() - 1.0
 		return
 	# A thief about to reach a gate outranks everything else.
 	for z in world.zombies:
@@ -2480,13 +2515,15 @@ func _shots_walkthrough() -> void:
 		await _capture("q9_wipe_retry.png", 5)
 		world.spawn_saw(0.0, -40.0, true)
 		var bay := PitBay.new()
-		bay.setup(squad.road_half - Progression.LANE_W * 0.5, Progression.LANE_W)
+		bay.setup(world.road_half)
 		bay.position.z = -9.0
 		world.add_child(bay)
 		hud.show_running()
 		await _capture("q10_bay.png", 5)
 		bay.queue_free()
 		show_title()
+		hud.set_lb_teaser("DAILY #12   ·   Bo leads with 21400   ·   you 2nd")
+		await _capture("q13_title_lb.png", 5)
 		hud.show_leaderboard({"configured": true, "joined": false, "name": "", "mode": "daily", "status": "", "answer": {}, "period_label": "DAILY #12"})
 		await _capture("q11_lb_join.png", 5)
 		hud.show_leaderboard({"configured": true, "joined": true, "name": "Ada", "mode": "daily", "status": "", "period_label": "DAILY #12", "answer": {"ok": true, "total": 3, "rows": [{"rank": 1, "name": "Bo", "score": 21400, "level": 4}, {"rank": 2, "name": "Ada", "score": 18920, "level": 4}, {"rank": 3, "name": "Kit", "score": 9000, "level": 3}], "you": {"rank": 2, "score": 18920, "level": 4}}})

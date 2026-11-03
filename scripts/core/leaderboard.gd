@@ -76,6 +76,26 @@ static func rows_text(answer: Dictionary) -> Array:
 	return out
 
 
+## The home screen's one line: the leader, and you.
+static func teaser(answer: Dictionary, period: int) -> String:
+	var rows: Array = answer.get("rows", [])
+	if rows.is_empty():
+		return "DAILY #%d   ·   nobody yet, be first" % period
+	var top: Dictionary = rows[0]
+	var line := "DAILY #%d   ·   %s leads with %d" % [period, str(top.name), int(top.score)]
+	var you = answer.get("you", null)
+	if you is Dictionary:
+		line += "   ·   you %s" % ordinal(int(you.rank))
+	return line
+
+
+static func ordinal(n: int) -> String:
+	var tail := "th"
+	if n % 100 < 11 or n % 100 > 13:
+		tail = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+	return "%d%s" % [n, tail]
+
+
 static func you_text(answer: Dictionary) -> String:
 	var you = answer.get("you", null)
 	if you == null or not (you is Dictionary):

@@ -23,3 +23,12 @@ func test_names_ids_and_signing() -> void:
 	check(Leaderboard.you_text({"you": {"rank": 2, "score": 7000}, "total": 9}).contains("rank 2 of 9"), "your rank")
 	# A local build has neither; a CI build has both. Never one without the other.
 	check((LeaderboardConfig.URL == "") == (LeaderboardConfig.SECRET == ""), "the server and the secret come together")
+
+
+func test_teaser() -> void:
+	check(Leaderboard.teaser({}, 12).contains("be first"), "an empty board invites")
+	var t := Leaderboard.teaser({"rows": [{"rank": 1, "name": "Bo", "score": 21400, "level": 4}], "you": {"rank": 2, "score": 100}}, 12)
+	check(t.contains("Bo leads with 21400") and t.contains("you 2nd"), "the leader and you")
+	check_eq(Leaderboard.ordinal(1), "1st", "1st")
+	check_eq(Leaderboard.ordinal(11), "11th", "11th")
+	check_eq(Leaderboard.ordinal(23), "23rd", "23rd")

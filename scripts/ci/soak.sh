@@ -10,6 +10,9 @@ SEEDS="${2:-6}"
 FRAMES="${3:-7000}"
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
+# A fresh cache has no class names yet: without this the first run cannot
+# parse game.gd and sits in an empty main loop forever.
+"$GODOT" --headless --path . --import >"$LOG" 2>&1 || true
 fails=0
 runs=0
 for mode in "" "--endless" "--daily" "--weekly"; do

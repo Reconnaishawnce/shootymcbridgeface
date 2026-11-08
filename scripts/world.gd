@@ -141,6 +141,11 @@ var now := 0.0
 ## Endless: no bosses, no squad reset, gates forever. Levels tick every
 ## GATES_PER_LEVEL gates for difficulty and the HUD.
 var endless := false
+## Boss rush: one gate, then the boss, level after level.
+var rush := false
+const RUSH_GATES := 1
+## The event knobs this run carries (Events.mods); resting by default.
+var event_mods: Dictionary = Events.DEFAULT_MODS
 ## False once the player has had no hand on the road for a few seconds:
 ## panels stop climbing, so a squad left to itself takes what is printed.
 var hands_on := true
@@ -287,6 +292,10 @@ func start_level(n: int) -> void:
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	_saw_plan = gen.saws_for_level(level) if gen != null else []
+	# A saw storm: more saws, placed by the same generator.
+	for i in range(int(event_mods.get("saws_extra", 0))):
+		if gen != null and level >= Difficulty.SAW_LEVEL:
+			_saw_plan.append({"index": gen.rng.randi_range(1, Difficulty.GATES_PER_LEVEL - 2), "x": gen.rng.randf_range(-0.7, 0.7), "aim": false})
 	_barricade_plan = gen.barricades_for_level(level, _saw_plan) if gen != null else []
 	_bay_due = PitStop.has_bay(level)
 	_bay_lane_open = false
@@ -368,9 +377,17 @@ func _clear_actors() -> void:
 		b.queue_free()
 
 
+## Where this level's boss stands: after the last gate, or right after
+## the one gate of a rush level.
+func boss_at() -> float:
+	if rush:
+		return Difficulty.gate_distance(RUSH_GATES) + Difficulty.BOSS_LEAD * 0.5
+	return Difficulty.boss_distance()
+
+
 ## Advance the world by one frame. Returns the scroll speed used.
 func advance(delta: float, p_squad: Squad) -> float:
-	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level)
+	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level) + float(event_mods.get("speed_bonus", 0.0))
 	if powerups != null:
 		target *= powerups.world_speed_mult(now)
 	world_speed = lerpf(world_speed, target, 1.0 - exp(-2.5 * delta))
@@ -658,7 +675,7 @@ func _gate_index(n: int) -> int:
 
 func _spawn() -> void:
 	var count := squad.count if squad != null else 1
-	var limit := 1 << 30 if endless else Difficulty.GATES_PER_LEVEL
+	var limit := 1 << 30 if endless else (RUSH_GATES if rush else Difficulty.GATES_PER_LEVEL)
 	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
 		var z := -(Difficulty.gate_distance(_next_gate) - level_distance)
 		var has_vehicles: bool = squad != null and squad.vehicles_alive() > 0
@@ -729,7 +746,7 @@ func _spawn() -> void:
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
 			var sx := squad.position.x if (bool(plan.get("aim", false)) and squad != null) else float(plan.x) * road_half
-			spawn_saw(sx, -(Difficulty.saw_distance(n) - level_distance))
+			spawn_saw(sx, -(Difficulty.saw_distance(n) - level_distance), false, float(event_mods.get("saw_speed", 0.0)))
 			_saw_plan.erase(plan)
 	for plan in _crate_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
@@ -740,13 +757,13 @@ func _spawn() -> void:
 			add_child(c)
 			_crates.append(c)
 			_crate_plan.erase(plan)
-	if not endless and not _boss_spawned and Difficulty.boss_distance() - level_distance <= SPAWN_AHEAD:
+	if not endless and not _boss_spawned and boss_at() - level_distance <= SPAWN_AHEAD:
 		_boss_spawned = true
 		boss = Boss.new()
 		var convoy := squad.vehicles_alive() if squad != null else 0
 		boss.setup(Difficulty.boss_hp(level, perk_count, squad.count if squad != null else 0) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)) * Difficulty.band_boss(band()), Difficulty.boss_kind(level))
 		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
-		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
+		boss.position = Vector3(0.0, 0.0, -(boss_at() - level_distance))
 		add_child(boss)
 		boss_spawned.emit(boss)
 
@@ -804,7 +821,7 @@ func _note_wave_id(n: int, wave: int) -> void:
 ## A wave spec with the modifier applied: more bodies, more health.
 func _spec(p_level: int, index: int, count: int) -> Dictionary:
 	var convoy := squad.vehicles_alive() if squad != null else 0
-	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV, Difficulty.is_elite(endless, index))
+	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV, Difficulty.is_elite(endless, index) or bool(event_mods.get("elite_all", false)))
 	var bw := Difficulty.band_wave(band())
 	var w := mod("wave") * bw
 	var h := mod("hp") * bw
@@ -939,7 +956,7 @@ func _gate_ahead_of(z: float) -> Gate:
 
 
 func _move_gates(delta: float, p_squad: Squad) -> void:
-	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0)
+	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0) + float(event_mods.get("reveal_penalty", 0.0))
 	for g in gates.duplicate():
 		g.position.z += world_speed * delta
 		g.update_hot(now)

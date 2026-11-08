@@ -790,6 +790,33 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
+## Events, the weekly challenge, boss rush (0.49)
+
+`Events` (pure) owns two rotations and one set of knobs. The knobs
+(`DEFAULT_MODS`) are what an event can turn: a bounty multiplier, fog
+with a reveal penalty, extra and faster saws, every wave elite, a road
+speed bonus; `mods` merges a list of events over the defaults
+(multipliers multiply, counts add, flags or). The weekend event
+(`weekend_event`, Saturday and Sunday by UTC weekday, rotating by week
+through `WEEKEND`) rides every mode that day, the daily included, so
+the day's board is still one contest. The weekly challenge
+(`weekly_challenge`, rotating through `WEEKLY`) rides every weekly run
+of that week and is named on the daily card and the board's header, so
+each week's board is a different race. `Game.start_run` asks
+`Events.for_run`, hands the knobs to `World.event_mods`, and sets the
+fog look (`_apply_event_look`); the world reads the knobs where the
+saws are planned and spawned, where waves are specced, where panels
+reveal and where the road's speed is set; `_on_zombie_killed` applies
+the bounty multiplier. The first level's banner names the event. The
+bot takes `--smoke-event=ID`, and CI runs a saw storm.
+
+Boss rush (`World.rush`, mode "rush", `Road.UNLOCKS` at 1200) is one
+gate and then the boss, level after level: `RUSH_GATES` caps the gates
+and waves of a level and `boss_at` stands the boss just past them. The
+run starts with `Difficulty.RUSH_START_SQUAD` extra soldiers and keeps
+its own best under the "rush" key. The bot takes `--rush` and prints
+`SMOKE_RUSH` per boss; CI requires one.
+
 ## The run meta (0.48)
 
 Four things that give a finished run a reason to come back tomorrow.

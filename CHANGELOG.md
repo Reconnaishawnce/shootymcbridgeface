@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.49 (events, the weekly challenge, boss rush)
+
+- Weekend events: on Saturdays and Sundays the whole road carries one
+  event, named on the home screen and at the start of the run, the same
+  for everyone: DOUBLE BOUNTY, a SAW STORM (two more saws a level, and
+  faster) or FOG ON THE BRIDGE (a grey haze, panels show late). They
+  rotate week to week.
+- The weekly challenge: every weekly run of a week carries a twist
+  (fog, a saw storm, elite waves or a fast road), named on the daily
+  card and in the weekly board's header, so the board is a new contest
+  every week.
+- BOSS RUSH, a new mode at 1200 trophies on the road: one gate, then
+  the boss, level after level, with thirty extra soldiers to start and
+  its own best.
+
 ## 0.48 (the run meta: quest coins, the streak, the bar, the snipers)
 
 - Quests pay coins as well as points: three coins per point, and 300

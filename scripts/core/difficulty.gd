@@ -379,6 +379,8 @@ const TURRET_DPS_PER_LEVEL := 2.0
 const TURRET_RANGE := 30.0
 const TURRET_SHOTS_PER_SECOND := 4.0
 const MAX_TURRETS := 2
+## Boss rush starts every run with this many soldiers over the shop's.
+const RUSH_START_SQUAD := 30
 const SAW_LEVEL := 2
 const SAW_TWO_LEVEL := 5
 const SAW_OFFSET := 8.0

@@ -197,6 +197,10 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
+		elif a.begins_with("--smoke-event="):
+			_smoke_event = a.get_slice("=", 1)
+		elif a == "--rush":
+			_smoke_rush = true
 		elif a.begins_with("--smoke-squad="):
 			_smoke_squad = a.get_slice("=", 1)
 		elif a.begins_with("--smoke-idle-from="):
@@ -278,7 +282,7 @@ func _ready() -> void:
 	show_title()
 	if smoke:
 		_smoke_lb_check()
-		start_run("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels")))
+		start_run("rush" if _smoke_rush else ("weekly" if _smoke_weekly else ("daily" if _smoke_daily else ("endless" if _smoke_endless else "levels"))))
 	elif _shots_dir != "":
 		_shots_walkthrough()
 
@@ -916,6 +920,8 @@ func show_title() -> void:
 		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"modifier": modifier, "mode_hint": hint,
 		"streak_line": Streak.line(streak, Daily.day_number(int(Time.get_unix_time_from_system()))),
+		"event_line": Events.banner(int(Time.get_unix_time_from_system())),
+		"rush_best": SaveData.load_best("rush"),
 	})
 
 
@@ -973,12 +979,15 @@ func _feature_open(feature: String) -> bool:
 			return Modifiers.unlocked(feature, normal_level, hard_level)
 		"weekly":
 			return int(stats.get("weeklies", 0)) > 0
+		"rush":
+			return false
 	return true
 
 
 func _title_buttons(runs: int) -> Dictionary:
 	var b := Goals.title_buttons(runs, _feature_open("hard"), character_mode)
 	b.weekly = bool(b.get("weekly", false)) and _feature_open("weekly")
+	b.rush = bool(b.get("rush", false)) and _feature_open("rush")
 	return b
 
 
@@ -1130,7 +1139,7 @@ func open_daily() -> void:
 	daily_results = Daily.prune(daily_results, daily_day)
 	week_number = Daily.week_number(int(Time.get_unix_time_from_system()))
 	weekly_results = Daily.prune_weeks(weekly_results, week_number)
-	hud.show_daily(daily_day, daily_results, week_number, weekly_results)
+	hud.show_daily(daily_day, daily_results, week_number, weekly_results, Events.weekly_line(week_number))
 
 
 ## Put the last result (or today's daily best) on the clipboard.
@@ -1204,6 +1213,14 @@ func start_run(p_mode: String = "levels") -> void:
 	run_seed = _smoke_seed if smoke else randi()
 	# The daily: one seed for everyone, no upgrades, rifles.
 	run_meta = Meta.new() if mode in ["daily", "weekly"] else meta
+	var now_unix := int(Time.get_unix_time_from_system())
+	_events = Events.for_run(mode, now_unix)
+	if smoke:
+		_events = [_smoke_event] if _smoke_event != "" else []
+	_event_mods = Events.mods(_events)
+	world.event_mods = _event_mods
+	world.rush = mode == "rush"
+	_apply_event_look(bool(_event_mods.get("fog", false)))
 	if mode == "daily":
 		daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 		run_seed = Daily.seed_for_day(daily_day)
@@ -1269,7 +1286,7 @@ func start_run(p_mode: String = "levels") -> void:
 	_horde_warned = false
 	squad.now = 0.0
 	world.now = 0.0
-	squad.reset(run_meta.start_squad())
+	squad.reset(run_meta.start_squad() + (Difficulty.RUSH_START_SQUAD if mode == "rush" else 0))
 	_level_entry_count = squad.count
 	# Reset before RUNNING: a road snapping back to two lanes must not
 	# banner, chime or glide the camera like a mid-run widening.
@@ -1348,7 +1365,7 @@ func end_run() -> void:
 		shown_best = maxi(prev, score)
 	else:
 		if not smoke:
-			records = SaveData.record_run(score, world.level, world.endless, modifier)
+			records = SaveData.record_run(score, world.level, world.endless, "rush" if mode == "rush" else modifier)
 			coins = SaveData.add_coins(earned)
 		if records.new_best_score:
 			best = score
@@ -1879,7 +1896,7 @@ func _on_gate_stepped(gate: Gate, index: int) -> void:
 
 func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
-	bounty += Bounty.for_kind(zombie.kind_name())
+	bounty += int(round(float(Bounty.for_kind(zombie.kind_name())) * float(_event_mods.get("bounty_mult", 1.0))))
 	world.supply_funds = bounty
 	# Greed shows on the counter as it happens, not only at the end.
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
@@ -1942,6 +1959,8 @@ func _on_boss_hit(boss: Boss, is_core: bool) -> void:
 
 
 func _on_boss_killed(level: int, squad_left: int) -> void:
+	if smoke and mode == "rush":
+		print("SMOKE_RUSH ", JSON.stringify({"level": level, "squad": squad_left, "frame": _frames}))
 	bosses_killed += 1
 	if smoke:
 		print("SMOKE_BOSS_DOWN ", JSON.stringify({"level": level, "squad_left": squad_left, "frame": _frames}))
@@ -1981,7 +2000,26 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 		Burst.spawn(world, world.boss.position + Vector3(0.0, 1.5, 0.0), Boss.SKIN, 30, 0.2, 6.0, 0.9)
 
 
+## Fog: a thick grey haze that eats the far road; off again after.
+func _apply_event_look(fog: bool) -> void:
+	if _env == null:
+		return
+	if fog:
+		_env.fog_light_color = Color(0.62, 0.66, 0.72)
+		_env.fog_density = 0.028
+		_env.fog_sky_affect = 0.6
+	else:
+		_env.fog_light_color = Palette.FOG
+		_env.fog_density = 0.005
+		_env.fog_sky_affect = 0.15
+
+
 func _on_level_started(level: int) -> void:
+	if level == 1 and not _events.is_empty() and not smoke:
+		var id := str(_events[0])
+		hud.show_banner("%s\n%s" % [Events.title(id), Events.body(id)], 2.6)
+	if level == 1 and mode == "rush" and not smoke:
+		hud.show_banner("BOSS RUSH\nONE GATE, THEN THE BOSS. AGAIN.", 2.2)
 	if level <= 1:
 		return
 	hud.show_banner("LEVEL %d" % level, 1.0)
@@ -2049,6 +2087,12 @@ var _last_over: Dictionary = {}
 var _lb_teaser_at := -1000.0
 ## The day streak (Streak), kept in the save.
 var streak: Dictionary = {}
+## The events this run carries (Events.for_run) and their knobs.
+var _events: Array = []
+var _event_mods: Dictionary = Events.DEFAULT_MODS
+## --smoke-event=ID forces an event; --rush plays boss rush.
+var _smoke_event := ""
+var _smoke_rush := false
 ## One free retry of a level per run, with the squad you entered it with.
 var _level_retry_used := false
 var _level_entry_count := 1
@@ -2162,7 +2206,7 @@ func _lb_state() -> Dictionary:
 	return {
 		"configured": Leaderboard.configured(), "joined": bool(lb.get("joined", false)),
 		"name": str(lb.get("name", "")), "mode": _lb_mode, "status": _lb_status, "answer": _lb_answer,
-		"period_label": ("DAILY #%d" % period) if _lb_mode == "daily" else ("WEEK #%d" % period),
+		"period_label": ("DAILY #%d" % period) if _lb_mode == "daily" else ("WEEK #%d  ·  %s" % [period, Events.title(Events.weekly_challenge(period))]),
 	}
 
 
@@ -2897,7 +2941,8 @@ func _shots_walkthrough() -> void:
 	if _shots_quick:
 		# The menus only: every state of the home screen, the cards.
 		stats.runs = 3
-		trophies = 640
+		stats.weeklies = 1
+		trophies = 1240
 		modifier = "hard"
 		var today_q := Daily.day_number(int(Time.get_unix_time_from_system()))
 		streak = {"days": 4, "last_day": today_q - 1, "best": 4}

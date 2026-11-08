@@ -44,6 +44,14 @@ grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"heal"' || { echo "::error::the medi
 fail_on_script_errors "sniper smoke"
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"longshot"' || { echo "::error::the sniper squad never fired its longshot"; exit 1; }
 
+echo "== boss rush (one gate, then the boss) and a saw storm event"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2400 --rush --smoke-upgrades 2>&1 | tee "$LOG"
+fail_on_script_errors "rush smoke"
+grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a boss"; exit 1; }
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=3000 --smoke-event=saw_storm --smoke-seed=3 2>&1 | tee "$LOG"
+fail_on_script_errors "saw storm smoke"
+grep -q "SMOKE_SAW" "$LOG" || { echo "::error::the saw storm rolled no saw past the squad"; exit 1; }
+
 echo "== wipe and retry (nightmare, seed 11, a forced wipe at frame 4500: the results screen and the restart)"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=11 --nightmare --smoke-retry --smoke-wipe-at=4500 2>&1 | tee "$LOG"
 fail_on_script_errors "wipe and retry"

@@ -116,7 +116,9 @@ static func sections() -> Array:
 			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +
 			"ENDLESS opens at %d trophies: no bosses, no reset, the road just keeps getting harder. The last gate of every endless level brings an ELITE wave instead of a boss: three brutes or more, a tank, extra latchers. From level %d the road speeds up again and the crowds keep growing.\n" % [int(Road.UNLOCKS["endless"]), Difficulty.LATE_LEVEL] +
 			"DAILY: the same road for everyone today, no upgrades, rifles only. Best of the day counts and you can copy your result to share.\n" +
-			"WEEKLY: the same road for everyone all week, on hard, no upgrades."},
+			"WEEKLY: the same road for everyone all week, on hard, no upgrades, and a CHALLENGE that changes every week (fog, a saw storm, elite waves, a fast road), so the weekly board is a new contest each week.\n" +
+			"BOSS RUSH opens at %d trophies: one gate, then the boss, level after level, with %d extra soldiers to start. Its best is kept on its own.\n" % [int(Road.UNLOCKS["rush"]), Difficulty.RUSH_START_SQUAD] +
+			"EVENTS: on Saturdays and Sundays the whole road carries a weekend event, named on the home screen: DOUBLE BOUNTY (every kill pays twice), a SAW STORM (two more saws a level, faster), or FOG ON THE BRIDGE (panels show late). Everyone gets the same one."},
 		{"title": "SQUADS", "body":
 			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. SNIPERS (from %d trophies on the ROAD, or the SHOP) fire slowly, hit more than twice as hard, and every shot goes through one more zombie. " % int(Road.UNLOCKS["snipers"]) +
 			"The front %d soldiers' worth of guns count toward firepower one for one; past that every extra soldier adds a little less (500 soldiers shoot like %d). A bigger squad is mostly extra health, and the crowds grow to match its guns, so a huge squad is never a free ride." % [Progression.DPS_CAP_SOLDIERS, Progression.firing_count(500)]},

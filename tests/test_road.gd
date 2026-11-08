@@ -18,6 +18,7 @@ func test_milestones_and_unlocks() -> void:
 	check(not Road.is_unlocked("hard", 599) and Road.is_unlocked("hard", 600), "hard at 600")
 	check(Road.is_unlocked("endless", 300) and not Road.is_unlocked("nightmare", 1499), "endless at 300, nightmare at 1500")
 	check(Road.is_unlocked("snipers", 2000) and not Road.is_unlocked("snipers", 1999), "snipers at 2000")
+	check(Road.is_unlocked("rush", 1200) and Road.reward_text(Road.reward(12)).contains("BOSS RUSH"), "boss rush at 1200")
 	check_eq(str(Road.reward(20).id), "snipers", "milestone twenty is the sniper squad")
 	check_eq(str(Road.reward(25).id), "crown", "the later milestones are named items")
 	check(Road.reward_text(Road.reward(20)).contains("SNIPERS"), "and say so")

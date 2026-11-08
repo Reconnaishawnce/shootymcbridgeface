@@ -16,7 +16,7 @@ const MODE_MULT := {"normal": 1.0, "hard": 2.0, "nightmare": 3.0}
 ## Features and where they open.
 ## The fixed unlocks along the road, and the later milestones filled in:
 ## the SNIPERS squad at 2000, named locker items past that.
-const UNLOCKS := {"endless": 300, "hard": 600, "weekly": 900, "nightmare": 1500, "snipers": 2000}
+const UNLOCKS := {"endless": 300, "hard": 600, "weekly": 900, "rush": 1200, "nightmare": 1500, "snipers": 2000}
 const FIXED_ITEMS := {2500: "crown", 3000: "galaxy", 3500: "wings", 4000: "halo", 4500: "gold", 5000: "luna"}
 const ITEM_POOL := ["beanie", "ocean", "wood", "cape_blue", "zuri", "headband", "lava", "ice", "jetpack", "ada", "party", "galaxy", "gold", "rex", "wizard", "snow", "mei", "halo"]
 
@@ -73,7 +73,7 @@ static func reward(k: int) -> Dictionary:
 static func reward_text(r: Dictionary) -> String:
 	match str(r.kind):
 		"unlock":
-			return {"endless": "ENDLESS opens", "hard": "HARD mode opens", "weekly": "the WEEKLY opens", "nightmare": "NIGHTMARE opens", "snipers": "the SNIPERS squad opens"}.get(str(r.id), str(r.id))
+			return {"endless": "ENDLESS opens", "hard": "HARD mode opens", "weekly": "the WEEKLY opens", "nightmare": "NIGHTMARE opens", "snipers": "the SNIPERS squad opens", "rush": "BOSS RUSH opens"}.get(str(r.id), str(r.id))
 		"item":
 			return "%s (locker)" % Wardrobe.title(str(r.id))
 		"stars":

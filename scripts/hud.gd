@@ -93,6 +93,8 @@ var _title: Label
 var _records: Label
 var _coins_title: Label
 var _weekly_button: Button
+var _rush_button: Button
+var _event_line: Label
 var _plus_button: Button
 var _more_button: Button
 var _more_card: Control
@@ -786,7 +788,7 @@ func _build_title(root: Control) -> void:
 	modes.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	modes.alignment = BoxContainer.ALIGNMENT_CENTER
 	modes.add_theme_constant_override("separation", 14)
-	_pin(t, modes, 0.5, 0.56, Vector2(520.0, 70.0))
+	_pin(t, modes, 0.5, 0.56, Vector2(680.0, 70.0))
 	_endless_button = _button("ENDLESS", 26)
 	_endless_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
@@ -799,6 +801,16 @@ func _build_title(root: Control) -> void:
 	_weekly_button.custom_minimum_size = Vector2(160.0, 66.0)
 	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
 	modes.add_child(_weekly_button)
+	_rush_button = _button("BOSS RUSH", 24)
+	_rush_button.custom_minimum_size = Vector2(160.0, 66.0)
+	_rush_button.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
+	_rush_button.pressed.connect(func() -> void: play_pressed.emit("rush"))
+	modes.add_child(_rush_button)
+	# The weekend event, under the best lines.
+	_event_line = _label(21, HORIZONTAL_ALIGNMENT_CENTER)
+	_event_line.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3))
+	_event_line.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_pin(t, _event_line, 0.5, 0.39, Vector2(640.0, 56.0))
 	# Under the modes: the leaderboard, up front like any game, and the
 	# learning round beside it; then one line on who leads today.
 	var second := HBoxContainer.new()
@@ -1767,6 +1779,9 @@ func show_title(t: Dictionary) -> void:
 	_plus_button.visible = _shop_button.visible
 	_daily_button.visible = bool(buttons.get("daily", true))
 	_weekly_button.visible = bool(buttons.get("weekly", _daily_button.visible))
+	_rush_button.visible = bool(buttons.get("rush", false))
+	_event_line.text = str(t.get("event_line", ""))
+	_event_line.visible = _event_line.text != ""
 	_records_button.visible = bool(buttons.get("records", true))
 	_mode_button.visible = bool(buttons.get("mode", true))
 	_endless_button.visible = bool(buttons.get("endless", true))
@@ -1945,12 +1960,12 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 
 
 ## [param results] maps day number to {score, level, kills, peak}.
-func show_daily(day: int, results: Dictionary, week: int = 0, weekly: Dictionary = {}) -> void:
+func show_daily(day: int, results: Dictionary, week: int = 0, weekly: Dictionary = {}, challenge_line: String = "") -> void:
 	_hide_cards()
 	_daily_card.visible = true
 	_daily_title.text = Daily.label(day)
 	_daily_lines.text = _result_lines(results, day, "today", "No result yet today.")
-	_weekly_title.text = Daily.week_label(week)
+	_weekly_title.text = Daily.week_label(week) + ("\n" + challenge_line if challenge_line != "" else "")
 	_weekly_lines.text = _result_lines(weekly, week, "this week", "No result yet this week.")
 
 

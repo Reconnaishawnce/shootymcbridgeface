@@ -313,9 +313,9 @@ shipped and measured on its own.
 7. Mechanics, part three (0.48, done): quest coin rewards, the day
    streak with its coin bonus, the next-milestone bar, the later road
    filled in with named items, and the SNIPERS squad with the LONGSHOT.
-8. Mechanics, part four: events. Weekend modifiers (double bounty, fog
-   road, saw storm), a boss rush mode, and a weekly challenge with its
-   own board.
+8. Mechanics, part four (0.49, done): weekend events (double bounty,
+   saw storm, fog) on every mode, the weekly challenge that names each
+   week's board, and BOSS RUSH at 1200 trophies.
 9. Feel pass. Haptics, hit-stop on big kills, slow-motion on a boss
    kill, squad cheers, music layers that build with the combo, a
    results card that counts up with sound.

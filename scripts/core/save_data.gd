@@ -251,6 +251,43 @@ static func save_lessons_on(on: bool) -> void:
 	_write(SETTINGS, "lessons_on", on)
 
 
+## SEND REPORTS: crash and freeze reports go to the server on their own.
+static func load_reports_on() -> bool:
+	return bool(_read(SETTINGS, "reports_on", true))
+
+
+static func save_reports_on(on: bool) -> void:
+	_write(SETTINGS, "reports_on", on)
+
+
+## A random id that only groups one phone's reports; made on first use.
+static func load_telemetry_id() -> String:
+	return str(_read(SETTINGS, "telemetry_id", ""))
+
+
+static func save_telemetry_id(id: String) -> void:
+	_write(SETTINGS, "telemetry_id", id)
+
+
+## The previous session already reported as a crash (Telemetry.crash_marker).
+static func load_crash_reported() -> String:
+	return str(_read(SETTINGS, "crash_reported", ""))
+
+
+static func save_crash_reported(marker: String) -> void:
+	_write(SETTINGS, "crash_reported", marker)
+
+
+## Reports that could not be sent yet, newest last, at most PENDING_MAX.
+static func load_pending_reports() -> Array:
+	var v = _read(SETTINGS, "pending_reports", [])
+	return v if v is Array else []
+
+
+static func save_pending_reports(list: Array) -> void:
+	_write(SETTINGS, "pending_reports", list)
+
+
 ## NOTCH ROOM: "auto", "on" or "off".
 static func load_notch_mode() -> String:
 	var m := str(_read(SETTINGS, "notch_mode", "auto"))

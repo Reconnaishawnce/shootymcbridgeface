@@ -5,7 +5,14 @@
 // signature, the period, and whether the game could have produced the
 // numbers, then keeps the best score per player per period.
 //
-// Bindings: BOARD (KV namespace), SIGNING_SECRET (secret).
+// Bindings: BOARD (KV namespace), SIGNING_SECRET (secret), and for the
+// reports page ADMIN_KEY (secret): the one you type into the URL.
+//
+// Reports: the game POSTs crash, freeze and bug reports to /report,
+// signed with the same secret (over "report|" + the text). They are
+// kept thirty days. GET /reports?key=ADMIN_KEY lists them (add &html=1
+// for a page you can read on a phone), GET /report/<id>?key=ADMIN_KEY
+// shows one.
 
 export const EPOCH_DAY = 20748; // matches scripts/core/daily.gd
 export const TOP_KEPT = 200;
@@ -24,6 +31,11 @@ export const CAPS = {
 };
 export const RATE_PER_MINUTE = 20;
 export const GRACE_SECONDS = 15 * 60;
+export const REPORT_MAX_BYTES = 48000;
+export const REPORT_TTL_SECONDS = 30 * 86400;
+export const REPORTS_PER_INSTALL_PER_DAY = 10;
+export const REPORT_KINDS = ["crash", "freeze", "slow", "manual"];
+export const REPORTS_LIST_MAX = 100;
 
 const enc = new TextEncoder();
 
@@ -164,6 +176,90 @@ export async function forget(env, p) {
   return json({ ok: true });
 }
 
+// --- reports ------------------------------------------------------------
+
+function reportKey(nowUnix, rand) {
+  // Zero-padded so KV's lexicographic listing is chronological.
+  return `report:${String(nowUnix).padStart(12, "0")}:${rand}`;
+}
+
+export async function report(env, body, nowUnix) {
+  if (!body || typeof body.text !== "string" || typeof body.sig !== "string") return json({ ok: false, error: "bad body" }, 400);
+  if (enc.encode(body.text).length > REPORT_MAX_BYTES) return json({ ok: false, error: "too big" }, 413);
+  const expect = await hmacHex(env.SIGNING_SECRET, `report|${body.text}`);
+  if (!timingEqual(expect, body.sig)) return json({ ok: false, error: "bad signature" }, 403);
+  let p;
+  try {
+    p = JSON.parse(body.text);
+  } catch (e) {
+    return json({ ok: false, error: "bad json" }, 400);
+  }
+  if (!p || typeof p !== "object" || !REPORT_KINDS.includes(p.kind)) return json({ ok: false, error: "bad kind" }, 400);
+  const install = typeof p.install === "string" && /^[a-f0-9]{8,32}$/.test(p.install) ? p.install : "anon";
+  const dayKey = `rr:${install}:${dayNumber(nowUnix)}`;
+  const n = parseInt((await env.BOARD.get(dayKey)) || "0", 10) + 1;
+  await env.BOARD.put(dayKey, String(n), { expirationTtl: 86400 });
+  if (n > REPORTS_PER_INSTALL_PER_DAY) return json({ ok: false, error: "enough for today" }, 429);
+  const rand = Math.random().toString(16).slice(2, 8).padEnd(6, "0");
+  const key = reportKey(nowUnix, rand);
+  const row = {
+    t: nowUnix,
+    kind: p.kind,
+    version: String(p.version || "?").slice(0, 32),
+    device: String(p.device || "?").slice(0, 80),
+    state: String(p.state || "").slice(0, 32),
+    crumb: String(p.crumb || "").slice(0, 64),
+    note: String(p.note || "").slice(0, 600),
+    text: body.text,
+  };
+  await env.BOARD.put(key, JSON.stringify(row), { expirationTtl: REPORT_TTL_SECONDS });
+  return json({ ok: true, id: key.slice("report:".length) });
+}
+
+function adminOk(env, key) {
+  if (!env.ADMIN_KEY) return "no admin key: add the ADMIN_KEY secret to the Worker";
+  if (!timingEqual(String(key || ""), env.ADMIN_KEY)) return "bad key";
+  return null;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function reportsHtml(rows) {
+  const items = rows.map((r) => {
+    const when = new Date(r.t * 1000).toISOString().replace("T", " ").slice(0, 16);
+    let pretty = r.text;
+    try { pretty = JSON.stringify(JSON.parse(r.text), null, 2); } catch (e) { /* keep raw */ }
+    return `<details><summary><b>${esc(r.kind)}</b> &middot; v${esc(r.version)} &middot; ${esc(r.device)} &middot; ${esc(r.state)}/${esc(r.crumb)} &middot; ${when}${r.note ? " &middot; <i>" + esc(r.note) + "</i>" : ""}</summary><pre>${esc(pretty)}</pre></details>`;
+  });
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty reports</title><style>body{font:15px/1.4 system-ui;margin:12px;background:#111;color:#eee}summary{cursor:pointer;padding:6px 0}pre{white-space:pre-wrap;word-break:break-word;background:#1b1b22;padding:10px;border-radius:8px;font-size:12px}details{border-bottom:1px solid #333}</style><h2>Reports (${rows.length}, newest first)</h2>${items.join("") || "<p>None yet.</p>"}`;
+}
+
+export async function reports(env, key, limit, html) {
+  const why = adminOk(env, key);
+  if (why) return json({ ok: false, error: why }, env.ADMIN_KEY ? 403 : 503);
+  const n = Math.min(Math.max(parseInt(limit || "50", 10) || 50, 1), REPORTS_LIST_MAX);
+  const list = await env.BOARD.list({ prefix: "report:" });
+  const keys = list.keys.map((k) => k.name).sort().slice(-n).reverse();
+  const rows = [];
+  for (const k of keys) {
+    const row = await env.BOARD.get(k, "json");
+    if (row) rows.push({ id: k.slice("report:".length), ...row });
+  }
+  if (html) return new Response(reportsHtml(rows), { headers: { "content-type": "text/html; charset=utf-8" } });
+  return json({ ok: true, total: list.keys.length, rows: rows.map((r) => ({ ...r, text: undefined, bytes: r.text.length })) });
+}
+
+export async function reportOne(env, key, id) {
+  const why = adminOk(env, key);
+  if (why) return json({ ok: false, error: why }, env.ADMIN_KEY ? 403 : 503);
+  if (!/^[0-9]{12}:[a-f0-9]{6}$/.test(id)) return json({ ok: false, error: "bad id" }, 400);
+  const row = await env.BOARD.get(`report:${id}`, "json");
+  if (!row) return json({ ok: false, error: "not found" }, 404);
+  return json({ ok: true, id, ...row });
+}
+
 export async function handle(request, env, nowUnix = Math.floor(Date.now() / 1000)) {
   const url = new URL(request.url);
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
@@ -172,6 +268,22 @@ export async function handle(request, env, nowUnix = Math.floor(Date.now() / 100
     const period = parseInt(url.searchParams.get("period") || "0", 10);
     const viewer = url.searchParams.get("id") || "";
     return board(env, mode, period, viewer);
+  }
+  if (request.method === "POST" && url.pathname === "/report") {
+    if (await rateLimited(env, ip)) return json({ ok: false, error: "slow down" }, 429);
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return json({ ok: false, error: "bad json" }, 400);
+    }
+    return report(env, body, nowUnix);
+  }
+  if (request.method === "GET" && url.pathname === "/reports") {
+    return reports(env, url.searchParams.get("key"), url.searchParams.get("limit"), url.searchParams.get("html") === "1");
+  }
+  if (request.method === "GET" && url.pathname.startsWith("/report/")) {
+    return reportOne(env, url.searchParams.get("key"), url.pathname.slice("/report/".length));
   }
   if (request.method === "POST" && (url.pathname === "/submit" || url.pathname === "/forget")) {
     if (await rateLimited(env, ip)) return json({ ok: false, error: "slow down" }, 429);

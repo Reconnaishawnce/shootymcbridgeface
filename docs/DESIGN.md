@@ -294,6 +294,35 @@ The measurements before and after are in CHANGELOG 0.42; the bot's own
 runs in `scripts/ci/check.sh` and `soak.sh` guard the active player's
 side of the curve.
 
+## Reports that send themselves
+
+`Telemetry` (pure) is the form; `Diag` fills it; `Game` decides when.
+`Diag.context` is everything the old mail report had plus the state,
+the breadcrumb, uptime and `perf()`: a frame-time histogram by
+`Telemetry.HIST_EDGES`, the worst frames with where the game was, node
+and object counts, draw calls, memory. `Diag.bundle` turns it into a
+`Telemetry.payload` (known keys, lists trimmed), `Telemetry.text` makes
+compact JSON and drops the oldest events, then errors, then stalls
+until it fits `MAX_BYTES`, and `Telemetry.body` signs `report|<text>`
+with the leaderboard secret, so the Worker verifies the exact bytes
+and no canonical form has to agree between GDScript and JavaScript.
+
+Triggers: `Game._tele_report_crash` on the first title after a session
+that died in the foreground (once per previous session, by
+`crash_marker`); `Diag.long_frame` for a frame of `LONG_FRAME_SECONDS`
+in a run (`PER_RUN_FREEZES`); the fps watchdog switching safe graphics
+on; and the SETTINGS button, which uploads first and mails second.
+`Telemetry.allowed` applies the SEND REPORTS toggle and the per-session
+cap; the player's own report always goes. A failed send that was not a
+rejection waits in the save (`PENDING_MAX`) and goes on the next title.
+The install id is random and separate from the leaderboard id.
+
+On the Worker, `report()` checks the signature, the size, the kind and
+a per-install daily cap, and stores the row under a zero-padded
+timestamp key with a thirty-day TTL so KV's listing is chronological;
+`reports()` and `reportOne()` sit behind `ADMIN_KEY` and render JSON
+or a phone-readable HTML page.
+
 ## The top edge of the screen
 
 Some phones draw the game under the camera cutout, and the soldier

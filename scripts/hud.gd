@@ -39,6 +39,8 @@ signal crash_dismissed
 signal lesson_closed
 signal learn_pressed
 signal lessons_toggled(on: bool)
+## SEND REPORTS toggled.
+signal reports_toggled(on: bool)
 ## NOTCH ROOM cycled: "auto", "on" or "off".
 signal notch_changed(mode: String)
 signal pit_buy(id: String)
@@ -79,6 +81,8 @@ var _top_edge: Array[Control] = []
 var _top_inset := 0.0
 var _notch_mode := "auto"
 var _settings_notch: Button
+var _settings_reports: Button
+var _crash_body: Label
 var _boss_fill: ColorRect
 var _boss_label: Label
 
@@ -563,6 +567,10 @@ func set_lessons(on: bool) -> void:
 	_settings_lessons.text = "LESSONS: %s" % ("ON" if on else "OFF")
 
 
+func set_reports(on: bool) -> void:
+	_settings_reports.text = "SEND REPORTS: %s" % ("ON" if on else "OFF")
+
+
 ## Remembers a top-edge control's built offsets so the inset can move it.
 func _track_top(c: Control) -> void:
 	c.set_meta("top0", c.offset_top)
@@ -631,7 +639,8 @@ func _build_crash(root: Control) -> void:
 	var body := _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	body.custom_minimum_size.x = 520.0
-	body.text = "The game stopped suddenly last time. A report (phone, graphics, what the game was doing) helps fix it. One tap opens your mail app with it filled in; nothing is sent on its own."
+	body.text = "The game stopped suddenly last time. A report (phone, graphics, what the game was doing) helps fix it. If SEND REPORTS is on it has already gone; this sends it again with a word from you."
+	_crash_body = body
 	body.modulate = Color(0.9, 0.9, 0.95)
 	box.add_child(body)
 	var send := _button("SEND THE REPORT", 34)
@@ -644,9 +653,11 @@ func _build_crash(root: Control) -> void:
 	box.add_child(no)
 
 
-func show_crash_card() -> void:
+func show_crash_card(sent: bool = false) -> void:
 	_crash_card.move_to_front()
 	_crash_card.visible = true
+	_crash_body.text = ("The game stopped suddenly last time. A report (phone, graphics, what the game was doing) has already gone to the developer. Add a word about what you were doing and send it again, or carry on." if sent
+		else "The game stopped suddenly last time. A report (phone, graphics, what the game was doing) helps fix it. Tap SEND to upload it; if there is no connection it goes by email instead.")
 
 
 func hide_crash_card() -> void:
@@ -1188,8 +1199,14 @@ func _build_settings(root: Control) -> void:
 		set_notch_mode(next)
 		notch_changed.emit(next))
 	box.add_child(_settings_notch)
+	_settings_reports = _button("SEND REPORTS: ON", 34)
+	_settings_reports.pressed.connect(func() -> void:
+		var on := not _settings_reports.text.ends_with("ON")
+		set_reports(on)
+		reports_toggled.emit(on))
+	box.add_child(_settings_reports)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch.\nNotch room: moves the soldier count and the top buttons down from under a camera cutout. AUTO asks the phone; ON forces it."
+	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch.\nNotch room: moves the soldier count and the top buttons down from under a camera cutout. AUTO asks the phone; ON forces it.\nSend reports: after a crash, a freeze or a slow start the game sends the developer what it knows on its own: the phone model, its graphics chip, frame times, what the game was doing. Never your name, never the leaderboard name."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb.custom_minimum_size.x = 520.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
@@ -1202,7 +1219,7 @@ func _build_settings(root: Control) -> void:
 	_report_note.custom_minimum_size = Vector2(520.0, 56.0)
 	_report_note.add_theme_font_size_override("font_size", 22)
 	box.add_child(_report_note)
-	var report := _button("REPORT A BUG BY EMAIL", 28)
+	var report := _button("SEND A BUG REPORT", 28)
 	report.pressed.connect(func() -> void: report_pressed.emit(_report_note.text))
 	box.add_child(report)
 	var back := _button("BACK", 34)

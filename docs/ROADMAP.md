@@ -290,16 +290,13 @@ shipped and measured on its own.
    climbing. The pit lane is painted yellow with lead-in arrows on the
    road. NOTCH ROOM in SETTINGS moves the top of the HUD out from under
    a camera cutout (AUTO reads the phone's safe area).
-2. Telemetry. Crash and freeze reports go to the leaderboard Worker on
-   their own: a `/report` route with the same signature scheme, a size
-   cap, a rate limit and a 30-day KV TTL; the game sends the Diag bundle
-   (device, GPU, OS, renderer, frame-time history, event ring, state
-   breadcrumbs, node counts) after a bad exit, a stall, or a long frame,
-   with a SEND REPORTS toggle that defaults on and says what leaves the
-   phone. A `/reports` admin route lists them. Then a perf pass driven
-   by what comes back: shader pre-warm of every material, caps on
-   bullets, globs and effects at once, and a busy-screen soak on the
-   bot that counts nodes and frame times.
+2. Telemetry (0.43, done). Crash, freeze and slow-start reports go to
+   the Worker on their own (`/report`, signed, capped, thirty days),
+   with SEND REPORTS in SETTINGS and an admin page behind `ADMIN_KEY`.
+   The manual report uploads first and mails second. Particle systems
+   are capped, saws and the pit lane joined the warm-up, and the bot
+   reports the busiest the scene got. The perf fixes themselves wait
+   for the first reports: what the S23 Ultra sends decides them.
 3. Look, part one: colour. A palette pass toward the saturated,
    high-contrast reference (deep blue bridge, hot red crowds, gold
    turrets, purple multipliers): a graded sky and fog, sun and fill

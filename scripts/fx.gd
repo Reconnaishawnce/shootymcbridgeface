@@ -8,6 +8,12 @@ const BLOOD := Color(0.45, 0.08, 0.1)
 const DUST := Color(0.62, 0.55, 0.45, 0.7)
 const SMOKE := Color(0.35, 0.35, 0.38, 0.6)
 const SPARK := Color(1.0, 0.8, 0.35)
+## One-shot systems alive at once; past this a puff is skipped. A busy
+## screen on a weak phone is where freezes were reported.
+const MAX_LIVE := 36
+static var live := 0
+## The most alive at once this session, for the smoke bot's counters.
+static var live_peak := 0
 
 
 static func _mesh(size: float, color: Color, glow: bool = false) -> Mesh:
@@ -21,6 +27,10 @@ static func _mesh(size: float, color: Color, glow: bool = false) -> Mesh:
 
 
 static func _one_shot(parent: Node, at: Vector3, amount: int, life: float) -> CPUParticles3D:
+	if live >= MAX_LIVE:
+		return null
+	live += 1
+	live_peak = maxi(live_peak, live)
 	var p := CPUParticles3D.new()
 	p.one_shot = true
 	p.emitting = true
@@ -32,13 +42,17 @@ static func _one_shot(parent: Node, at: Vector3, amount: int, life: float) -> CP
 	p.global_position = at
 	var tw := p.create_tween()
 	tw.tween_interval(life + 0.2)
-	tw.tween_callback(p.queue_free)
+	tw.tween_callback(func() -> void:
+		live = maxi(0, live - 1)
+		p.queue_free())
 	return p
 
 
 ## A splash of dark red when a zombie dies.
 static func blood(parent: Node, at: Vector3, big: bool = false) -> void:
 	var p := _one_shot(parent, at, 14 if big else 8, 0.55)
+	if p == null:
+		return
 	p.mesh = _mesh(0.11 if big else 0.08, BLOOD)
 	p.direction = Vector3(0.0, 1.0, 0.0)
 	p.spread = 70.0
@@ -52,6 +66,8 @@ static func blood(parent: Node, at: Vector3, big: bool = false) -> void:
 ## A puff of dust: a soldier down, a shell landing, a vehicle wrecked.
 static func dust(parent: Node, at: Vector3, amount: int = 10, size: float = 0.25) -> void:
 	var p := _one_shot(parent, at, amount, 0.7)
+	if p == null:
+		return
 	p.mesh = _mesh(size, DUST)
 	p.direction = Vector3(0.0, 1.0, 0.0)
 	p.spread = 85.0
@@ -66,6 +82,8 @@ static func dust(parent: Node, at: Vector3, amount: int = 10, size: float = 0.25
 ## Sparks: a shell burst, a boss core hit, a vehicle rank.
 static func sparks(parent: Node, at: Vector3, amount: int = 12) -> void:
 	var p := _one_shot(parent, at, amount, 0.4)
+	if p == null:
+		return
 	p.mesh = _mesh(0.06, SPARK, true)
 	p.direction = Vector3(0.0, 1.0, 0.0)
 	p.spread = 180.0
@@ -77,6 +95,8 @@ static func sparks(parent: Node, at: Vector3, amount: int = 12) -> void:
 ## Smoke that rises and fades: muzzle puffs, wrecks.
 static func smoke(parent: Node, at: Vector3, amount: int = 6) -> void:
 	var p := _one_shot(parent, at, amount, 0.9)
+	if p == null:
+		return
 	p.mesh = _mesh(0.16, SMOKE)
 	p.direction = Vector3(0.0, 1.0, 0.0)
 	p.spread = 30.0

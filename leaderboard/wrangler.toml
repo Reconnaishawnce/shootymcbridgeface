@@ -2,6 +2,7 @@
 #   npx wrangler kv namespace create BOARD   (paste the id below)
 #   npx wrangler secret put SIGNING_SECRET   (the same value as the
 #   repository secret LEADERBOARD_SECRET)
+#   npx wrangler secret put ADMIN_KEY        (your password for /reports)
 name = "shootymcbridgeface-leaderboard"
 main = "worker.js"
 compatibility_date = "2025-01-01"

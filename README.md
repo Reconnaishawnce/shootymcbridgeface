@@ -146,9 +146,12 @@ the same key (see below).
   time slows for a beat.
 - **Slow phone?** The game lowers its own graphics once if it cannot
   hold the frame rate, and says so; SETTINGS turns it back.
-- **Bug reports**: SETTINGS has REPORT A BUG BY EMAIL. It opens your mail
-  app with the diagnostics filled in (phone, GPU, app version, the last
-  game events, stalls, how the previous session ended, engine errors)
+- **Bug reports**: crashes, frozen frames and slow starts are reported
+  to the game's server on their own (phone, GPU, app version, frame
+  times, the last game events, how the previous session ended, engine
+  errors; never a name), and SEND REPORTS in SETTINGS turns that off.
+  SEND A BUG REPORT in SETTINGS uploads one with your own words, or
+  opens your mail app with it filled in when there is no connection,
   and copies the same text to the clipboard. SAFE GRAPHICS in the same
   card turns off glow, fog, shadows and anti-aliasing for phones that
   glitch.

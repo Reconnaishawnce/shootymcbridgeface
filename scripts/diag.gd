@@ -21,6 +21,13 @@ var _last_beat := 0.0
 var _clean := false
 var _frames := 0
 var _enabled := true
+## Frame times this session: a histogram by Telemetry.HIST_EDGES and
+## the worst few frames with where the game was.
+var frame_hist: Array = [0, 0, 0, 0, 0]
+var worst_frames: Array = []
+## A single frame of Telemetry.LONG_FRAME_SECONDS or more, in the
+## foreground: a freeze the game should report.
+signal long_frame(seconds: float, crumb: String)
 
 
 func _ready() -> void:
@@ -46,10 +53,17 @@ func _process(_delta: float) -> void:
 	_last_wall = now
 	# A long gap between frames while in the foreground is a stall worth
 	# knowing about: which state, which breadcrumb, how long.
+	if _frames > 2:
+		var ms := wall * 1000.0
+		frame_hist[Telemetry.hist_bucket(ms)] += 1
+		if ms > 50.0:
+			worst_frames = Telemetry.note_worst(worst_frames, {"ms": snappedf(ms, 0.1), "t": snappedf(now, 0.01), "state": state_name, "crumb": crumb})
 	if Report.is_stall(wall) and _clean == false and _frames > 2:
 		if stalls.size() < MAX_STALLS:
 			stalls.append({"t": snappedf(now, 0.01), "seconds": snappedf(wall, 0.01), "state": state_name, "crumb": crumb})
 		note("STALL", {"seconds": snappedf(wall, 0.01), "crumb": crumb})
+		if wall >= Telemetry.LONG_FRAME_SECONDS:
+			long_frame.emit(wall, crumb)
 	if now - _last_beat >= HEARTBEAT_EVERY:
 		_beat(false)
 
@@ -87,10 +101,25 @@ func note(event: String, data: Dictionary = {}) -> void:
 	events = Report.trim(events)
 
 
-## The whole report: device, app, the previous session, stalls, engine
-## errors from both logs, a save summary and the event log.
-func report(save: Dictionary, note: String = "") -> String:
-	var ctx := {
+## Counters a report carries: frame times, scene size, memory.
+func perf() -> Dictionary:
+	return {
+		"hist": frame_hist.duplicate(),
+		"worst": worst_frames.duplicate(true),
+		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"objects": int(Performance.get_monitor(Performance.OBJECT_COUNT)),
+		"draw_calls": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		"primitives": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		"fps": Engine.get_frames_per_second(),
+		"memory_mb": snappedf(float(OS.get_static_memory_usage()) / 1048576.0, 0.1),
+		"uptime": snappedf(Time.get_ticks_msec() * 0.001, 0.1),
+	}
+
+
+## Everything a report is made from: device, app, the previous session,
+## stalls, engine errors from both logs, a save summary, the event log.
+func context(save: Dictionary, p_note: String = "") -> Dictionary:
+	return {
 		"version": str(ProjectSettings.get_setting("application/config/version", "dev")),
 		"time": Time.get_datetime_string_from_system(true, true),
 		"device": "%s (%s)" % [OS.get_model_name(), OS.get_name()],
@@ -109,9 +138,24 @@ func report(save: Dictionary, note: String = "") -> String:
 		"previous_errors": Report.error_lines(_previous_log()),
 		"current_errors": Report.error_lines(_current_log()),
 		"save": save,
-		"note": note,
+		"note": p_note,
+		"state": state_name,
+		"crumb": crumb,
+		"uptime": snappedf(Time.get_ticks_msec() * 0.001, 0.1),
+		"perf": perf(),
 	}
-	return Report.build(ctx)
+
+
+## The report as text, for the mail app and the clipboard.
+func report(save: Dictionary, p_note: String = "") -> String:
+	return Report.build(context(save, p_note))
+
+
+## The report as a payload for the server (Telemetry).
+func bundle(save: Dictionary, kind: String, p_note: String = "") -> Dictionary:
+	var c := context(save, p_note)
+	c.kind = kind
+	return Telemetry.payload(c)
 
 
 ## Open the mail app with the report, and put it on the clipboard too.

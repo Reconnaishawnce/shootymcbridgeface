@@ -70,5 +70,35 @@ check(r.status === 429, "rate limited per ip");
 r = await get("/");
 check(r.body.ok && r.body.day === day, "the root says which day it is");
 
+// Reports.
+const payload = JSON.stringify({ kind: "freeze", version: "0.43.1", device: "Galaxy S23 Ultra (Android)", state: "running", crumb: "boss", install: "abcdef0123456789", events: ["a", "b"] });
+const rsig = await hmacHex(env.SIGNING_SECRET, "report|" + payload);
+r = await post("/report", { text: payload, sig: rsig }, "7.7.7.7");
+check(r.status === 200 && r.body.ok && /^[0-9]{12}:[a-f0-9]{6}$/.test(r.body.id), "a signed report is stored");
+const firstId = r.body.id;
+r = await post("/report", { text: payload + " ", sig: rsig }, "7.7.7.7");
+check(r.status === 403, "a changed text fails the signature");
+const big = JSON.stringify({ kind: "crash", pad: "x".repeat(50000) });
+r = await post("/report", { text: big, sig: await hmacHex(env.SIGNING_SECRET, "report|" + big) }, "7.7.7.7");
+check(r.status === 413, "an oversize report is refused");
+const odd = JSON.stringify({ kind: "weird" });
+r = await post("/report", { text: odd, sig: await hmacHex(env.SIGNING_SECRET, "report|" + odd) }, "7.7.7.7");
+check(r.status === 400, "an unknown kind is refused");
+r = await get("/reports?key=whatever");
+check(r.status === 503, "no admin key configured: the list says so");
+env.ADMIN_KEY = "admin-secret";
+r = await get("/reports?key=wrong");
+check(r.status === 403, "a wrong admin key is refused");
+r = await get("/reports?key=admin-secret");
+check(r.body.ok && r.body.rows.length === 1 && r.body.rows[0].kind === "freeze" && r.body.rows[0].text === undefined && r.body.rows[0].bytes > 0, "the list shows the summary, not the body");
+r = await get(`/report/${firstId}?key=admin-secret`);
+check(r.body.ok && r.body.text === payload, "one report comes back whole");
+const page = await handle(new Request("https://x.test/reports?key=admin-secret&html=1"), env, NOW);
+const htmlText = await page.text();
+check(page.headers.get("content-type").startsWith("text/html") && htmlText.includes("Galaxy S23 Ultra") && htmlText.includes("&lt;") === false, "the html page lists the device");
+for (let i = 0; i < 12; i++) await post("/report", { text: payload, sig: rsig }, "8.8.8." + i);
+r = await post("/report", { text: payload, sig: rsig }, "8.8.8.99");
+check(r.status === 429, "an install is capped per day");
+
 console.log(failures === 0 ? "\nleaderboard worker: all checks passed" : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

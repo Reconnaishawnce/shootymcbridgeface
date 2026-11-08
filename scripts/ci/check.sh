@@ -29,6 +29,7 @@ echo "== smoke play (900 fixed frames, auto-steer)"
 fail_on_script_errors "smoke play"
 grep -q "SMOKE_RESULT" "$LOG" || { echo "::error::smoke run produced no result line"; exit 1; }
 grep "SMOKE_LB" "$LOG" | grep -q '"closed":true' && grep "SMOKE_LB" "$LOG" | grep -q '"opened":true' || { echo "::error::the leaderboard page did not open and close over the home screen"; exit 1; }
+grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"fits":true' && grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"signed":true' || { echo "::error::the crash report did not build, fit and sign"; exit 1; }
 
 echo "== wipe and retry (nightmare, seed 11, a forced wipe at frame 4500: the results screen and the restart)"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=11 --nightmare --smoke-retry --smoke-wipe-at=4500 2>&1 | tee "$LOG"

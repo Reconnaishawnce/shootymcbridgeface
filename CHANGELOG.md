@@ -3,6 +3,30 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.43 (reports that send themselves)
+
+- Crash, freeze and slow-start reports go to the game's server on
+  their own. After a session that died in the foreground, a single
+  frozen frame of two seconds or more, or a start slow enough to
+  switch safe graphics on, the game sends what it knows: phone model,
+  OS, graphics chip, renderer, frame-time buckets and the worst
+  frames, the event log, engine error lines, a save summary, where the
+  game was. Under a random install id; never a name. One freeze report
+  a run, six reports a session, ten a day per phone, 48 KB each, kept
+  thirty days; offline, up to three wait in the save. SEND REPORTS in
+  SETTINGS turns it off. The crash card and the home screen say when
+  one has gone.
+- SEND A BUG REPORT in SETTINGS uploads first and falls back to the
+  mail app only when there is no server or no connection.
+- The Worker grew `/report` and an admin page (`/reports?key=...&html=1`)
+  behind a new `ADMIN_KEY` secret; see leaderboard/README.md. The
+  Worker must be redeployed from the dashboard for the routes to exist.
+- Performance: one-shot particle systems are capped at 36 alive at
+  once, saws and the pit lane join the shader warm-up, and the smoke
+  bot now prints the busiest the scene got (nodes, zombies, effects)
+  and builds and signs a crash report headless, which check.sh
+  requires.
+
 ## 0.42 (the balance pass: a huge squad is not a free ride)
 
 - Measured with a new idle bot (`--smoke-idle`, `--smoke-idle-from=N`):

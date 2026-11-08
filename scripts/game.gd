@@ -67,6 +67,13 @@ var _run_time := 0.0
 ## without one the road stops rewarding fire: panels do not climb.
 var _last_input_at := 0.0
 var _hands_hint_shown := false
+## Telemetry: reports that go on their own. The toggle, this phone's
+## random id, and the caps for this session and run.
+var reports_on := true
+var _tele_id := ""
+var _tele_sent := 0
+var _tele_freezes_run := 0
+var _tele_crash_sent := false
 const HANDS_OFF_SECONDS := 4.0
 var _level_peak := 1
 ## The upgrades in force for the current run: the real ones, or a blank
@@ -121,6 +128,8 @@ var _smoke_upgrades := false
 var _smoke_idle := false
 ## --smoke-idle-from=N: the bot plays until level N, then does nothing.
 var _smoke_idle_from := 0
+## The busiest the scene got this run: nodes, zombies, live effects.
+var _smoke_peak := {"nodes": 0, "zombies": 0, "fx": 0}
 var _shots_dir := ""
 var _shots_quick := false
 var _game_over_at := 0
@@ -237,6 +246,13 @@ func _ready() -> void:
 	hud.set_shadows(SaveData.load_shadows_on())
 	hud.set_safe_graphics(SaveData.load_safe_graphics())
 	hud.set_notch_mode(SaveData.load_notch_mode())
+	reports_on = SaveData.load_reports_on()
+	hud.set_reports(reports_on)
+	_tele_id = SaveData.load_telemetry_id()
+	if _tele_id == "":
+		_tele_id = Leaderboard.new_id()
+		SaveData.save_telemetry_id(_tele_id)
+	Diag.long_frame.connect(_on_long_frame)
 	hud.set_lessons(lessons_on)
 	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
@@ -469,6 +485,11 @@ func _build_scene() -> void:
 		lessons_on = on
 		SaveData.save_lessons_on(on)
 		sfx.play("click"))
+	hud.reports_toggled.connect(func(on: bool) -> void:
+		reports_on = on
+		SaveData.save_reports_on(on)
+		Diag.note("reports_toggle", {"on": on})
+		sfx.play("click"))
 	hud.notch_changed.connect(func(mode: String) -> void:
 		SaveData.save_notch_mode(mode)
 		Diag.note("notch_mode", {"mode": mode, "inset": hud.top_inset()})
@@ -621,6 +642,13 @@ func _warm_up() -> void:
 	c.setup("bomb")
 	c.position = Vector3(3.0, 0.0, 2.0)
 	warm.add_child(c)
+	var saw := Saw.new()
+	saw.setup(-3.0, 3.0)
+	warm.add_child(saw)
+	var bay := PitBay.new()
+	bay.setup(world.road_half)
+	bay.position.z = -30.0
+	warm.add_child(bay)
 	var st := Strike.new()
 	st.setup(-3.0)
 	warm.add_child(st)
@@ -676,6 +704,7 @@ func _watch_fps() -> void:
 		_apply_graphics(true)
 		hud.toast(Perf.notice())
 		Diag.note("auto_safe_graphics", {"avg": snappedf(avg, 0.1)})
+		_telemetry("slow", "safe graphics switched on at %.1f fps" % avg)
 	_fps_frames = 0
 	_fps_since = now
 
@@ -704,10 +733,101 @@ func _save_summary() -> Dictionary:
 	}
 
 
+## The player's own report: uploaded first; by mail (and the clipboard)
+## when there is no server or it cannot be reached.
 func _send_report(note: String) -> void:
 	sfx.play("click")
+	var sent := _telemetry("manual", note, func(ok: bool, id: String) -> void:
+		if ok:
+			hud.show_banner("REPORT SENT\nTHANK YOU  (%s)" % id.right(6), 2.2)
+		else:
+			_send_report_by_mail(note))
+	if not sent:
+		_send_report_by_mail(note)
+
+
+func _send_report_by_mail(note: String) -> void:
 	var ok := Diag.send(_save_summary(), note)
 	hud.show_banner("REPORT COPIED\nOPENING MAIL..." if ok else "REPORT COPIED TO CLIPBOARD\nNO MAIL APP FOUND", 2.2)
+
+
+## Builds and sends a report of [param kind] if the rules allow; true
+## when one was sent (or queued). [param done] hears the outcome.
+func _telemetry(kind: String, note: String = "", done: Callable = Callable()) -> bool:
+	if smoke or _shots_dir != "":
+		return false
+	if not Telemetry.allowed(reports_on, Leaderboard.configured(), kind, _tele_sent, _tele_freezes_run):
+		return false
+	_tele_sent += 1
+	if kind == "freeze":
+		_tele_freezes_run += 1
+	var p := Diag.bundle(_save_summary(), kind, note)
+	p.install = _tele_id
+	var text := Telemetry.text(p)
+	Diag.note("report_build", {"kind": kind, "bytes": text.length()})
+	_tele_post(text, false, done)
+	return true
+
+
+## POSTs one report; a failure keeps it in the save for the next title.
+func _tele_post(text: String, from_queue: bool, done: Callable = Callable()) -> void:
+	var req := HTTPRequest.new()
+	req.timeout = 12.0
+	add_child(req)
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
+		var ok: bool = parsed is Dictionary and code == 200 and bool(parsed.get("ok", false))
+		var id := str(parsed.get("id", "")) if parsed is Dictionary else ""
+		Diag.note("report_sent", {"ok": ok, "code": code, "id": id})
+		if not ok and not from_queue and code != 400 and code != 403 and code != 413 and code != 429:
+			_tele_queue(text)
+		if done.is_valid():
+			done.call(ok, id))
+	var err := req.request(Telemetry.url(LeaderboardConfig.URL), ["Content-Type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(Telemetry.body(text, LeaderboardConfig.SECRET)))
+	if err != OK:
+		req.queue_free()
+		if not from_queue:
+			_tele_queue(text)
+		if done.is_valid():
+			done.call(false, "")
+
+
+func _tele_queue(text: String) -> void:
+	var pending := SaveData.load_pending_reports()
+	pending.append(text)
+	while pending.size() > Telemetry.PENDING_MAX:
+		pending.pop_front()
+	SaveData.save_pending_reports(pending)
+
+
+## Reports kept from an offline moment go out, one per title visit.
+func _tele_flush() -> void:
+	if not Leaderboard.configured() or not reports_on:
+		return
+	var pending := SaveData.load_pending_reports()
+	if pending.is_empty():
+		return
+	var text := str(pending.pop_front())
+	SaveData.save_pending_reports(pending)
+	_tele_post(text, true)
+
+
+## The previous session died in the foreground: report it once.
+func _tele_report_crash() -> void:
+	if not Diag.had_bad_exit():
+		return
+	var marker := Telemetry.crash_marker(Diag.previous)
+	if marker == "" or SaveData.load_crash_reported() == marker:
+		return
+	SaveData.save_crash_reported(marker)
+	_tele_crash_sent = _telemetry("crash", "")
+
+
+func _on_long_frame(seconds: float, crumb: String) -> void:
+	if state != State.RUNNING or _warming:
+		return
+	_telemetry("freeze", "a frame of %.1f s at %s" % [seconds, crumb])
 
 
 func show_title() -> void:
@@ -716,6 +836,8 @@ func show_title() -> void:
 	if not smoke and _shots_dir == "":
 		_lb_send_pending()
 		_lb_teaser()
+		_tele_report_crash()
+		_tele_flush()
 	sfx.set_music("calm")
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
@@ -729,7 +851,8 @@ func show_title() -> void:
 	var runs := int(stats.get("runs", 0))
 	var goal := Goals.next(_goal_context())
 	if Diag.had_bad_exit() and runs > 0:
-		goal = "The game stopped suddenly last time. SETTINGS has a REPORT A BUG button that emails the details."
+		goal = ("The game stopped suddenly last time. A report went to the developer on its own." if _tele_crash_sent
+			else "The game stopped suddenly last time. SETTINGS has a SEND A BUG REPORT button.")
 	if Diag.had_bad_exit() and runs > 0 and not _crash_card_shown and not smoke and _shots_dir == "":
 		_crash_card_shown = true
 		call_deferred("_offer_crash_report")
@@ -747,7 +870,7 @@ func show_title() -> void:
 
 func _offer_crash_report() -> void:
 	if state == State.TITLE:
-		hud.show_crash_card()
+		hud.show_crash_card(_tele_crash_sent)
 
 
 func _quests_left() -> int:
@@ -1020,6 +1143,7 @@ func toggle_squad() -> void:
 
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
+	_tele_freezes_run = 0
 	_last_input_at = 0.0
 	_hands_hint_shown = false
 	_cam_pull = 0.0
@@ -2434,6 +2558,10 @@ func _smoke_tick() -> void:
 			print("SMOKE_IDLE ", JSON.stringify({"frame": _frames, "level": world.level, "squad": squad.count}))
 		if not _smoke_idle:
 			_bot_steer()
+		if _frames % 30 == 0:
+			_smoke_peak.nodes = maxi(_smoke_peak.nodes, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
+			_smoke_peak.zombies = maxi(_smoke_peak.zombies, world.zombies.size())
+			_smoke_peak.fx = maxi(_smoke_peak.fx, Fx.live_peak)
 		return
 	if _shots_dir != "":
 		return
@@ -2470,6 +2598,12 @@ func _smoke_tick() -> void:
 			"state": state,
 			"retries": _smoke_retries,
 		}
+		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
+		# The report the phone would send after a crash, built headless.
+		var bundle := Diag.bundle(_save_summary(), "crash", "smoke")
+		bundle.install = "0123456789abcdef"
+		var tele_text := Telemetry.text(bundle)
+		print("SMOKE_TELEMETRY ", JSON.stringify({"bytes": tele_text.length(), "kind": bundle.kind, "signed": Telemetry.body(tele_text, "x").sig.length() == 64, "fits": tele_text.length() <= Telemetry.MAX_BYTES}))
 		print("SMOKE_RESULT ", JSON.stringify(summary))
 		var ok := gates_passed >= 3 and total_distance > 100.0
 		_quit_with(0 if ok else 1)

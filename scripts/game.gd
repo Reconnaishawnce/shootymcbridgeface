@@ -378,6 +378,23 @@ func _build_scene() -> void:
 		hud.show_float("SAW AHEAD", false)
 		sfx.play("boss_roar", -12.0, 2.2))
 	world.saw_hit.connect(_on_saw_hit)
+	world.barricade_spawned.connect(func() -> void:
+		hud.show_float("WALL AHEAD", false)
+		sfx.play("step", -10.0, 0.6))
+	world.barricade_hit.connect(_on_barricade_hit)
+	world.barricade_broken.connect(func(at: Vector3) -> void:
+		Burst.spawn(world, at + Vector3(0.0, 0.8, 0.0), Barricade.BLOCK, 14, 0.18, 5.0, 0.6)
+		if not smoke:
+			Fx.dust(world, at + Vector3(0.0, 0.5, 0.0), 14, 0.3)
+		sfx.play("explosion", -10.0, 1.1))
+	world.split.connect(func(at: Vector3, n: int) -> void:
+		if smoke:
+			print("SMOKE_SPLIT ", JSON.stringify({"into": n, "level": world.level, "frame": _frames}))
+		Burst.spawn(world, at + Vector3(0.0, 0.9, 0.0), Zombie.SPLITTER_SKIN, 10, 0.14, 5.0, 0.5)
+		sfx.play("hit", -4.0, 0.5)
+		hud.show_float("SPLIT!", false))
+	world.turret_bought.connect(func() -> void:
+		_on_turret_bought("supply"))
 	world.foreman_threw.connect(func(what: String) -> void:
 		if smoke:
 			print("SMOKE_FOREMAN ", JSON.stringify({"what": what, "level": world.level, "frame": _frames}))
@@ -583,6 +600,12 @@ func _check_lessons() -> void:
 	var saw := world.nearest_saw(26.0)
 	if saw != null and _teach("saw"):
 		return
+	var wall := world.nearest_barricade(28.0)
+	if wall != null and _teach("barricade"):
+		return
+	for z in world.zombies:
+		if z.is_splitter() and z.position.z > -30.0 and _teach("splitter"):
+			return
 	var bay := world.nearest_bay()
 	if bay != null and bay.position.z > -32.0 and _teach("pitstop"):
 		return
@@ -645,6 +668,14 @@ func _warm_up() -> void:
 	var saw := Saw.new()
 	saw.setup(-3.0, 3.0)
 	warm.add_child(saw)
+	var wall := Barricade.new()
+	wall.setup(1, 3.3, 20.0)
+	wall.position.z = 6.0
+	warm.add_child(wall)
+	var turret := Turret.new()
+	turret.setup(1, 10.0)
+	turret.position = Vector3(5.0, 0.0, 2.0)
+	warm.add_child(turret)
 	var bay := PitBay.new()
 	bay.setup(world.road_half)
 	bay.position.z = -30.0
@@ -1892,7 +1923,7 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 	bounty = maxi(0, bounty - cost)
 	world.supply_funds = bounty
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
-	var what := "+%d SOLDIERS" % amount if id == "soldiers" else Powerups.title(id)
+	var what := "+%d SOLDIERS" % amount if id == "soldiers" else ("GOLD TURRET" if id == "turret" else Powerups.title(id))
 	hud.show_banner("SUPPLY: %s\n-%d COINS" % [what, cost], 1.2)
 	sfx.play("gate_good", -2.0, 1.1)
 	_punch(3.0)
@@ -1903,6 +1934,8 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 # --- the pit stop ----------------------------------------------------------
 
 var _pit_open := false
+## A lesson to show once the pit sheet closes (the sheet pauses the tree).
+var _teach_after_pit := ""
 var _pit_cleared := 0
 ## The leaderboard: {id, name, joined, pending}. See Leaderboard.
 var lb: Dictionary = {}
@@ -1933,7 +1966,7 @@ func _on_pit_stop() -> void:
 	if smoke:
 		# The bot buys what it can afford, best first, and rolls on.
 		var bought := []
-		for id in ["rounds", "rifles", "bomb", "armor"]:
+		for id in ["turret", "rounds", "rifles", "bomb", "armor"]:
 			while squad.pit.can_buy(id, bounty) and bought.size() < 3:
 				_pit_buy(id)
 				bought.append(id)
@@ -1965,6 +1998,9 @@ func _pit_buy(id: String) -> void:
 		"dressing":
 			squad.add(PitStop.dressing_for(squad.count))
 			squad.rally()
+		"turret":
+			if world.add_turret():
+				_on_turret_bought("pit")
 	Diag.note("pit_buy", {"id": id, "left": bounty})
 	if not smoke:
 		sfx.play("gate_good", -4.0)
@@ -1980,6 +2016,10 @@ func _pit_leave() -> void:
 	get_tree().paused = false
 	Diag.set_state("running")
 	sfx.play("click")
+	if _teach_after_pit != "":
+		var id := _teach_after_pit
+		_teach_after_pit = ""
+		_teach(id)
 	if _pit_cleared > 0:
 		hud.show_banner("THE PIT CREW CLEARED THE ROAD\n%d ZOMBIES GONE" % _pit_cleared, 1.6)
 	else:
@@ -2294,6 +2334,29 @@ func _on_shell_exploded(at: Vector3, kills: int) -> void:
 		Fx.smoke(world, at + Vector3(0.0, 0.6, 0.0), 4)
 	if kills >= 3:
 		_punch(1.5)
+
+
+func _on_barricade_hit(hit: bool) -> void:
+	if smoke:
+		print("SMOKE_WALL ", JSON.stringify({"hit": hit, "level": world.level, "squad": squad.count, "frame": _frames}))
+	if hit:
+		sfx.play("explosion", -6.0, 0.9)
+		_shake = minf(1.0, _shake + 0.6)
+		hud.flash(0.18)
+		hud.show_banner("INTO THE WALL", 0.9)
+
+
+## A gold turret is up: say so, and teach it once.
+func _on_turret_bought(from: String) -> void:
+	Diag.note("turret", {"from": from, "count": world.turrets.size(), "level": world.level})
+	if smoke:
+		print("SMOKE_TURRET ", JSON.stringify({"from": from, "count": world.turrets.size(), "level": world.level, "frame": _frames}))
+	sfx.play("gate_good", -4.0, 0.8)
+	hud.show_banner("GOLD TURRET ON THE CURB", 1.2)
+	if from == "supply":
+		_teach("turret")
+	else:
+		_teach_after_pit = "turret"
 
 
 func _on_saw_hit(hit: bool) -> void:
@@ -2641,6 +2704,11 @@ func _bot_steer() -> void:
 		if _bot_spread:
 			squad.set_spread(0.6)
 		return
+	# A wall ahead on our side: take the open half.
+	var wall := world.nearest_barricade(22.0)
+	if wall != null and wall.covers_x(squad.position.x):
+		squad.target_x = -float(wall.side) * world.road_half * 0.5
+		return
 	# Lightning ring on top of us: head for the nearest safe spot, and dash
 	# there if it is far.
 	if world.strike_threat_at(squad.position.x, squad.reach() + 0.6):
@@ -2821,6 +2889,15 @@ func _shots_walkthrough() -> void:
 		pair.position = Vector3(0.0, 0.0, -17.0)
 		crowd.add_child(pair)
 		pair.reveal_all()
+		var wall := Barricade.new()
+		wall.setup(1, world.road_half, 30.0)
+		wall.position.z = -5.0
+		wall.take_damage(12.0)
+		crowd.add_child(wall)
+		var turret := Turret.new()
+		turret.setup(-1, 10.0)
+		turret.position = Vector3(turret.stand_x(world.road_half), 0.0, Turret.AHEAD_Z)
+		crowd.add_child(turret)
 		squad.set_count(12)
 		squad.set_spread(1.1)
 		hud.show_running()

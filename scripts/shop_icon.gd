@@ -73,6 +73,8 @@ func _draw() -> void:
 			_cross(c, s, dim)
 		"rifles":
 			_rifle(c, s, dim)
+		"turret":
+			_turret(c, s, dim)
 		_:
 			draw_circle(c, s * 0.5, GOLD * dim)
 
@@ -217,6 +219,19 @@ func _cross(c: Vector2, s: float, dim: float) -> void:
 	draw_rect(Rect2(c.x - s * 0.6, c.y - s * 0.2, s * 1.2, s * 0.4), _col(RED, dim))
 	var pulse := 0.9 + 0.1 * sin(_t * 4.0)
 	draw_arc(c, s * 0.9 * pulse, 0.0, TAU, 32, Color(1.0, 0.4, 0.4, 0.35 * dim), s * 0.05)
+
+
+func _turret(c: Vector2, s: float, dim: float) -> void:
+	# A gold drum, a head with twin barrels, a flash at the muzzle.
+	draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.9, s * 0.9), c + Vector2(s * 0.9, s * 0.9), c + Vector2(s * 0.6, s * 0.35), c + Vector2(-s * 0.6, s * 0.35)]), _col(GOLD.darkened(0.25), dim))
+	draw_rect(Rect2(c.x - s * 0.55, c.y - s * 0.2, s * 1.1, s * 0.6), _col(GOLD, dim))
+	draw_rect(Rect2(c.x - s * 0.3, c.y - s * 0.05, s * 0.9, s * 0.12), _col(STEEL.darkened(0.3), dim))
+	draw_rect(Rect2(c.x - s * 0.3, c.y + s * 0.15, s * 0.9, s * 0.12), _col(STEEL.darkened(0.3), dim))
+	draw_circle(c + Vector2(-s * 0.2, -s * 0.4), s * 0.16, _col(WHITE, dim))
+	var ph := fmod(_t * 3.0, 1.0)
+	for i in range(4):
+		var a := ph * TAU * 0.5 + float(i) * TAU / 4.0
+		draw_line(c + Vector2(s * 0.75, s * 0.1), c + Vector2(s * 0.75, s * 0.1) + Vector2(cos(a), sin(a)) * s * (0.2 + 0.1 * sin(_t * 9.0)), _col(GOLD, dim), s * 0.06)
 
 
 func _rifle(c: Vector2, s: float, dim: float) -> void:

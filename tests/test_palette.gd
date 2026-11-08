@@ -13,8 +13,8 @@ func test_the_cast_reads() -> void:
 	check(Palette.hue_gap(Palette.SOLDIER, Palette.ZOMBIE) > 0.3, "soldiers and zombies are opposite hues")
 	check(Palette.hue_gap(Palette.ZOMBIE, Palette.ROAD) > 0.3, "zombies stand off the deck")
 	check(Palette.chroma(Palette.ZOMBIE) > 0.7 and Palette.chroma(Palette.SOLDIER) > 0.7, "both are vivid")
-	for a in [Palette.ZOMBIE, Palette.BRUTE, Palette.RUNNER, Palette.THIEF, Palette.TANK, Palette.LATCHER]:
-		for b in [Palette.ZOMBIE, Palette.BRUTE, Palette.RUNNER, Palette.THIEF, Palette.TANK, Palette.LATCHER]:
+	for a in [Palette.ZOMBIE, Palette.BRUTE, Palette.RUNNER, Palette.THIEF, Palette.TANK, Palette.LATCHER, Palette.SPLITTER]:
+		for b in [Palette.ZOMBIE, Palette.BRUTE, Palette.RUNNER, Palette.THIEF, Palette.TANK, Palette.LATCHER, Palette.SPLITTER]:
 			if a != b:
 				check(Palette.hue_gap(a, b) > 0.04 or absf(Palette.luma(a) - Palette.luma(b)) > 0.12, "zombie kinds tell apart (%s vs %s)" % [a.to_html(false), b.to_html(false)])
 

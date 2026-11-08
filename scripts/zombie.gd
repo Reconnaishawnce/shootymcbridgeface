@@ -7,7 +7,7 @@ extends Node3D
 ## down if they get there. Tanks are wide bullet sponges that shield the
 ## gate behind them.
 
-enum Kind { NORMAL, BRUTE, THIEF, TANK, RUNNER, LATCHER }
+enum Kind { NORMAL, BRUTE, THIEF, TANK, RUNNER, LATCHER, SPLITTER }
 
 const SKIN := Palette.ZOMBIE
 const SKIN_PALE := Palette.ZOMBIE_PALE
@@ -16,6 +16,7 @@ const THIEF_SKIN := Palette.THIEF
 const TANK_SKIN := Palette.TANK
 const RUNNER_SKIN := Palette.RUNNER
 const LATCHER_SKIN := Palette.LATCHER
+const SPLITTER_SKIN := Palette.SPLITTER
 const SHIRTS := [
 	Color(0.5, 0.2, 0.2), Color(0.35, 0.35, 0.4), Color(0.4, 0.3, 0.2),
 	Color(0.35, 0.2, 0.4), Color(0.2, 0.35, 0.3), Color(0.55, 0.45, 0.2),
@@ -103,6 +104,13 @@ func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
 			radius = 0.5
 			homing = 2.2
 			_base_scale = 1.0
+		Kind.SPLITTER:
+			# Slow, bloated, and worse dead than alive.
+			speed = p_speed * 0.8
+			bite = 2
+			radius = 0.72
+			homing = 1.0
+			_base_scale = 1.3
 		_:
 			speed = p_speed
 			bite = 1
@@ -118,7 +126,7 @@ func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
 
 
 func kind_name() -> String:
-	return ["normal", "brute", "thief", "tank", "runner", "latcher"][kind]
+	return ["normal", "brute", "thief", "tank", "runner", "latcher", "splitter"][kind]
 
 
 func is_thief() -> bool:
@@ -131,6 +139,10 @@ func is_tank() -> bool:
 
 func is_runner() -> bool:
 	return kind == Kind.RUNNER
+
+
+func is_splitter() -> bool:
+	return kind == Kind.SPLITTER
 
 
 func is_latcher() -> bool:
@@ -156,6 +168,9 @@ func _build() -> void:
 		Kind.LATCHER:
 			skin = LATCHER_SKIN
 			shirt = Color(0.3, 0.1, 0.25)
+		Kind.SPLITTER:
+			skin = SPLITTER_SKIN
+			shirt = Color(0.35, 0.4, 0.15)
 	var ink := 0.03
 
 	# Shambling thick legs, bare feet.
@@ -250,6 +265,19 @@ func _build() -> void:
 		sack.position = Vector3(-0.22, 1.05, -0.1)
 		Mats.ink(sack, ink)
 		_body.add_child(sack)
+	elif is_splitter():
+		# Bloated: a belly that bulges past the shirt, and the pustules of
+		# the three runners waiting inside.
+		var belly := Mats.ball(0.34, skin)
+		belly.position = Vector3(0.0, 0.68, 0.14)
+		belly.scale = Vector3(1.15, 0.95, 1.0)
+		Mats.ink(belly, ink)
+		_body.add_child(belly)
+		for k in range(3):
+			var pus := Mats.ball(0.09, skin.lightened(0.3))
+			var a := -0.7 + float(k) * 0.7
+			pus.position = Vector3(sin(a) * 0.3, 0.72 + float(k % 2) * 0.12, 0.14 + cos(a) * 0.3)
+			_body.add_child(pus)
 	elif is_latcher():
 		# Claws: it holds on.
 		for side in [-1.0, 1.0]:

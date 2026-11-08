@@ -4,7 +4,7 @@ extends RefCounted
 ## formation that mows a crowd earns more than a narrow one that drills
 ## what is in front of it. Pure.
 
-const BY_KIND := {"normal": 1, "runner": 1, "thief": 2, "latcher": 2, "brute": 3, "tank": 5}
+const BY_KIND := {"normal": 1, "runner": 1, "thief": 2, "latcher": 2, "brute": 3, "tank": 5, "splitter": 3}
 const BOSS := 25
 const GATE := 2
 ## Extra on straight fire: the drill pays in damage, not coins.

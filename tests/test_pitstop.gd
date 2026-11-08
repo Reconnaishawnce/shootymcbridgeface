@@ -12,6 +12,11 @@ func test_prices_and_effects() -> void:
 	for i in range(10):
 		left = pit.buy("rounds", 100000)
 	check(pit.is_maxed("rounds") and pit.stack("rounds") == 5, "five at most")
+	check_eq(pit.cost("turret"), 120, "a turret costs 120")
+	pit.buy("turret", 1000)
+	pit.buy("turret", 1000)
+	check(pit.is_maxed("turret"), "two turrets at most")
+	check(PitStop.effect_text("turret", 1).contains("turret"), "the turret tile says what it is")
 	check_eq(pit.buy("rounds", 100000), 100000, "maxed: nothing spent")
 	check_eq(pit.cost("bomb"), 25, "bombs stay cheap")
 	pit.buy("bomb", 100)

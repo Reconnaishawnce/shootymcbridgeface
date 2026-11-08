@@ -41,6 +41,14 @@ signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
 signal saw_spawned
+## A wall is ahead; the squad hit one (or steered clear); one broke.
+signal barricade_spawned
+signal barricade_hit(hit: bool)
+signal barricade_broken(at: Vector3)
+## A splitter burst into runners.
+signal split(at: Vector3, count: int)
+## A gold turret was bought from a supply panel.
+signal turret_bought
 signal saw_hit(hit: bool)
 ## The foreman threw a saw or dropped a crate.
 signal foreman_threw(what: String)
@@ -162,6 +170,10 @@ var _latched: Array[Zombie] = []
 var _crates: Array[Crate] = []
 var _crate_plan: Array = []
 var _saw_plan: Array = []
+var _barricade_plan: Array = []
+var _barricades: Array = []
+## Gold turrets on the walkways; they last the run.
+var turrets: Array = []
 ## Coins the squad can spend at a supply panel: the game keeps it equal
 ## to the run's bounty.
 var supply_funds := 0
@@ -259,6 +271,7 @@ func _clear_bet() -> void:
 func start_level(n: int) -> void:
 	level = n
 	phase = Phase.GATES
+	_refresh_turrets()
 	# Waves that outlived the level are gone with it; so is any open bet.
 	_wave_alive.clear()
 	_wave_voided.clear()
@@ -274,6 +287,7 @@ func start_level(n: int) -> void:
 	boss = null
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	_saw_plan = gen.saws_for_level(level) if gen != null else []
+	_barricade_plan = gen.barricades_for_level(level, _saw_plan) if gen != null else []
 	_bay_due = PitStop.has_bay(level)
 	_bay_lane_open = false
 	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
@@ -333,6 +347,10 @@ func _clear_actors() -> void:
 	for st in _strikes:
 		st.queue_free()
 	_strikes.clear()
+	for w in _barricades:
+		if is_instance_valid(w):
+			w.queue_free()
+	_barricades.clear()
 	_latched.clear()
 	for c in _crates:
 		c.queue_free()
@@ -374,6 +392,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 	_move_boss(delta)
 	_move_spits(p_squad)
 	_move_saws(delta, p_squad)
+	_move_barricades(delta, p_squad)
 	_move_bay(delta, p_squad)
 	_move_crates(delta, p_squad)
 	_move_bombs(p_squad)
@@ -438,6 +457,7 @@ func _focus_on_latched(delta: float, p_squad: Squad) -> void:
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			_note_wave_death(z)
+			_split(z)
 			z.die()
 		break
 
@@ -574,6 +594,7 @@ func try_hit(b: Bullet) -> bool:
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			_note_wave_death(z)
+			_split(z)
 			z.die()
 			if b.source != null and is_instance_valid(b.source):
 				b.source.note_kill()
@@ -581,6 +602,14 @@ func try_hit(b: Bullet) -> bool:
 				# Piercing: keep flying, but never count the same kill twice.
 				b.hits_left -= 1
 				continue
+		return true
+	for w in _barricades.duplicate():
+		if w.passed or w.position.z < z_lo - 0.4 or w.position.z > z_hi + 0.4 or not w.covers_x(b.position.x):
+			continue
+		if w.take_damage(b.damage):
+			_barricades.erase(w)
+			barricade_broken.emit(w.global_position)
+			w.shatter()
 		return true
 	if boss != null and boss.alive and boss.position.z >= z_lo - 0.6 and boss.position.z <= z_hi + 0.6:
 		if absf(boss.position.x - b.position.x) <= (Boss.BODY_RADIUS * 0.75 if boss.holds_back() else Boss.BODY_RADIUS):
@@ -686,6 +715,16 @@ func _spawn() -> void:
 			_bay.setup(road_half)
 			_bay.position.z = -(bay_d - level_distance)
 			add_child(_bay)
+	for plan in _barricade_plan.duplicate():
+		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
+		if Difficulty.barricade_distance(n) - level_distance <= SPAWN_AHEAD:
+			_barricade_plan.erase(plan)
+			var w := Barricade.new()
+			w.setup(int(plan.side), road_half, Difficulty.barricade_hp(squad.dps() if squad != null else 10.0))
+			w.position.z = -(Difficulty.barricade_distance(n) - level_distance)
+			add_child(w)
+			_barricades.append(w)
+			barricade_spawned.emit()
 	for plan in _saw_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
@@ -742,6 +781,8 @@ func _spawn_wave(n: int, count: int) -> void:
 		_spawn_zombie(spec.tank_hp, spec.speed, Zombie.Kind.TANK, base_z + 3.0, wave)
 	for i in range(spec.latchers):
 		_spawn_zombie(spec.latcher_hp, spec.speed, Zombie.Kind.LATCHER, base_z - gen.rng.randf_range(2.0, 6.0), wave)
+	for i in range(int(spec.get("splitters", 0))):
+		_spawn_zombie(spec.splitter_hp, spec.speed, Zombie.Kind.SPLITTER, base_z - gen.rng.randf_range(3.0, 8.0), wave)
 	# Thieves start on the squad's side of the gate ahead and sprint for it.
 	# The gate this wave follows is at wave_distance - WAVE_OFFSET; the next
 	# gate is GATE_SPACING further. Put thieves 14 m short of that next gate.
@@ -922,6 +963,9 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 						supply_funds -= cost
 						if panel.power == "soldiers":
 							after = before + panel.amount
+						elif panel.power == "turret":
+							if add_turret():
+								turret_bought.emit()
 						else:
 							powerup_granted.emit(panel.power, false)
 						supply_bought.emit(panel.power, panel.amount, cost)
@@ -1347,6 +1391,7 @@ func heli_hit_latched(dps: float, delta: float, source: Node) -> void:
 		zombies.erase(z)
 		zombie_killed.emit(z)
 		_note_wave_death(z)
+		_split(z)
 		z.die()
 		if source != null and is_instance_valid(source):
 			source.note_kill()
@@ -1377,6 +1422,7 @@ func explode_at(at: Vector3, radius: float, damage: float, source: Node = null) 
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			_note_wave_death(z)
+			_split(z)
 			z.die()
 			kills += 1
 			if source != null and is_instance_valid(source):
@@ -1473,6 +1519,100 @@ func nearest_saw(max_range: float) -> Saw:
 
 ## Saws roll at the squad; one that reaches it takes a slice unless the
 ## squad is dashing or shielded. They cut zombies on the way.
+## A splitter's death lets its runners out, into the same wave.
+func _split(z: Zombie) -> void:
+	if not z.is_splitter():
+		return
+	var n := Difficulty.SPLIT_INTO
+	for i in range(n):
+		var zb := Zombie.new()
+		zb.setup(z.max_hp * Difficulty.SPLIT_HP_MULT, z.speed * Difficulty.SPLIT_SPEED_MULT / 2.6, Zombie.Kind.RUNNER)
+		zb.wave_id = z.wave_id
+		if z.wave_id >= 0:
+			_wave_alive[z.wave_id] = int(_wave_alive.get(z.wave_id, 0)) + 1
+		zb.lane_offset = gen.rng.randf_range(-1.1, 1.1)
+		zb.lane_min = z.lane_min
+		zb.lane_max = z.lane_max
+		var a := float(i) / float(n) * TAU
+		zb.position = Vector3(clampf(z.position.x + cos(a) * 0.7, z.lane_min, z.lane_max), 0.0, z.position.z - 0.4 + sin(a) * 0.5)
+		add_child(zb)
+		zombies.append(zb)
+	split.emit(z.position, n)
+
+
+## Walls scroll with the road; one that reaches the squad on its side
+## shatters and takes a slice.
+func _move_barricades(delta: float, p_squad: Squad) -> void:
+	for w in _barricades.duplicate():
+		w.position.z += world_speed * delta
+		if not w.passed and w.position.z >= -0.6:
+			w.passed = true
+			var hit: bool = w.covers_x(p_squad.position.x)
+			if hit and p_squad.is_invulnerable():
+				dodged.emit()
+				hit = false
+			elif hit and p_squad.is_shielded():
+				shield_blocked.emit()
+				hit = false
+			elif hit:
+				var bite := _bite(Difficulty.barricade_bite(p_squad.count))
+				p_squad.add(-bite)
+				squad_bitten.emit(bite, true)
+			barricade_hit.emit(hit)
+			if hit:
+				_barricades.erase(w)
+				barricade_broken.emit(w.global_position)
+				w.shatter()
+				continue
+		if w.position.z > DESPAWN_Z:
+			_barricades.erase(w)
+			w.queue_free()
+
+
+func nearest_barricade(max_range: float) -> Barricade:
+	var best: Barricade = null
+	for w in _barricades:
+		if w.passed or w.position.z < -max_range:
+			continue
+		if best == null or w.position.z > best.position.z:
+			best = w
+	return best
+
+
+## The zombie a turret should shoot: the nearest live one ahead, not a
+## clinger (those are the player's to tap).
+func nearest_zombie_for_turret(max_range: float) -> Zombie:
+	var best: Zombie = null
+	for z in zombies:
+		if not z.alive or z.latched or z.position.z > 1.0 or z.position.z < -max_range:
+			continue
+		if best == null or z.position.z > best.position.z:
+			best = z
+	return best
+
+
+## A gold turret joins on the emptier side; false when both are taken.
+func add_turret() -> bool:
+	if turrets.size() >= Difficulty.MAX_TURRETS:
+		return false
+	var side: int = 1 if turrets.is_empty() else -int(turrets[0].side)
+	var t := Turret.new()
+	t.setup(side, Difficulty.turret_dps(level))
+	t.world = self
+	t.range_z = Difficulty.TURRET_RANGE
+	t.shots_per_second = Difficulty.TURRET_SHOTS_PER_SECOND
+	t.position = Vector3(t.stand_x(road_half), 0.0, Turret.AHEAD_Z)
+	add_child(t)
+	turrets.append(t)
+	return true
+
+
+## Turrets keep pace with the level: a little more fire each one.
+func _refresh_turrets() -> void:
+	for t in turrets:
+		t.dps = Difficulty.turret_dps(level)
+
+
 func _move_saws(delta: float, p_squad: Squad) -> void:
 	for s in _saws.duplicate():
 		s.tick(delta, world_speed, road_half)
@@ -1482,6 +1622,7 @@ func _move_saws(delta: float, p_squad: Squad) -> void:
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			_note_wave_death(z)
+			_split(z)
 			z.die()
 		if not s.passed and s.position.z >= -0.8:
 			s.passed = true
@@ -1630,6 +1771,7 @@ func _move_bombs(p_squad: Squad) -> void:
 				zombies.erase(z)
 				zombie_killed.emit(z)
 				_note_wave_death(z)
+				_split(z)
 				z.die()
 				kills += 1
 		if boss != null and boss.alive and boss.position.distance_to(at) <= Bomb.RADIUS + 1.5:

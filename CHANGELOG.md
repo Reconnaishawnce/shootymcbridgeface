@@ -3,6 +3,25 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.46 (the turret, the wall, the splitter)
+
+- The GOLD TURRET: a gun that rides the curb beside you, keeps
+  pace, and fires on its own at whatever is nearest. Its fire is on top
+  of the squad's and outside the squad's cap, so it is the one buy that
+  makes a huge squad hit harder. The pit stop sells it (120 bounty,
+  two at most) and gold supply panels offer it; it lasts the run and
+  grows with the level.
+- WALLS: from level 3 a barricade stands across half the road a little
+  after a gate, two a level from level 6. Shoot it down before it
+  arrives (about a second of your fire; a bar shows once it is hit) or
+  steer onto the open half; run into it and it shatters and takes six
+  percent of the squad.
+- SPLITTERS: from level 4 a slow, bloated yellow-green zombie with
+  twice the health bursts into three fast runners when it dies,
+  wherever it dies. Kill it far away.
+- Lessons for all three, HOW TO PLAY lines, the bot steers round walls
+  and buys a turret first at the pit.
+
 ## 0.45 (bodies: chunkier, livelier, louder)
 
 - Soldiers and zombies are chunkier: bigger heads on barrel bodies

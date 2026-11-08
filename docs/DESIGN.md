@@ -790,6 +790,44 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
+## The turret, the wall, the splitter (0.46)
+
+Three mechanics that give the road more to do, each scale-aware.
+
+The gold turret (`Turret`) rides the curb beside the squad, keeps
+pace with it, turns its head to the nearest zombie in `TURRET_RANGE`
+and fires `TURRET_SHOTS_PER_SECOND` gold tracers that deal
+`Difficulty.turret_dps(level)` between them, through the same
+`World.try_hit` as the squad's bullets. Its fire is outside the squad's
+cap, so it is the one purchase that makes a big squad hit harder.
+`World.add_turret` raises one on the emptier side (`MAX_TURRETS`); the
+pit stop sells it as an item and `SUPPLY_POWER_COST` lists it for gold
+supply panels, where the world raises it instead of granting a
+power-up. `_refresh_turrets` lifts its damage with each level. It lasts
+the run.
+
+The wall (`Barricade`) stands across one half of the road a little
+after a gate (`barricades_for_level`, never the opener, a fork gate or
+a saw's gate; two a level from `BARRICADE_TWO_LEVEL`). It carries about
+a second of the squad's fire (`barricade_hp`), shows a bar once hit,
+and shatters when shot down; a squad that runs into it loses
+`BARRICADE_BITE_FRACTION` and shatters it too. Bullets test walls after
+zombies and the boss, so a crowd in front of a wall still takes the
+fire first. The bot takes the open half.
+
+The splitter (`Zombie.Kind.SPLITTER`) is a slow bloated walker with
+`SPLITTER_HP_MULT` the health, from `SPLITTER_LEVEL` on even gates,
+that bursts into `SPLIT_INTO` runners with `SPLIT_HP_MULT` of its
+health when it dies, anywhere it dies (`World._split` runs on every
+kill path and keeps the runners in the splitter's wave, so the wave
+bonus waits for them). Kill it far away or meet its children at your
+feet.
+
+Each has a lesson (`barricade`, `splitter`, `turret`; the turret's
+waits for the pit sheet to close, since the sheet pauses the tree), a
+HOW TO PLAY line, a smoke line (`SMOKE_WALL`, `SMOKE_SPLIT`,
+`SMOKE_TURRET`), and the bot buys a turret first at the pit.
+
 ## Art direction (graphics pass 1)
 
 Everything is still primitives built in code, so the look comes from

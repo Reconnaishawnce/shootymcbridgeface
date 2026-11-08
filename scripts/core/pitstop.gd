@@ -11,8 +11,9 @@ const ITEMS := {
 	"armor": {"name": "FLAK JACKETS", "desc": "Every heavy bite takes less", "base": 80, "growth": 1.5, "max": 3, "unit": "bites"},
 	"bomb": {"name": "BOMB", "desc": "One more in the belt", "base": 25, "growth": 1.0, "max": 99, "unit": "bomb"},
 	"dressing": {"name": "FIELD DRESSING", "desc": "Soldiers back on their feet, now", "base": 45, "growth": 1.3, "max": 99, "unit": "soldiers"},
+	"turret": {"name": "GOLD TURRET", "desc": "A gun on the curb that fires on its own", "base": 120, "growth": 1.6, "max": 2, "unit": "turrets"},
 }
-const ORDER := ["rounds", "rifles", "armor", "bomb", "dressing"]
+const ORDER := ["turret", "rounds", "rifles", "armor", "bomb", "dressing"]
 const PIT_LEVEL := 2
 ## The bay sits this far past the gate at BAY_GATE_INDEX.
 const BAY_GATE_INDEX := 5
@@ -89,6 +90,8 @@ static func effect_text(id: String, n: int, count: int = 0) -> String:
 			return "+1 bomb"
 		"dressing":
 			return "+%d soldiers" % dressing_for(count)
+		"turret":
+			return "+1 turret, its own fire"
 	return ""
 
 

@@ -224,6 +224,10 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 		latchers = 1 + int(lv / 2.0)
 	# Many bodies, little health: mowing a crowd is the fun part. The
 	# opener of every level is gentler because the squad has just reset.
+	# Splitters: from SPLITTER_LEVEL, on even gates past the opener.
+	var splitters := 0
+	if level >= SPLITTER_LEVEL and index >= 2 and index % 2 == 0:
+		splitters = 1 + int(lv / 4.0)
 	var hp := 0.8 + ix * 0.1 + lv * 0.3
 	var count := 4 + int(ix * 1.0 + lv * 1.0)
 	var runners := 1 + int(ix / 3.0) + int(lv / 3.0)
@@ -253,6 +257,8 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 		"tanks": tanks,
 		"latchers": mini(latchers, MAX_LATCHERS),
 		"latcher_hp": hp * 2.5,
+		"splitters": mini(splitters, MAX_SPLITTERS),
+		"splitter_hp": hp * SPLITTER_HP_MULT,
 		# Runners: fast, thin, and they find you. The near-miss engine.
 		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS),
 		# Flankers: runners that come over the curbs beside you. The world
@@ -349,6 +355,30 @@ const STRIKE_WARNING := 1.3
 ## Buzz saws: loose on the bridge from this level, one a level, two
 ## from SAW_TWO_LEVEL, each a little after a gate so the road is clear
 ## to see it coming. A hit takes a slice, like a brute.
+## Barricades: a wall across half the road from this level, one a level,
+## two from BARRICADE_TWO_LEVEL, each a little after a gate. It carries
+## about a second of the squad's fire in health; running into it takes a
+## slice like a brute, and shatters it.
+const BARRICADE_LEVEL := 3
+const BARRICADE_TWO_LEVEL := 6
+const BARRICADE_OFFSET := 14.0
+const BARRICADE_HP_SECONDS := 1.0
+const BARRICADE_HP_MIN := 12.0
+const BARRICADE_BITE_FRACTION := 0.06
+## Splitters: bloated walkers from this level that burst into SPLIT_INTO
+## runners when they die, each with SPLIT_HP_MULT of the splitter's health.
+const SPLITTER_LEVEL := 4
+const SPLITTER_HP_MULT := 2.2
+const SPLIT_INTO := 3
+const SPLIT_HP_MULT := 0.5
+const SPLIT_SPEED_MULT := 2.2
+const MAX_SPLITTERS := 3
+## The gold turret: its own fire, outside the squad's cap.
+const TURRET_DPS_BASE := 14.0
+const TURRET_DPS_PER_LEVEL := 2.0
+const TURRET_RANGE := 30.0
+const TURRET_SHOTS_PER_SECOND := 4.0
+const MAX_TURRETS := 2
 const SAW_LEVEL := 2
 const SAW_TWO_LEVEL := 5
 const SAW_OFFSET := 8.0
@@ -644,7 +674,8 @@ const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
 ## Supply panels: the bounty spent on the road instead of in the shop.
 const SUPPLY_LEVEL := 2
 const SUPPLY_CHANCE := 0.2
-const SUPPLY_POWER_COST := {"shield": 40, "bomb": 30, "frenzy": 40, "slow": 35}
+## "turret" is not a power-up: the world raises a gold turret for it.
+const SUPPLY_POWER_COST := {"shield": 40, "bomb": 30, "frenzy": 40, "slow": 35, "turret": 150}
 const SUPPLY_SOLDIER_COST := 7
 const SUPPLY_SOLDIERS_MAX := 40
 ## The road answers the convoy: each vehicle counts as this many soldiers
@@ -806,6 +837,45 @@ static func saw_distance(index: int) -> float:
 
 static func saw_bite(squad_count: int) -> int:
 	return maxi(3, int(float(squad_count) * SAW_BITE_FRACTION))
+
+
+static func barricade_distance(index: int) -> float:
+	return gate_distance(index) + BARRICADE_OFFSET
+
+
+static func barricade_bite(squad_count: int) -> int:
+	return maxi(2, int(float(squad_count) * BARRICADE_BITE_FRACTION))
+
+
+## A wall's health: about a second of the squad's fire, never trivial.
+static func barricade_hp(squad_dps: float) -> float:
+	return maxf(BARRICADE_HP_MIN, squad_dps * BARRICADE_HP_SECONDS)
+
+
+## The gold turret's damage per second on [param level].
+static func turret_dps(level: int) -> float:
+	return TURRET_DPS_BASE + TURRET_DPS_PER_LEVEL * float(level - 1)
+
+
+## Where the walls stand this level: gate indices and sides. Never the
+## opener, never a fork gate, never where a saw is.
+func barricades_for_level(level: int, saw_plan: Array = []) -> Array:
+	if level < BARRICADE_LEVEL:
+		return []
+	var used := {}
+	for p in saw_plan:
+		used[int(p.index)] = true
+	var out := []
+	var count := 2 if level >= BARRICADE_TWO_LEVEL else 1
+	for i in range(count):
+		var index := rng.randi_range(1, GATES_PER_LEVEL - 2)
+		var tries := 0
+		while (used.has(index) or is_fork_gate(index)) and tries < GATES_PER_LEVEL:
+			index = 1 + (index % (GATES_PER_LEVEL - 2))
+			tries += 1
+		used[index] = true
+		out.append({"index": index, "side": -1 if rng.randf() < 0.5 else 1})
+	return out
 
 
 ## A supply panel for a squad of [param count]: half the time soldiers

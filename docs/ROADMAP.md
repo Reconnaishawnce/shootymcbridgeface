@@ -303,10 +303,10 @@ shipped and measured on its own.
 4. Look, part two: bodies (0.45, done). Chunkier soldiers and zombies,
    a livelier run, squash and knock-back on hits, the squad flinching
    on bites, a star muzzle flash, fat tracers, confetti on gates.
-5. Mechanics, part one: the turret and the wall. Gold turrets you buy
-   with bounty that ride the curb and fire on their own; walls and
-   barricades across half the road that must be shot down or steered
-   around; zombie types that split or shield.
+5. Mechanics, part one (0.46, done): the gold turret on the curb
+   (pit stop and supply panels, fire outside the squad's cap), walls
+   across half the road to shoot down or steer round, and the splitter
+   that bursts into runners. Shielding was already the tank.
 6. Mechanics, part two: hero abilities. A tap-the-hero ability with a
    cooldown per squad type (rifles: volley; shotgun: shockwave; medic:
    heal pulse), upgradeable in the shop, with a lesson each.

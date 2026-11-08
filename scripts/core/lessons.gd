@@ -36,6 +36,12 @@ const CATALOG := {
 		"body": "Olive panels turn soldiers into a vehicle: a JEEP for 20, a TANK for 60, bigger things later. It rides with you from level to level with its own gun and health bar, until something heavy wrecks it."},
 	"pitstop": {"title": "PIT STOP",
 		"body": "A pit lane pulls off the right side of the road: a ramp with yellow chevrons, a pit wall, a garage and a crew waving you in. Steer right onto the ramp and ride the lane to the garage. The road waits while you spend this run's bounty on this run's gear, and the crew clears the road ahead for you. What you spend here you do not take home."},
+	"barricade": {"title": "WALLS",
+		"body": "A wall across half the road. Shoot it down before it reaches you, or steer onto the open half. Run into it and it shatters, and takes a slice of the squad with it."},
+	"splitter": {"title": "SPLITTERS",
+		"body": "The bloated yellow-green one bursts when it dies: three fast runners come out of it. Kill it far away, not at your feet."},
+	"turret": {"title": "THE GOLD TURRET",
+		"body": "Your turret rides the curb beside you and fires on its own at whatever is nearest. Its fire is extra, on top of the squad's. The pit stop and gold supply panels sell them, two at most."},
 	"saw": {"title": "SAWS",
 		"body": "A buzz saw is rolling down the bridge at you. Steer round it or dash through it; touching it takes a slice of the squad. It cuts zombies too."},
 	"boss_walker": {"title": "THE WALKER",
@@ -54,7 +60,7 @@ const CATALOG := {
 		"body": "Squad at zero? Once a run you can buy a few soldiers back for stars, if you decide in five seconds. Not in the daily or weekly."},
 }
 ## The order lessons are listed on the LEARN page.
-const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "pitstop", "vehicle", "saw", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
+const ORDER := ["basics", "shoot_panels", "fire_modes", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "pitstop", "turret", "vehicle", "saw", "barricade", "splitter", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
 ## Seconds between two pop-ups, so a busy gate does not stack three.
 const COOLDOWN := 4.0
 

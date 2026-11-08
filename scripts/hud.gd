@@ -1247,53 +1247,53 @@ func _build_settings(root: Control) -> void:
 	var head := _label(48, HORIZONTAL_ALIGNMENT_CENTER)
 	head.text = "SETTINGS"
 	box.add_child(head)
-	_settings_sound = _button("SOUND: ON", 34)
+	_settings_sound = _button("SOUND: ON", 29)
 	_settings_sound.pressed.connect(_on_sound_pressed)
 	box.add_child(_settings_sound)
-	_settings_music = _button("MUSIC: ON", 34)
+	_settings_music = _button("MUSIC: ON", 29)
 	_settings_music.pressed.connect(_on_music_pressed)
 	box.add_child(_settings_music)
-	_settings_characters = _button("CHARACTERS: OFF", 34)
+	_settings_characters = _button("CHARACTERS: OFF", 29)
 	_settings_characters.pressed.connect(_on_characters_pressed)
 	box.add_child(_settings_characters)
-	_settings_shadows = _button("SHADOWS: ON", 34)
+	_settings_shadows = _button("SHADOWS: ON", 29)
 	_settings_shadows.pressed.connect(func() -> void:
 		var on := not _settings_shadows.text.ends_with("ON")
 		set_shadows(on)
 		shadows_toggled.emit(on))
 	box.add_child(_settings_shadows)
-	_settings_lessons = _button("LESSONS: ON", 34)
+	_settings_lessons = _button("LESSONS: ON", 29)
 	_settings_lessons.pressed.connect(func() -> void:
 		var on := not _settings_lessons.text.ends_with("ON")
 		set_lessons(on)
 		lessons_toggled.emit(on))
 	box.add_child(_settings_lessons)
-	_settings_safe = _button("SAFE GRAPHICS: OFF", 34)
+	_settings_safe = _button("SAFE GRAPHICS: OFF", 29)
 	_settings_safe.pressed.connect(func() -> void:
 		var on := not _settings_safe.text.ends_with("ON")
 		set_safe_graphics(on)
 		safe_graphics_toggled.emit(on))
 	box.add_child(_settings_safe)
-	_settings_notch = _button("NOTCH ROOM: AUTO", 34)
+	_settings_notch = _button("NOTCH ROOM: AUTO", 29)
 	_settings_notch.pressed.connect(func() -> void:
 		var next: String = {"auto": "on", "on": "off", "off": "auto"}[_notch_mode]
 		set_notch_mode(next)
 		notch_changed.emit(next))
 	box.add_child(_settings_notch)
-	_settings_haptics = _button("HAPTICS: ON", 34)
+	_settings_haptics = _button("HAPTICS: ON", 29)
 	_settings_haptics.pressed.connect(func() -> void:
 		var on := not _settings_haptics.text.ends_with("ON")
 		set_haptics(on)
 		haptics_toggled.emit(on))
 	box.add_child(_settings_haptics)
-	_settings_reports = _button("SEND REPORTS: ON", 34)
+	_settings_reports = _button("SEND REPORTS: ON", 29)
 	_settings_reports.pressed.connect(func() -> void:
 		var on := not _settings_reports.text.ends_with("ON")
 		set_reports(on)
 		reports_toggled.emit(on))
 	box.add_child(_settings_reports)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch.\nNotch room: moves the soldier count and the top buttons down from under a camera cutout. AUTO asks the phone; ON forces it.\nSend reports: after a crash, a freeze or a slow start the game sends the developer what it knows on its own: the phone model, its graphics chip, frame times, what the game was doing. Never your name, never the leaderboard name."
+	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Haptics: the phone buzzes with the game.  Send reports: crashes and freezes reach the developer on their own; never your name."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb.custom_minimum_size.x = 520.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
@@ -1306,10 +1306,10 @@ func _build_settings(root: Control) -> void:
 	_report_note.custom_minimum_size = Vector2(520.0, 56.0)
 	_report_note.add_theme_font_size_override("font_size", 22)
 	box.add_child(_report_note)
-	var report := _button("SEND A BUG REPORT", 28)
+	var report := _button("SEND A BUG REPORT", 26)
 	report.pressed.connect(func() -> void: report_pressed.emit(_report_note.text))
 	box.add_child(report)
-	var back := _button("BACK", 34)
+	var back := _button("BACK", 29)
 	back.pressed.connect(func() -> void: settings_closed.emit())
 	box.add_child(back)
 

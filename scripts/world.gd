@@ -393,7 +393,10 @@ func _tick_horde(delta: float, p_squad: Squad) -> void:
 		if _horde_timer <= 0.0:
 			_horde_timer = HORDE_INTERVAL
 			if not p_squad.is_shielded():
-				var bite := _bite(Difficulty.horde_bite(p_squad.count))
+				# The boss-time horde is softened by armour like any heavy
+				# bite; the hands-off horde is not: it is the price of
+				# leaving, and armour bought with coins must not cover it.
+				var bite := Difficulty.horde_bite(p_squad.count) if hands_pressing else _bite(Difficulty.horde_bite(p_squad.count))
 				p_squad.add(-bite)
 				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BOSS)
 				squad_bitten.emit(bite, true)

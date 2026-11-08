@@ -285,7 +285,8 @@ The fixes are all scale-aware, so a small squad feels nothing:
   horde does the rest: `World._tick_horde` presses at
   `HORDE_HANDS_SPEED` during the gates in every mode from
   `Difficulty.HANDS_OFF_HORDE_LEVEL` while hands are off, and eats five
-  percent a bite once it arrives. About twenty seconds of grace, then a
+  percent a bite once it arrives, unsoftened by armour (maxed ARMOR and
+  THICK SKIN had cut it to two soldiers a bite, which gates outpaced). About twenty seconds of grace, then a
   squad of any size is gone inside a minute and a half; a hand back on
   the road sends it home.
 

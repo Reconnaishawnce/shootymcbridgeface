@@ -753,7 +753,8 @@ func _warm_up() -> void:
 	warm.queue_free()
 	# The music, one loop a frame, still under the loading screen.
 	Diag.mark("warm_up:music")
-	await sfx.build_music()
+	await sfx.build_music(func(style: String) -> void: Diag.mark("music:%s" % style))
+	Diag.mark("music_ready")
 	hud.end_font_warm()
 	await get_tree().process_frame
 	hud.show_loading(false)
@@ -2818,7 +2819,7 @@ func _on_sound_toggled(on: bool) -> void:
 		sfx.play("click")
 		# Sound was off at boot, so the loops were never built: build them
 		# now, one a frame.
-		sfx.build_music()
+		sfx.build_music(func(style: String) -> void: Diag.mark("music:%s" % style))
 
 
 func _on_music_toggled(on: bool) -> void:

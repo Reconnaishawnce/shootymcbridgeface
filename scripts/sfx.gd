@@ -74,14 +74,17 @@ func _ready() -> void:
 
 
 ## Synthesise the loops, one a frame, and start them. Call once, under
-## the loading screen; await it.
-func build_music() -> void:
+## the loading screen; await it. [param on_loop] hears each style's
+## name as it lands (the game leaves a breadcrumb; this script knows no
+## autoloads, so the unit tests can load it).
+func build_music(on_loop: Callable = Callable()) -> void:
 	if _music_ready or not enabled:
 		return
 	for style in MUSIC_STYLES:
 		var mp: AudioStreamPlayer = _music[style]
 		mp.stream = make_music(style)
-		Diag.mark("music:%s" % style)
+		if on_loop.is_valid():
+			on_loop.call(style)
 		if is_inside_tree():
 			await get_tree().process_frame
 	for style in MUSIC_STYLES:
@@ -89,7 +92,6 @@ func build_music() -> void:
 		if mp.stream != null:
 			mp.play()
 	_music_ready = true
-	Diag.mark("music_ready")
 
 
 func _exit_tree() -> void:

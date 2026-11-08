@@ -1,6 +1,13 @@
 extends TestCase
 
 
+func test_supply_extras_have_names() -> void:
+	check_eq(Powerups.title("turret"), "GOLD TURRET", "a supply panel can name the turret")
+	check(Powerups.description("turret") != "", "and describe it")
+	check_eq(Powerups.title("nonsense"), "NONSENSE", "an unknown id never crashes a label")
+	check_eq(GateMath.label(GateMath.supply(150, "turret")), "GOLD TURRET\n150c", "the supply panel label")
+
+
 func test_timers_stack_and_expire() -> void:
 	var p := Powerups.new()
 	check(not p.active("slow", 0.0), "nothing at start")

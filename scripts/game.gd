@@ -1996,7 +1996,7 @@ func _on_supply_bought(id: String, amount: int, cost: int) -> void:
 	bounty = maxi(0, bounty - cost)
 	world.supply_funds = bounty
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
-	var what := "+%d SOLDIERS" % amount if id == "soldiers" else ("GOLD TURRET" if id == "turret" else Powerups.title(id))
+	var what := "+%d SOLDIERS" % amount if id == "soldiers" else Powerups.title(id)
 	hud.show_banner("SUPPLY: %s\n-%d COINS" % [what, cost], 1.2)
 	sfx.play("gate_good", -2.0, 1.1)
 	_punch(3.0)

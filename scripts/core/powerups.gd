@@ -25,15 +25,28 @@ var bombs := 0
 var _until: Dictionary = {}
 
 
+## Things a supply panel can sell that are not power-ups: named here so
+## panels, crates and banners can label them.
+const EXTRAS := {"turret": {"name": "GOLD TURRET", "desc": "A gun on the curb that fires on its own."}}
+
+
 static func title(id: String) -> String:
 	if id == MYSTERY:
 		return "?"
+	if EXTRAS.has(id):
+		return str(EXTRAS[id]["name"])
+	if not CATALOG.has(id):
+		return id.to_upper()
 	return CATALOG[id]["name"]
 
 
 static func description(id: String) -> String:
 	if id == MYSTERY:
 		return "Could be anything."
+	if EXTRAS.has(id):
+		return str(EXTRAS[id]["desc"])
+	if not CATALOG.has(id):
+		return ""
 	return CATALOG[id]["desc"]
 
 

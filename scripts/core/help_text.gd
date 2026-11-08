@@ -15,6 +15,8 @@ static func sections() -> Array:
 			"You lead a squad of little soldiers down a road full of zombies. " +
 			"The road scrolls on its own. You steer left and right, pick which gate panel to walk through, and aim your guns. " +
 			"More soldiers means more bullets. Lose them all and the run is over."},
+		{"title": "FEEL", "body":
+			"The phone buzzes with the game (HAPTICS in SETTINGS turns it off): a tap for a bite, a thump for a brute, a long one when the boss goes down. Heavy kills land with a blink of stopped time, the boss falls in slow motion under confetti, the music brightens as your combo climbs, and the score on the results card counts up before it settles."},
 		{"title": "LEARN AS YOU GO", "body":
 			"The first time something new appears on the road (a hidden panel, a sum, a deal, a perk gate, the fork, a saw, each boss...) the road pauses and one short card says how it works. Tap GOT IT and play on. " +
 			"LEARN on the home screen starts a learning round where every card shows again. LESSONS in SETTINGS turns them off. This page is the long version."},

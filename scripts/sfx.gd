@@ -16,7 +16,11 @@ static var music_on := true
 
 const MUSIC_RATE := 8000
 const MUSIC_DB := -15.0
-const MUSIC_STYLES := ["calm", "tense", "boss"]
+## The room layers crossfade against each other; SHIMMER rides on top of
+## whichever is playing and follows the combo.
+const MUSIC_STYLES := ["calm", "tense", "boss", "shimmer"]
+const SHIMMER := "shimmer"
+const SHIMMER_DB := -13.0
 
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
@@ -115,7 +119,15 @@ func set_music(style: String) -> void:
 		return
 	_music_style = style
 	for key in _music_target:
+		if key == SHIMMER:
+			continue
 		_music_target[key] = db_to_linear(MUSIC_DB) if key == style else 0.0
+
+
+## The combo layer: 0 is silent, 1 is full. Bright and beatless, so it
+## sits on any of the room layers without clashing with their tempo.
+func set_shimmer(amount: float) -> void:
+	_music_target[SHIMMER] = db_to_linear(SHIMMER_DB) * clampf(amount, 0.0, 1.0)
 
 
 func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -302,7 +314,44 @@ static func make_crate() -> AudioStreamWAV:
 ## A short looping bed synthesised from a kick, a bass pulse, hats and a pad.
 ## Three styles share the key so crossfading between them feels like one
 ## track getting more urgent.
+## The shimmer: four high notes under a fast tremolo and a slow swell,
+## no beat, looping. Louder with the combo.
+static func make_shimmer() -> AudioStreamWAV:
+	var rate := float(MUSIC_RATE)
+	var seconds := 4.8
+	var n := int(seconds * rate)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var notes := [440.0, 523.25, 659.25, 783.99]
+	var phases := PackedFloat32Array()
+	phases.resize(notes.size())
+	for i in range(n):
+		var t := float(i) / rate
+		var trem := 0.55 + 0.45 * sin(TAU * 6.0 * t)
+		var swell := 0.6 + 0.4 * sin(TAU * t / seconds)
+		var v := 0.0
+		for j in range(notes.size()):
+			phases[j] += TAU * float(notes[j]) / rate
+			v += sin(phases[j]) * 0.05 * (1.0 if j % 2 == 0 else 0.7)
+		out[i] = clampf(v * trem * swell, -1.0, 1.0)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = MUSIC_RATE
+	stream.stereo = false
+	var bytes := PackedByteArray()
+	bytes.resize(n * 2)
+	for i in range(n):
+		bytes.encode_s16(i * 2, int(out[i] * 32767.0))
+	stream.data = bytes
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = n
+	return stream
+
+
 static func make_music(style: String) -> AudioStreamWAV:
+	if style == SHIMMER:
+		return make_shimmer()
 	var bpm := 100.0
 	var kicks := [0]
 	var hats := []

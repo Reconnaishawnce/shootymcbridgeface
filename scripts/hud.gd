@@ -41,6 +41,10 @@ signal crash_dismissed
 signal lesson_closed
 signal learn_pressed
 signal lessons_toggled(on: bool)
+## HAPTICS toggled.
+signal haptics_toggled(on: bool)
+## The results card's score ticked up a notch (for a sound).
+signal count_tick(fraction: float)
 ## SEND REPORTS toggled.
 signal reports_toggled(on: bool)
 ## NOTCH ROOM cycled: "auto", "on" or "off".
@@ -84,6 +88,10 @@ var _top_inset := 0.0
 var _notch_mode := "auto"
 var _settings_notch: Button
 var _settings_reports: Button
+var _settings_haptics: Button
+var _over_template := ""
+var _over_count_tween: Tween
+var _over_tick_at := 0.0
 var _crash_body: Label
 var _boss_fill: ColorRect
 var _boss_label: Label
@@ -605,6 +613,10 @@ func set_lessons(on: bool) -> void:
 
 func set_reports(on: bool) -> void:
 	_settings_reports.text = "SEND REPORTS: %s" % ("ON" if on else "OFF")
+
+
+func set_haptics(on: bool) -> void:
+	_settings_haptics.text = "HAPTICS: %s" % ("ON" if on else "OFF")
 
 
 ## Remembers a top-edge control's built offsets so the inset can move it.
@@ -1268,6 +1280,12 @@ func _build_settings(root: Control) -> void:
 		set_notch_mode(next)
 		notch_changed.emit(next))
 	box.add_child(_settings_notch)
+	_settings_haptics = _button("HAPTICS: ON", 34)
+	_settings_haptics.pressed.connect(func() -> void:
+		var on := not _settings_haptics.text.ends_with("ON")
+		set_haptics(on)
+		haptics_toggled.emit(on))
+	box.add_child(_settings_haptics)
 	_settings_reports = _button("SEND REPORTS: ON", 34)
 	_settings_reports.pressed.connect(func() -> void:
 		var on := not _settings_reports.text.ends_with("ON")
@@ -2037,7 +2055,7 @@ func show_game_over(r: Dictionary) -> void:
 	_boss_box.visible = false
 	# With characters on, the hero always gets out. Kids keep their people.
 	_over_title.text = "%s ESCAPED" % hero_name if hero_name != "" else "WIPED OUT"
-	var head := "NEW BEST!  %d" % score if is_best else "Score %d   (best %d)" % [score, best]
+	var head := "NEW BEST!  {SCORE}" if is_best else "Score {SCORE}   (best %d)" % best
 	var where := "Level %d   %d m" % [level, distance]
 	if mode == "endless":
 		where = "Endless   %d m" % distance
@@ -2100,7 +2118,24 @@ func show_game_over(r: Dictionary) -> void:
 	var goal := str(r.get("goal", ""))
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal
-	_over_lines.text = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
+	_over_template = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
+	if _over_count_tween != null:
+		_over_count_tween.kill()
+	if bool(r.get("instant", false)) or score <= 0:
+		_over_lines.text = _over_template.replace("{SCORE}", str(score))
+	else:
+		# The score counts up from nothing, a tick every few notches, so
+		# the number lands instead of appearing.
+		_over_lines.text = _over_template.replace("{SCORE}", "0")
+		_over_tick_at = 0.0
+		_over_count_tween = create_tween()
+		_over_count_tween.tween_method(func(v: float) -> void:
+			var shown := int(round(v))
+			_over_lines.text = _over_template.replace("{SCORE}", str(shown))
+			var frac := v / float(score)
+			if frac - _over_tick_at >= 0.08 or frac >= 1.0:
+				_over_tick_at = frac
+				count_tick.emit(frac), 0.0, float(score), 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	var tip := str(r.get("tip", ""))
 	_over_tip.text = "TIP: " + tip if tip != "" else ""
 	_over_tip.visible = tip != ""

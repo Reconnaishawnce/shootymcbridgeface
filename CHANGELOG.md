@@ -3,6 +3,20 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.50 (the feel pass)
+
+- The phone buzzes with the game: a tap for a bite, a thump for a
+  brute, a long one when the boss goes down, and shorter ones for
+  gates, perfects, the hero move, walls, saws, pit buys and the wipe.
+  HAPTICS in SETTINGS turns it off.
+- Heavy kills land with a blink of stopped time and a nudge of the
+  camera; the boss falls in slow motion under a flash and a shower of
+  confetti.
+- The music brightens as the combo climbs: a shimmering high layer
+  rises with the multiplier and fades when the chain breaks.
+- The results card counts the score up from zero with rising ticks and
+  a chime when it lands; the squad cheers on a perfect and on its move.
+
 ## 0.49 (events, the weekly challenge, boss rush)
 
 - Weekend events: on Saturdays and Sundays the whole road carries one

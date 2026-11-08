@@ -261,6 +261,15 @@ static func save_lessons_on(on: bool) -> void:
 	_write(SETTINGS, "lessons_on", on)
 
 
+## HAPTICS: the phone buzzes with the game.
+static func load_haptics_on() -> bool:
+	return bool(_read(SETTINGS, "haptics_on", true))
+
+
+static func save_haptics_on(on: bool) -> void:
+	_write(SETTINGS, "haptics_on", on)
+
+
 ## SEND REPORTS: crash and freeze reports go to the server on their own.
 static func load_reports_on() -> bool:
 	return bool(_read(SETTINGS, "reports_on", true))

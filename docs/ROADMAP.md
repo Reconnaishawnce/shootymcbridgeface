@@ -316,9 +316,9 @@ shipped and measured on its own.
 8. Mechanics, part four (0.49, done): weekend events (double bounty,
    saw storm, fog) on every mode, the weekly challenge that names each
    week's board, and BOSS RUSH at 1200 trophies.
-9. Feel pass. Haptics, hit-stop on big kills, slow-motion on a boss
-   kill, squad cheers, music layers that build with the combo, a
-   results card that counts up with sound.
+9. Feel pass (0.50, done): haptics with a setting, hit-stop on heavy
+   kills, slow motion on the boss's fall, cheers, a combo-driven music
+   layer, a results card that counts up.
 10. Second balance pass with the telemetry: what the reports and the
     boards say about where runs end, where they never end, and what
     nobody buys.

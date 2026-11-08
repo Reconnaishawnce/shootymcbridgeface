@@ -71,6 +71,11 @@ var _hands_hint_shown := false
 ## become one (screen position, time, movement).
 var _ability_last := -1000.0
 var _ability_uses := 0
+## Haptics: the setting, and when the phone last buzzed (wall clock).
+var haptics_on := true
+var _buzz_last := -10.0
+var _buzz_last_ms := 0
+var _bigkill_last := -10.0
 var _tap_start := Vector2.ZERO
 var _tap_time := 0.0
 var _tap_moved := 0.0
@@ -268,6 +273,8 @@ func _ready() -> void:
 	hud.set_notch_mode(SaveData.load_notch_mode())
 	reports_on = SaveData.load_reports_on()
 	hud.set_reports(reports_on)
+	haptics_on = SaveData.load_haptics_on()
+	hud.set_haptics(haptics_on)
 	_tele_id = SaveData.load_telemetry_id()
 	if _tele_id == "":
 		_tele_id = Leaderboard.new_id()
@@ -523,6 +530,16 @@ func _build_scene() -> void:
 		lessons_on = on
 		SaveData.save_lessons_on(on)
 		sfx.play("click"))
+	hud.haptics_toggled.connect(func(on: bool) -> void:
+		haptics_on = on
+		SaveData.save_haptics_on(on)
+		sfx.play("click")
+		_buzz("gate_good"))
+	hud.count_tick.connect(func(frac: float) -> void:
+		sfx.play("step", -14.0 + 6.0 * frac, 0.8 + 0.6 * frac)
+		if frac >= 1.0:
+			sfx.play("gate_good", -6.0, 1.2)
+			_buzz("rally"))
 	hud.reports_toggled.connect(func(on: bool) -> void:
 		reports_on = on
 		SaveData.save_reports_on(on)
@@ -893,6 +910,7 @@ func show_title() -> void:
 		_tele_report_crash()
 		_tele_flush()
 	sfx.set_music("calm")
+	sfx.set_shimmer(0.0)
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
 		squad.squad_type = squad_type
@@ -1500,6 +1518,7 @@ func end_run() -> void:
 		"leaderboard": (mode == "daily" or mode == "weekly") and Leaderboard.configured(),
 	}
 	hud.show_game_over(_last_over)
+	_buzz("wipe")
 	Diag.note("end_run_done", {"ms": Time.get_ticks_msec() - t0, "level": world.level, "score": score, "mode": mode})
 	Diag.mark("end_run:shown")
 	if character_mode:
@@ -1623,6 +1642,8 @@ func use_ability() -> void:
 			sfx.play("gate_good", -2.0, 1.1)
 			hud.show_float("HEAL PULSE  +%d" % n, true)
 	hud.show_banner(Abilities.title(id), 0.6)
+	_buzz("ability")
+	squad.cheer()
 	if not smoke:
 		Fx.confetti(world, squad.position + Vector3(0.0, 1.6, -1.0), 12)
 
@@ -1678,6 +1699,7 @@ func _tick_run(delta: float) -> void:
 		sfx.play("boss_roar", -6.0, 0.8)
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.set_combo(combo.count if combo.alive(_run_time) else 0, combo.multiplier(), combo.remaining(_run_time))
+	sfx.set_shimmer(((combo.multiplier() - 1.0) / (Combo.MAX_MULT - 1.0)) if combo.alive(_run_time) else 0.0)
 	# Danger pulse: the squad is a shadow of what it was this level.
 	var danger := 0.0
 	if squad.count > 0 and squad.count <= 5:
@@ -1864,15 +1886,18 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 		squad.rally()
 		sfx.play("rally")
 		_punch(5.0)
+		_buzz("rally")
 		if not smoke:
 			Fx.confetti(world, squad.position + Vector3(0.0, 2.2, -1.5), 22)
 	elif after > before:
 		sfx.play("gate_good")
 		_punch(3.0)
+		_buzz("gate_good")
 		if not smoke:
 			Fx.confetti(world, squad.position + Vector3(0.0, 2.0, -1.5), 10)
 	else:
 		sfx.play("gate_bad", -4.0)
+		_buzz("gate_bad")
 
 
 func _on_gate_robbed(gate: Gate, index: int) -> void:
@@ -1908,6 +1933,13 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 		hud.show_float("%d COMBO" % chain, true)
 	var color := Zombie.BRUTE_SKIN if zombie.brute else Zombie.SKIN
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.8, 0.0), color, 6 if zombie.brute else 3, 0.16 if zombie.brute else 0.12)
+	# A heavy going down lands: a blink of hit-stop and a buzz, not for
+	# every one in a crowd.
+	if (zombie.brute or zombie.is_tank() or zombie.is_splitter()) and Time.get_ticks_msec() * 0.001 - _bigkill_last > 0.5 and _slowmo_until <= 0.0:
+		_bigkill_last = Time.get_ticks_msec() * 0.001
+		_hitstop(0.045)
+		_punch(2.0)
+		_buzz("heavy")
 	if not smoke:
 		Fx.blood(world, zombie.position + Vector3(0.0, 0.9, 0.0), zombie.brute or zombie.is_tank())
 
@@ -1915,6 +1947,7 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	_shake = minf(1.0, _shake + (0.5 if heavy else 0.2))
 	squad.squash()
+	_buzz("heavy" if heavy else "bite")
 	sfx.play("bite", 0.0 if heavy else -6.0)
 	Burst.spawn(world, squad.position + Vector3(0.0, 0.9, -0.5), Soldier.BODY, mini(bite * 3, 24), 0.12, 4.5)
 	hud.show_float("-%d" % bite, false)
@@ -1993,7 +2026,12 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	squad.cheer()
 	hud.flash(0.35)
 	sfx.play("level_clear")
-	_punch(6.0)
+	_punch(8.0)
+	_buzz("boss_down")
+	# The boss goes down in slow motion, under confetti.
+	_slowmo(0.25, 0.9)
+	if not smoke:
+		Fx.confetti(world, squad.position + Vector3(0.0, 2.4, -3.0), 36)
 	_shake = 0.8
 	if world.boss != null:
 		Burst.spawn(world, world.boss.position + Vector3(0.0, 2.0, 0.0), Boss.CORE_COLOR, 40, 0.22, 7.0, 0.9)
@@ -2145,6 +2183,7 @@ func _pit_buy(id: String) -> void:
 			if world.add_turret():
 				_on_turret_bought("pit")
 	Diag.note("pit_buy", {"id": id, "left": bounty})
+	_buzz("buy")
 	if not smoke:
 		sfx.play("gate_good", -4.0)
 		hud.show_pitstop(squad.pit, bounty, squad.count)
@@ -2448,6 +2487,27 @@ func _hitstop(seconds: float) -> void:
 	_slowmo_until = Time.get_ticks_msec() * 0.001 + seconds
 
 
+## Slow motion for a moment: the boss going down, the last soldier.
+func _slowmo(scale: float, seconds: float) -> void:
+	if smoke:
+		return
+	Engine.time_scale = scale
+	_slowmo_until = Time.get_ticks_msec() * 0.001 + seconds
+
+
+## The phone buzzes for [param event], if the setting allows and the
+## last buzz was not a moment ago.
+func _buzz(event: String) -> void:
+	if smoke or _shots_dir != "":
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	if not Haptics.allowed(event, haptics_on, now, _buzz_last, _buzz_last_ms):
+		return
+	_buzz_last = now
+	_buzz_last_ms = Haptics.duration(event, haptics_on)
+	Input.vibrate_handheld(_buzz_last_ms)
+
+
 func _on_vehicle_formed(id: String) -> void:
 	_hitstop(0.08)
 	if smoke:
@@ -2487,6 +2547,7 @@ func _on_barricade_hit(hit: bool) -> void:
 		_shake = minf(1.0, _shake + 0.6)
 		hud.flash(0.18)
 		hud.show_banner("INTO THE WALL", 0.9)
+		_buzz("wall")
 
 
 ## A gold turret is up: say so, and teach it once.
@@ -2509,6 +2570,7 @@ func _on_saw_hit(hit: bool) -> void:
 		sfx.play("explosion", -6.0, 1.3)
 		_shake = minf(1.0, _shake + 0.7)
 		hud.flash(0.2)
+		_buzz("saw")
 	else:
 		sfx.play("throw", -8.0, 0.7)
 
@@ -2630,6 +2692,8 @@ func _on_gate_perfect(_gate, _index: int) -> void:
 	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
 	sfx.play("level_clear", -8.0, 1.5)
 	_punch(2.0)
+	_buzz("perfect")
+	squad.cheer()
 	if not smoke:
 		Fx.confetti(world, squad.position + Vector3(0.0, 2.4, -2.0), 30)
 
@@ -3002,7 +3066,7 @@ func _shots_walkthrough() -> void:
 		squad.position.x = 0.0
 		camera.position = CAM_HOME
 		_cam_rig.position.x = 0.0
-		hud.show_game_over({"score": 4210, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "tip": Tips.for_wipe({"in_boss": true, "boss_kind": "foreman"}), "retry_level": 3, "goal": "Form a JEEP: reach 32 soldiers and take the olive panel."})
+		hud.show_game_over({"instant": true, "score": 4210, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "tip": Tips.for_wipe({"in_boss": true, "boss_kind": "foreman"}), "retry_level": 3, "goal": "Form a JEEP: reach 32 soldiers and take the olive panel."})
 		await _capture("q9_wipe_retry.png", 5)
 		world.spawn_saw(0.0, -40.0, true)
 		var bay := PitBay.new()

@@ -790,6 +790,35 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
+## Feel (0.50)
+
+`Haptics` (pure) is a table of moments to milliseconds and a gap rule;
+`Game._buzz` asks it and calls `Input.vibrate_handheld`, never more
+than once per `MIN_GAP` unless the new buzz is longer. Bites, heavy
+bites, walls, saws, gates good and bad, perfects, the hero move, pit
+buys, rallies, the boss going down and the wipe each have a length;
+HAPTICS in SETTINGS turns them off.
+
+Time: `_hitstop` (time scale 0.05) now fires for a brute, tank or
+splitter going down, at most twice a second and never over another
+slow moment; `_slowmo(0.25, 0.9)` runs the boss's fall under a flash,
+a punch, a cheer and a shower of confetti. Both use the one
+`_slowmo_until` clock, so the frame-rate watchdog and the smoke bot's
+time-scale check are unchanged.
+
+Music: `Sfx` gained a fourth loop, SHIMMER, four high notes under a
+fast tremolo and a slow swell with no beat, so it sits on calm, tense
+or boss without a tempo to clash with. `set_music` leaves it alone and
+`set_shimmer` sets its level; `Game._tick_run` feeds it the combo
+multiplier's fraction of `Combo.MAX_MULT`, so the music brightens as
+the chain climbs and falls silent when it breaks.
+
+The results card: `Hud.show_game_over` builds the text with a
+`{SCORE}` slot and tweens the shown score from zero over 1.1 seconds,
+emitting `count_tick` every eight percent; the game plays a rising
+tick each time and a chime with a buzz when it lands. The squad cheers
+on a perfect and on its move.
+
 ## Events, the weekly challenge, boss rush (0.49)
 
 `Events` (pure) owns two rotations and one set of knobs. The knobs

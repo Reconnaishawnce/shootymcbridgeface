@@ -162,6 +162,11 @@ static func is_elite(endless: bool, index: int) -> bool:
 	return endless and index == GATES_PER_LEVEL - 1
 
 
+## From this level the horde behind creeps up whenever no hand is on the
+## road (World.hands_on); level 1 is left alone for reading.
+const HANDS_OFF_HORDE_LEVEL := 2
+
+
 ## A latcher's bite on a squad of [param squad_count].
 static func latch_bite(squad_count: int) -> int:
 	return maxi(LATCH_BITE, int(float(squad_count) * LATCH_BITE_FRACTION))

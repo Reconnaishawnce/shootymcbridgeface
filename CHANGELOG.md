@@ -18,8 +18,10 @@ Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
   endless never had; latchers eat a slice of the squad per bite, not
   one soldier; the first saw of every level is thrown at where you
   stand; bosses are sized for the squad that meets them; and past level
-  10 the road speeds up again while crowds keep growing. After:
-  MEASURED_AFTER
+  10 the road speeds up again while crowds keep growing. And hands
+  matter: a few seconds with no touch and panels stop climbing (the
+  squad's own fire had been shooting them to x5), while the horde
+  behind closes in and eats until you steer again. MEASURED_AFTER
 - The pit lane is painted yellow, ramps and all, with yellow arrows and
   PIT painted on the road for sixteen metres before the ramp and a lit
   strip where the lane leaves the road.

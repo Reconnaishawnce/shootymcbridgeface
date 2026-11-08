@@ -1411,7 +1411,7 @@ func _tick_run(delta: float) -> void:
 	var hands_on: bool = not _touches.is_empty() or _run_time - _last_input_at < HANDS_OFF_SECONDS
 	if world.hands_on and not hands_on and world.phase == World.Phase.GATES and not _hands_hint_shown and not smoke:
 		_hands_hint_shown = true
-		hud.show_hint("HANDS ON THE ROAD\nPANELS ONLY CLIMB WHILE YOU STEER OR AIM", 3.0)
+		hud.show_hint("HANDS ON THE ROAD\nPANELS STOP CLIMBING AND THE HORDE BEHIND CATCHES UP", 3.0)
 	world.hands_on = hands_on
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta

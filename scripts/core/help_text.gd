@@ -82,7 +82,7 @@ static func sections() -> Array:
 			"Lightning warns for %.1f seconds with a ring that fills up before the bolt lands, and only the ring is hit. The STORM hangs back and calls lightning in lines across the whole road with one gap: find the gap. " % Difficulty.STRIKE_WARNING +
 			"Every fourth level THE FOREMAN takes the road: it hangs back, hurls buzz saws down your lane (two when it is angry) and drops supply crates between you, so the fight is dodge, grab and shoot. " +
 			"All of them call runners and get angrier below half health; all but the foreman drop red rings that turn into lightning bolts. " +
-			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives." % int(Modifiers.get_value("normal", "horde_level"))},
+			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives. The same horde closes in any mode, from level %d, whenever your hands leave the road for a few seconds: it eats %d%% of the squad a bite until you steer again." % [int(Modifiers.get_value("normal", "horde_level")), Difficulty.HANDS_OFF_HORDE_LEVEL, 5]},
 		{"title": "POWER-UPS", "body":
 			"BOMB: tap the bomb button to throw one. It aims itself at the boss or the nearest brute or tank in reach, and the button pulses when there is something worth it. Big blast, kills most things in it.\n" +
 			"SLOW-MO: the road and the zombies slow down for a while.\n" +

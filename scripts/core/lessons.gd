@@ -47,7 +47,7 @@ const CATALOG := {
 	"boss_foreman": {"title": "THE FOREMAN",
 		"body": "It hangs back and works the road: it hurls buzz saws down your lane, two when it is angry, and drops supply crates between you. Dodge the saws, grab the crates, shoot the core."},
 	"horde": {"title": "THE HORDE",
-		"body": "A wall of zombies creeps up behind you while the road is stopped for the boss. Kill the boss fast, or it starts eating."},
+		"body": "A wall of zombies creeps up behind you while the road is stopped for the boss, and whenever your hands leave the road. Kill the boss fast, keep steering, or it starts eating."},
 	"veterans": {"title": "VETERANS",
 		"body": "A survivor of every boss steps up with a name, a beret and a trait the whole squad feels: DEADEYE hits harder, TOUGH softens heavy bites, a FIELD MEDIC brings soldiers back, LUCKY pays more at the end. Up to three a run. A heavy bite can take one with it, so keep them out of the brutes."},
 	"rally": {"title": "RALLY",

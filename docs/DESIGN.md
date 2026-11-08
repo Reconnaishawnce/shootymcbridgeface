@@ -280,7 +280,14 @@ The fixes are all scale-aware, so a small squad feels nothing:
   with no touch and no finger held (the bot counts as a hand), and
   `World._hit_gate` then lets bullets through panels without stepping
   them: a squad nobody is steering takes what is printed. The HUD says
-  so once per run the first time it happens.
+  so once per run the first time it happens. That alone left two of
+  five idle runs alive on flat fork payouts and supply buys, so the
+  horde does the rest: `World._tick_horde` presses at
+  `HORDE_HANDS_SPEED` during the gates in every mode from
+  `Difficulty.HANDS_OFF_HORDE_LEVEL` while hands are off, and eats five
+  percent a bite once it arrives. About twenty seconds of grace, then a
+  squad of any size is gone inside a minute and a half; a hand back on
+  the road sends it home.
 
 The measurements before and after are in CHANGELOG 0.42; the bot's own
 runs in `scripts/ci/check.sh` and `soak.sh` guard the active player's

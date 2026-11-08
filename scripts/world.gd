@@ -88,6 +88,8 @@ var _horde_timer := 0.0
 const HORDE_REST_Z := 10.0
 const HORDE_BITE_Z := 1.6
 const HORDE_SPEED := 0.65
+## How fast the horde closes while nobody's hand is on the road.
+const HORDE_HANDS_SPEED := 1.2
 const HORDE_RETREAT_SPEED := 2.5
 const HORDE_INTERVAL := 0.6
 ## Steering margin inside the curbs.
@@ -375,9 +377,14 @@ func advance(delta: float, p_squad: Squad) -> float:
 ## and if it arrives it eats on a timer. Kill the boss and it falls back.
 func _tick_horde(delta: float, p_squad: Squad) -> void:
 	var active := level >= int(Modifiers.get_value(modifier, "horde_level")) and not endless
-	var pressing := active and phase == Phase.BOSS and boss != null and boss.alive and boss.position.z > BOSS_ENGAGE_Z - 2.0
+	var boss_pressing := active and phase == Phase.BOSS and boss != null and boss.alive and boss.position.z > BOSS_ENGAGE_Z - 2.0
+	# Hands off the road during the gates: the horde behind catches up,
+	# in every mode, so a squad left to itself does not live for ever.
+	var hands_pressing := not hands_on and phase == Phase.GATES and level >= Difficulty.HANDS_OFF_HORDE_LEVEL
+	var pressing := boss_pressing or hands_pressing
 	if pressing:
-		horde_z = maxf(HORDE_BITE_Z, horde_z - HORDE_SPEED * mod("horde_speed") * _pace() * delta)
+		var speed := HORDE_HANDS_SPEED if hands_pressing else HORDE_SPEED * mod("horde_speed")
+		horde_z = maxf(HORDE_BITE_Z, horde_z - speed * _pace() * delta)
 	else:
 		horde_z = minf(HORDE_REST_Z, horde_z + HORDE_RETREAT_SPEED * delta)
 	_place_horde()

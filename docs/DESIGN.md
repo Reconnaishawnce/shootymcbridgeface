@@ -294,6 +294,21 @@ The measurements before and after are in CHANGELOG 0.42; the bot's own
 runs in `scripts/ci/check.sh` and `soak.sh` guard the active player's
 side of the curve.
 
+## The stability build (0.52)
+
+The first week of reports came from one phone, a Galaxy S23 Ultra on
+a 120 Hz panel, dying two to five seconds after the home screen with
+no engine error, once before PLAY. Three things changed in answer, all
+of them removals of risk rather than guesses: `Sfx` builds its music
+loops on the main thread under the loading screen (`build_music`, one
+loop a frame, awaited by `Game._warm_up`) instead of on a worker
+thread handed over seconds after boot, so the game has no threads;
+`Engine.max_fps` is 60 on mobile; and `Diag` beats every second and
+marks the warm-up, each loop and `music_ready`, so a death in that
+window is pinned to the second and the step. Reports carry
+`OS.get_memory_info` numbers because the engine's static counter is
+zero in release builds.
+
 ## Reports that send themselves
 
 `Telemetry` (pure) is the form; `Diag` fills it; `Game` decides when.

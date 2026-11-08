@@ -3,6 +3,25 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.52 (the stability build)
+
+- Six reports from one Galaxy S23 Ultra all died two to five seconds
+  after the home screen appeared, once before PLAY was even pressed,
+  with no engine error. This build removes everything that happens in
+  that window and could kill a process from outside GDScript, instead
+  of testing one guess at a time on a player's phone:
+  - The music loops are no longer built on a worker thread that handed
+    them over a few seconds after boot. They are built one a frame
+    under the loading screen, and the game has no other thread.
+  - Phones are capped at 60 frames a second. A 120 Hz panel had the
+    game doing every frame's work twice as often as any other phone.
+  - The vibrate permission from 0.51 stays.
+- The heartbeat is written once a second instead of every three, and
+  the warm-up and each music loop leave a breadcrumb, so if anything
+  is left the next report names the second and the step.
+- Reports carry real memory numbers (the OS's, since the engine's
+  counter is zero in release builds) and the frame cap.
+
 ## 0.51 (hotfix: the crash at the first gate)
 
 - Fixed: 0.50 crashed at the first gate on Android. The new haptics

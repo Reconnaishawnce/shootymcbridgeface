@@ -184,6 +184,10 @@ var _bot_spread := true
 
 
 func _ready() -> void:
+	# Phones with 90 or 120 Hz panels would run every frame's work that
+	# much more often; 60 is plenty for this game and halves the load.
+	if OS.has_feature("mobile"):
+		Engine.max_fps = 60
 	var args := OS.get_cmdline_user_args()
 	smoke = args.has("--smoke")
 	_smoke_endless = args.has("--endless")
@@ -747,6 +751,9 @@ func _warm_up() -> void:
 	for i in range(4):
 		await get_tree().process_frame
 	warm.queue_free()
+	# The music, one loop a frame, still under the loading screen.
+	Diag.mark("warm_up:music")
+	await sfx.build_music()
 	hud.end_font_warm()
 	await get_tree().process_frame
 	hud.show_loading(false)
@@ -2809,6 +2816,9 @@ func _on_sound_toggled(on: bool) -> void:
 	SaveData.save_sound_on(on)
 	if on:
 		sfx.play("click")
+		# Sound was off at boot, so the loops were never built: build them
+		# now, one a frame.
+		sfx.build_music()
 
 
 func _on_music_toggled(on: bool) -> void:

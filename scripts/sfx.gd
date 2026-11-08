@@ -30,7 +30,6 @@ var _hit_cooldown := 0.0
 var _music: Dictionary = {}
 var _music_target: Dictionary = {}
 var _music_style := ""
-var _music_thread: Thread
 var _music_ready := false
 
 
@@ -67,33 +66,30 @@ func _ready() -> void:
 		add_child(mp)
 		_music[style] = mp
 		_music_target[style] = 0.0
-	# The music loops are a few hundred thousand samples of GDScript maths.
-	# Done on the main thread that blocked the first frame for seconds on a
-	# phone (a gray screen after the splash), so it runs on a worker and
-	# the loops start whenever they are ready. Silent runs skip it.
-	if enabled:
-		_music_thread = Thread.new()
-		_music_thread.start(_build_music_loops)
+	# The music loops are built by build_music(), on the main thread under
+	# the loading screen, one loop a frame. They used to be built on a
+	# worker thread that handed them over a few seconds after boot; a
+	# phone that died in exactly that window every time (0.50) made the
+	# thread the prime suspect, and the game has no other thread.
 
 
-## Worker: synthesise every loop. Pure maths, touches no nodes.
-func _build_music_loops() -> Dictionary:
-	var out := {}
-	for style in MUSIC_STYLES:
-		out[style] = make_music(style)
-	return out
-
-
-func _finish_music_if_ready() -> void:
-	if _music_ready or _music_thread == null or _music_thread.is_alive():
+## Synthesise the loops, one a frame, and start them. Call once, under
+## the loading screen; await it.
+func build_music() -> void:
+	if _music_ready or not enabled:
 		return
-	var loops: Dictionary = _music_thread.wait_to_finish()
-	_music_thread = null
-	_music_ready = true
-	for style in loops:
+	for style in MUSIC_STYLES:
 		var mp: AudioStreamPlayer = _music[style]
-		mp.stream = loops[style]
-		mp.play()
+		mp.stream = make_music(style)
+		Diag.mark("music:%s" % style)
+		if is_inside_tree():
+			await get_tree().process_frame
+	for style in MUSIC_STYLES:
+		var mp: AudioStreamPlayer = _music[style]
+		if mp.stream != null:
+			mp.play()
+	_music_ready = true
+	Diag.mark("music_ready")
 
 
 func _exit_tree() -> void:
@@ -103,7 +99,6 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	_shot_cooldown -= delta
 	_hit_cooldown -= delta
-	_finish_music_if_ready()
 	# Crossfade the music layers toward their targets.
 	for style in _music:
 		var mp: AudioStreamPlayer = _music[style]
@@ -144,9 +139,6 @@ func play(name: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 ## Stop every voice and drop the streams. Called before quitting so no
 ## playback object is left alive at exit.
 func stop_all() -> void:
-	if _music_thread != null:
-		_music_thread.wait_to_finish()
-		_music_thread = null
 	for p in _players:
 		p.stop()
 		p.stream = null

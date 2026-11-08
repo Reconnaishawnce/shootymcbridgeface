@@ -7,7 +7,8 @@ extends Node
 
 const HEARTBEAT_PATH := "user://heartbeat.json"
 const LOG_DIR := "user://logs"
-const HEARTBEAT_EVERY := 3.0
+## Once a second: a death between two beats is pinned to the second.
+const HEARTBEAT_EVERY := 1.0
 const MAX_STALLS := 30
 
 var events: Array = []
@@ -101,6 +102,17 @@ func note(event: String, data: Dictionary = {}) -> void:
 	events = Report.trim(events)
 
 
+## Memory in use, in megabytes, as the OS sees it: the static counter is
+## zero in release builds, so this reads the process's physical use.
+func memory_mb() -> String:
+	var info := OS.get_memory_info()
+	var physical := float(info.get("physical", 0))
+	var free := float(info.get("free", 0))
+	if physical > 0.0:
+		return "%s used of %s" % [snappedf((physical - free) / 1048576.0, 1.0), snappedf(physical / 1048576.0, 1.0)]
+	return str(snappedf(float(OS.get_static_memory_usage()) / 1048576.0, 0.1))
+
+
 ## Counters a report carries: frame times, scene size, memory.
 func perf() -> Dictionary:
 	return {
@@ -111,7 +123,8 @@ func perf() -> Dictionary:
 		"draw_calls": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		"primitives": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
 		"fps": Engine.get_frames_per_second(),
-		"memory_mb": snappedf(float(OS.get_static_memory_usage()) / 1048576.0, 0.1),
+		"memory_mb": memory_mb(),
+		"max_fps": Engine.max_fps,
 		"uptime": snappedf(Time.get_ticks_msec() * 0.001, 0.1),
 	}
 
@@ -128,7 +141,7 @@ func context(save: Dictionary, p_note: String = "") -> Dictionary:
 		"renderer": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")),
 		"screen": "%s @ %sHz" % [str(DisplayServer.screen_get_size()), str(snappedf(DisplayServer.screen_get_refresh_rate(), 0.1))],
 		"fps": str(Engine.get_frames_per_second()),
-		"memory_mb": str(snappedf(float(OS.get_static_memory_usage()) / 1048576.0, 0.1)),
+		"memory_mb": memory_mb(),
 		"locale": OS.get_locale(),
 		"safe_graphics": SaveData.load_safe_graphics(),
 		"shadows": SaveData.load_shadows_on(),

@@ -886,7 +886,7 @@ func _build_title(root: Control) -> void:
 	# The bar to the next milestone, under the road line.
 	_road_bar = Control.new()
 	_road_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pin(t, _road_bar, 0.5, 1.0, Vector2(420.0, 10.0), Vector2(0.5, 1.0), Vector2(0.0, -200.0))
+	_pin(t, _road_bar, 0.5, 1.0, Vector2(420.0, 8.0), Vector2(0.5, 1.0), Vector2(0.0, -262.0))
 	var bar_bg := ColorRect.new()
 	bar_bg.color = Color(1.0, 1.0, 1.0, 0.16)
 	bar_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

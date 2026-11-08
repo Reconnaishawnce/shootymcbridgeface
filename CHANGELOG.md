@@ -3,6 +3,21 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.51 (hotfix: the crash at the first gate)
+
+- Fixed: 0.50 crashed at the first gate on Android. The new haptics
+  vibrated without the VIBRATE permission in the export, and Android
+  killed the app from the Java side with no GDScript error to report.
+  The first two crash reports to reach the server (a Galaxy S23 Ultra,
+  three seconds into a run, no errors, right after 0.50) pointed at
+  it. The permission is in the export now, and a test fails the build
+  if code vibrates without it, or talks to the network without
+  INTERNET.
+- Breadcrumbs through a run: the level, each gate, the boss and the
+  hero move are marked, so a crash names where it was.
+- The report's OS field was empty on Samsung; it falls back to the
+  version alias. Confetti joins the shader warm-up.
+
 ## 0.50 (the feel pass)
 
 - The phone buzzes with the game: a tap for a bite, a thump for a

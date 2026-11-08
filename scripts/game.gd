@@ -741,6 +741,7 @@ func _warm_up() -> void:
 	Fx.dust(warm, at, 6)
 	Fx.sparks(warm, at, 6)
 	Fx.smoke(warm, at, 4)
+	Fx.confetti(warm, at, 4)
 	Fx.trail(warm, Vector3.ZERO)
 	Burst.spawn(warm, at, Color(1.0, 0.6, 0.15), 6, 0.14, 2.0, 1.0)
 	for i in range(4):
@@ -1613,6 +1614,7 @@ func use_ability() -> void:
 	_ability_uses += 1
 	var id := Abilities.for_type(squad.squad_type)
 	Diag.note("ability", {"id": id, "level": level, "squad": squad.count})
+	Diag.mark("ability:%s" % id)
 	if smoke:
 		print("SMOKE_ABILITY ", JSON.stringify({"id": id, "uses": _ability_uses, "level": world.level, "frame": _frames}))
 	match id:
@@ -1872,6 +1874,7 @@ func _punch(amount: float) -> void:
 
 func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void:
 	gates_passed += 1
+	Diag.mark("gate:%d" % gates_passed)
 	_level_gates += 1
 	if smoke:
 		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "dist": int(world.level_distance), "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
@@ -1972,6 +1975,7 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 
 
 func _on_boss_spawned(boss: Boss) -> void:
+	Diag.mark("boss:%s" % boss.kind_name())
 	if smoke:
 		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "kind": boss.kind_name(), "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
 	hud.show_boss(true)
@@ -2053,6 +2057,7 @@ func _apply_event_look(fog: bool) -> void:
 
 
 func _on_level_started(level: int) -> void:
+	Diag.mark("level:%d" % level)
 	if level == 1 and not _events.is_empty() and not smoke:
 		var id := str(_events[0])
 		hud.show_banner("%s\n%s" % [Events.title(id), Events.body(id)], 2.6)
@@ -2505,6 +2510,9 @@ func _buzz(event: String) -> void:
 		return
 	_buzz_last = now
 	_buzz_last_ms = Haptics.duration(event, haptics_on)
+	# Android needs the VIBRATE permission for this (export_presets.cfg);
+	# without it the call kills the app from the Java side, which is how
+	# 0.50 crashed at the first gate.
 	Input.vibrate_handheld(_buzz_last_ms)
 
 

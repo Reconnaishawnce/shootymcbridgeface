@@ -1,6 +1,26 @@
 extends TestCase
 
 
+## 0.50 crashed every phone at its first gate: the game vibrated without
+## the Android VIBRATE permission, and the Java side killed the app with
+## no GDScript error to catch. Code that vibrates needs the preset to say
+## so, and this test says so for it.
+func test_export_declares_what_the_code_uses() -> void:
+	var f := FileAccess.open("res://export_presets.cfg", FileAccess.READ)
+	check(f != null, "the export preset is in the project")
+	if f == null:
+		return
+	var preset := f.get_as_text()
+	f.close()
+	var g := FileAccess.open("res://scripts/game.gd", FileAccess.READ)
+	var game := g.get_as_text()
+	g.close()
+	if game.contains("vibrate_handheld"):
+		check(preset.contains("permissions/vibrate=true"), "the game vibrates, so the Android preset grants VIBRATE")
+	if game.contains("HTTPRequest"):
+		check(preset.contains("permissions/internet=true"), "the game talks to the network, so the preset grants INTERNET")
+
+
 func test_log_lines_and_trim() -> void:
 	var l := Report.line(12.5, "running", "bite", {"left": 3})
 	check(l.contains("running") and l.contains("bite") and l.contains("\"left\":3"), "a line names the state, the event and the data")

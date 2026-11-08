@@ -123,7 +123,7 @@ func context(save: Dictionary, p_note: String = "") -> Dictionary:
 		"version": str(ProjectSettings.get_setting("application/config/version", "dev")),
 		"time": Time.get_datetime_string_from_system(true, true),
 		"device": "%s (%s)" % [OS.get_model_name(), OS.get_name()],
-		"os": OS.get_version(),
+		"os": OS.get_version() if OS.get_version() != "" else OS.get_version_alias(),
 		"gpu": "%s / %s" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()],
 		"renderer": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")),
 		"screen": "%s @ %sHz" % [str(DisplayServer.screen_get_size()), str(snappedf(DisplayServer.screen_get_refresh_rate(), 0.1))],

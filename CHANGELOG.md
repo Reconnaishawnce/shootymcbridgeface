@@ -21,7 +21,13 @@ Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
   10 the road speeds up again while crowds keep growing. And hands
   matter: a few seconds with no touch and panels stop climbing (the
   squad's own fire had been shooting them to x5), while the horde
-  behind closes in and eats until you steer again. MEASURED_AFTER
+  behind closes in and eats until you steer again. Measured: before,
+  three of four squads idled from level 6 in endless were still alive
+  after six and a half minutes, at levels 18 to 20 with 180 to 390
+  soldiers; after, every idle run ends in a wipe 40 to 70 seconds
+  after the hands come off (from level 4 at level 5, from level 6 at
+  level 8 or 9, from a peak of 500), while the bot that keeps playing
+  reaches level 11 with 268 soldiers in the same time as before.
 - The pit lane is painted yellow, ramps and all, with yellow arrows and
   PIT painted on the road for sixteen metres before the ramp and a lit
   strip where the lane leaves the road.

@@ -491,6 +491,12 @@ func _sync_visuals() -> void:
 	mark_veterans()
 
 
+## Bitten: every visible soldier flinches.
+func squash() -> void:
+	for s in _soldiers:
+		s.squash()
+
+
 ## Veterans ride in the front ranks, behind the hero if there is one,
 ## wearing their beret and name. Only touches a soldier whose mark is
 ## wrong, so the crowd churn costs nothing.

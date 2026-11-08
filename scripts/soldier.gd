@@ -43,8 +43,9 @@ const RAINBOW := [Color(1.0, 0.3, 0.3), Color(1.0, 0.6, 0.2), Color(1.0, 0.9, 0.
 
 ## Where the head sits and how big it is: everything on it is placed
 ## relative to these.
-const HEAD_Y := 1.08
-const HEAD_R := 0.24
+## Chunky: a head almost as wide as the body, short legs, a big gun.
+const HEAD_Y := 1.1
+const HEAD_R := 0.28
 
 var target_offset := Vector3.ZERO
 var detailed := true
@@ -63,6 +64,9 @@ var _halo: Node3D
 var _balloon: Node3D
 var _arms: Array[Node3D] = []
 var _tag: Label3D
+var _torso: MeshInstance3D
+var _head: MeshInstance3D
+var _squash_t := 0.0
 var _cheer_t := 0.0
 var _flash_t := 0.0
 var _recoil := 0.0
@@ -126,34 +130,36 @@ func _build() -> void:
 	# The front ranks get the ink line; the crowd behind stays cheap.
 	var ink_w := 0.022 if detailed else 0.0
 
-	# Short legs with round shoes.
+	# Short thick legs with big round boots.
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
-		hip.position = Vector3(side * 0.1, 0.38, 0.0)
-		var leg := Mats.pill(0.08, 0.24, pants)
+		hip.position = Vector3(side * 0.12, 0.38, 0.0)
+		var leg := Mats.pill(0.095, 0.24, pants)
 		leg.position.y = -0.14
 		hip.add_child(leg)
-		var shoe := Mats.ball(0.095, BOOT)
+		var shoe := Mats.ball(0.11, BOOT)
 		shoe.position = Vector3(0.0, -0.3, -0.03)
-		shoe.scale = Vector3(1.05, 0.65, 1.35)
+		shoe.scale = Vector3(1.05, 0.65, 1.4)
 		hip.add_child(shoe)
 		add_child(hip)
 		_legs.append(hip)
 
-	# An egg of a body.
-	var body := Mats.ball(0.235, top)
-	body.position.y = 0.64
-	body.scale = Vector3(1.0, 1.08, 0.92)
+	# A barrel of a body.
+	var body := Mats.ball(0.27, top)
+	body.position.y = 0.62
+	body.scale = Vector3(1.05, 1.0, 0.95)
 	if ink_w > 0.0:
 		Mats.ink(body, ink_w)
 	add_child(body)
+	_torso = body
 
-	# A big round head.
+	# A big round head, no neck to speak of.
 	var head := Mats.ball(HEAD_R, skin)
 	head.position.y = HEAD_Y
 	if ink_w > 0.0:
 		Mats.ink(head, ink_w)
 	add_child(head)
+	_head = head
 	if detailed:
 		_add_face()
 		if not COVERS_HAIR.has(hat):
@@ -161,38 +167,38 @@ func _build() -> void:
 	_add_hat(hat, top)
 
 	_gun = Node3D.new()
-	_gun.position = Vector3(0.14, 0.6, -0.3)
-	_gun.scale = Vector3.ONE * 0.85
+	_gun.position = Vector3(0.17, 0.58, -0.34)
+	_gun.scale = Vector3.ONE * 1.05
 	add_child(_gun)
 	_add_gun(weapon)
 
 	if not detailed:
 		return
 
-	var belt := Mats.torus(0.2, 0.245, BOOT)
-	belt.position.y = 0.48
+	var belt := Mats.torus(0.23, 0.285, BOOT)
+	belt.position.y = 0.46
 	belt.scale.y = 0.6
 	add_child(belt)
 	var buckle := Mats.ball(0.035, Color(1.0, 0.85, 0.3))
-	buckle.position = Vector3(0.0, 0.48, -0.225)
+	buckle.position = Vector3(0.0, 0.46, -0.26)
 	add_child(buckle)
 	_add_back(back, top)
 	if squad_type == "medic":
 		var cross_v := Mats.box(Vector3(0.06, 0.18, 0.03), CROSS)
-		cross_v.position = Vector3(0.0, 0.68, -0.225)
+		cross_v.position = Vector3(0.0, 0.66, -0.26)
 		add_child(cross_v)
 		var cross_h := Mats.box(Vector3(0.18, 0.06, 0.03), CROSS)
-		cross_h.position = Vector3(0.0, 0.68, -0.225)
+		cross_h.position = Vector3(0.0, 0.66, -0.26)
 		add_child(cross_h)
 	# Stubby arms, both on the gun.
 	for side in [-1.0, 1.0]:
 		var shoulder := Node3D.new()
-		shoulder.position = Vector3(side * 0.24, 0.76, -0.02)
+		shoulder.position = Vector3(side * 0.28, 0.76, -0.02)
 		shoulder.rotation_degrees.x = 75.0
-		var arm := Mats.pill(0.065, 0.26, top)
+		var arm := Mats.pill(0.078, 0.26, top)
 		arm.position.y = -0.14
 		shoulder.add_child(arm)
-		var hand := Mats.ball(0.07, skin)
+		var hand := Mats.ball(0.085, skin)
 		hand.position.y = -0.3
 		shoulder.add_child(hand)
 		add_child(shoulder)
@@ -291,7 +297,9 @@ func _add_hair(style: String, color: Color) -> void:
 func _add_hat(hat: String, top: Color) -> void:
 	match hat:
 		"helmet":
-			var helmet := Mats.ball(HEAD_R + 0.05, HELMET)
+			# The helmet wears the squad's colour: seen from above, the
+			# squad is mostly helmets, and a blue squad should look blue.
+			var helmet := Mats.ball(HEAD_R + 0.05, top.darkened(0.18) if not look.has("hat") else HELMET)
 			helmet.position.y = HEAD_Y + 0.08
 			helmet.scale = Vector3(1.0, 0.74, 1.0)
 			add_child(helmet)
@@ -426,22 +434,33 @@ func _add_gun(weapon: String) -> void:
 	if glow:
 		barrel = Mats.box(Vector3(0.11, 0.11, 0.4) if shotgun else Vector3(0.085, 0.085, 0.58), main, true)
 	else:
-		barrel = Mats.pill(0.055 if shotgun else 0.042, 0.4 if shotgun else 0.58, main)
+		barrel = Mats.pill(0.065 if shotgun else 0.05, 0.4 if shotgun else 0.58, main)
 		barrel.rotation_degrees.x = 90.0
 	barrel.position.z = -0.24
 	_gun.add_child(barrel)
-	var receiver := Mats.box(Vector3(0.09, 0.13, 0.22), accent if weapon != "standard" else GUN, glow)
+	var receiver := Mats.box(Vector3(0.11, 0.15, 0.26), accent if weapon != "standard" else GUN, glow)
 	receiver.position.z = 0.06
 	_gun.add_child(receiver)
-	_muzzle = Mats.box(Vector3(0.16, 0.16, 0.22), MUZZLE, true)
-	_muzzle.material_override = Mats.glow(MUZZLE, 3.0)
-	_muzzle.position.z = -0.52
+	# The muzzle flash: a four-point star of light at the barrel's end,
+	# turned a little differently each shot.
+	_muzzle = Mats.box(Vector3(0.4, 0.13, 0.06), MUZZLE, true)
+	_muzzle.material_override = Mats.glow(MUZZLE, 3.2)
+	_muzzle.position.z = -0.56
 	_muzzle.visible = false
 	_gun.add_child(_muzzle)
+	var cross := Mats.box(Vector3(0.13, 0.4, 0.06), MUZZLE, true)
+	cross.material_override = Mats.glow(MUZZLE, 3.2)
+	_muzzle.add_child(cross)
+	var core := Mats.ball(0.1, Color(1.0, 0.98, 0.85))
+	core.material_override = Mats.glow(Color(1.0, 0.98, 0.85), 3.6)
+	_muzzle.add_child(core)
 	if detailed:
-		var mag := Mats.box(Vector3(0.06, 0.12, 0.07), accent, glow)
-		mag.position = Vector3(0.0, -0.12, 0.02)
+		var mag := Mats.box(Vector3(0.07, 0.14, 0.08), accent, glow)
+		mag.position = Vector3(0.0, -0.13, 0.02)
 		_gun.add_child(mag)
+		var stock := Mats.box(Vector3(0.08, 0.11, 0.16), accent if weapon != "standard" else GUN.darkened(0.2), glow)
+		stock.position = Vector3(0.0, -0.02, 0.26)
+		_gun.add_child(stock)
 		if weapon == "candy":
 			var stripe := Mats.torus(0.04, 0.06, accent)
 			stripe.position.z = -0.3
@@ -523,15 +542,31 @@ func muzzle_world_position() -> Vector3:
 
 
 func flash() -> void:
-	_flash_t = 0.06
+	_flash_t = 0.07
 	_recoil = 1.0
 	_muzzle.visible = true
+	_muzzle.rotation.z = randf() * TAU
+	_muzzle.scale = Vector3.ONE * randf_range(0.8, 1.2)
+
+
+## Bitten: a squash, wider and shorter for a moment.
+func squash() -> void:
+	_squash_t = 1.0
 
 
 func _process(delta: float) -> void:
 	position = position.lerp(target_offset, 1.0 - exp(-10.0 * delta))
 	var t := Time.get_ticks_msec() * 0.001 * _stride + _phase
-	position.y = absf(sin(t)) * 0.06
+	# The run: a bob, a lean into each step, the head a beat behind.
+	position.y = absf(sin(t)) * 0.08
+	if _torso != null:
+		_torso.rotation.z = sin(t) * 0.07
+	if _head != null:
+		_head.position.y = HEAD_Y + absf(sin(t + 0.6)) * 0.03
+	if _squash_t > 0.0:
+		_squash_t = maxf(0.0, _squash_t - delta * 6.0)
+		var sq := sin(_squash_t * PI)
+		scale = Vector3(1.0 + 0.2 * sq, 1.0 - 0.18 * sq, 1.0 + 0.2 * sq)
 	if _cheer_t > 0.0:
 		_cheer_t = maxf(0.0, _cheer_t - delta * 1.1)
 		var hop := sin(_cheer_t * PI * 2.0)
@@ -542,7 +577,7 @@ func _process(delta: float) -> void:
 		_balloon.rotation.x = sin(t * 0.25) * 0.15
 		_balloon.rotation.z = cos(t * 0.2) * 0.12
 	for i in range(_legs.size()):
-		_legs[i].rotation.x = sin(t + PI * i) * 0.7
+		_legs[i].rotation.x = sin(t + PI * i) * 0.85
 	if _cape != null:
 		_cape.rotation.x = -0.35 - absf(sin(t * 0.5)) * 0.25
 	for i in range(_wings.size()):

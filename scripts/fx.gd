@@ -106,6 +106,41 @@ static func smoke(parent: Node, at: Vector3, amount: int = 6) -> void:
 	p.scale_amount_curve = _grow()
 
 
+## Confetti: flat flakes in every colour, thrown up and tumbling down.
+## A good gate, a perfect, a level cleared.
+static func confetti(parent: Node, at: Vector3, amount: int = 16) -> void:
+	var p := _one_shot(parent, at, amount, 1.1)
+	if p == null:
+		return
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.14, 0.14, 0.025)
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bm.material = mat
+	p.mesh = bm
+	p.color_ramp = _rainbow()
+	p.direction = Vector3(0.0, 1.0, 0.0)
+	p.spread = 55.0
+	p.initial_velocity_min = 4.0
+	p.initial_velocity_max = 7.5
+	p.gravity = Vector3(0.0, -7.0, 0.0)
+	p.angular_velocity_min = -360.0
+	p.angular_velocity_max = 360.0
+	p.scale_amount_min = 0.8
+	p.scale_amount_max = 1.3
+
+
+static func _rainbow() -> Gradient:
+	var g := Gradient.new()
+	var colors := [Color(1.0, 0.3, 0.3), Color(1.0, 0.85, 0.2), Color(0.3, 0.9, 0.4), Color(0.3, 0.6, 1.0), Color(0.8, 0.4, 1.0), Color(1.0, 0.5, 0.75)]
+	g.set_color(0, colors[0])
+	g.set_color(1, colors[colors.size() - 1])
+	for i in range(1, colors.size() - 1):
+		g.add_point(float(i) / float(colors.size() - 1), colors[i])
+	return g
+
+
 ## Dust kicked up behind a vehicle, as long as it exists.
 static func trail(parent: Node3D, offset: Vector3, size: float = 0.22) -> CPUParticles3D:
 	var p := CPUParticles3D.new()

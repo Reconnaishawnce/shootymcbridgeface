@@ -3,6 +3,22 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.45 (bodies: chunkier, livelier, louder)
+
+- Soldiers and zombies are chunkier: bigger heads on barrel bodies
+  with no neck, thicker legs and arms, bigger boots and hands, a
+  bigger gun with a stock, bigger glowing eyes and a wider jaw on the
+  zombies. The silhouettes read from the far end of the road. Helmets
+  wear the squad's colour (blue, orange or white by type): from above
+  a squad is mostly helmets, and a blue squad should look blue.
+- They move more: the run bobs and leans into each step with the head
+  a beat behind; zombies roll their heads, swing harder when they run,
+  squash and get knocked back a step when shot; the whole squad
+  flinches when bitten.
+- The muzzle flash is a four-point star with a white core, turned
+  differently every shot; tracers are fatter with a longer streak.
+- Confetti on a good gate, more on a rally, a shower on a PERFECT.
+
 ## 0.44 (colour: the bridge, the water, the red crowd)
 
 - The world is a bridge over water. Girders under the deck, a concrete

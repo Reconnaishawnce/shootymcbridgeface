@@ -300,10 +300,9 @@ shipped and measured on its own.
 3. Look, part one: colour (0.44, done). `Palette` with contrast tests,
    the bridge over water (girders, walkways, a far shore, a water
    shader), the red crowd, lit panels, a deeper sky, thicker ink.
-4. Look, part two: bodies. Chunkier soldiers and zombies (bigger heads,
-   helmets, visible rifles, fatter silhouettes), a two-frame run cycle,
-   squash-and-stretch on hits, bigger muzzle flashes and tracer trails,
-   confetti on gates, and screen-space shake and flash budgets.
+4. Look, part two: bodies (0.45, done). Chunkier soldiers and zombies,
+   a livelier run, squash and knock-back on hits, the squad flinching
+   on bites, a star muzzle flash, fat tracers, confetti on gates.
 5. Mechanics, part one: the turret and the wall. Gold turrets you buy
    with bounty that ride the curb and fire on their own; walls and
    barricades across half the road that must be shot down or steered

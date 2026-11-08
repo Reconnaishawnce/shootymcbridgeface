@@ -851,6 +851,31 @@ sky is a deeper blue over a peach horizon, the fog a light haze, the
 sun a touch stronger, the fill bluer, and the grade pushes saturation
 to 1.2. The ink line is thicker (`Palette.INK_WIDTH`) and darker.
 
+## Art direction (graphics pass 5: bodies)
+
+Chunk. `Soldier` heads went from 0.24 to 0.28 against a 0.27 barrel of
+a body with no neck, thicker legs and bigger boots, wider shoulders,
+and a gun scaled past one with a stock and a fatter receiver, so the
+silhouette reads from the far end of the road the way the reference's
+does, and the default helmet takes the squad's colour, since from
+above the squad is mostly helmets. `Zombie` heads, torsos, arms and hands grew the same way, with
+bigger glowing eyes and a wider jaw. Both keep their node counts:
+detail is in proportion, not in parts.
+
+Motion. The soldier's run is a bob with the torso leaning into each
+step and the head a beat behind; the zombie's lurch rolls the head,
+swings the legs harder for runners and thieves, and pumps the arms.
+`Zombie.take_damage` squashes wider and shorter and knocks the body
+back a step; `Squad.squash` makes every visible soldier flinch on a
+bite. The muzzle flash is a four-point star of glow with a white core,
+turned and scaled a little differently each shot; tracers are fatter
+with a longer streak.
+
+Confetti. `Fx.confetti` is a one-shot of flat flakes with a rainbow
+`color_ramp` and spin, thrown on a gain at a gate (more for a rally),
+and on a PERFECT. It sits under the particle cap like every other
+one-shot.
+
 ## Art direction (original notes)
 
 Flat-shaded low-poly primitives on purpose, but assembled into characters:

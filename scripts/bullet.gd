@@ -21,14 +21,14 @@ var _age := 0.0
 var hits_left_bonus := 0
 
 
-func _init(size: float = 1.0, color: Color = COLOR, length: float = 0.7) -> void:
-	var m := Mats.box(Vector3(0.09 * size, 0.09 * size, length), color, true)
-	m.material_override = Mats.glow(color, 2.6)
+func _init(size: float = 1.0, color: Color = COLOR, length: float = 0.95) -> void:
+	# Fat tracers: a bright head and a long streak behind it.
+	var m := Mats.box(Vector3(0.12 * size, 0.12 * size, length), color, true)
+	m.material_override = Mats.glow(color, 2.8)
 	add_child(m)
-	# A fainter, thinner tail behind the head: the streak of a tracer.
-	var tail := Mats.box(Vector3(0.05 * size, 0.05 * size, length * 1.6), Color(color.r, color.g, color.b, 0.35), true)
-	tail.material_override = Mats.glow(Color(color.r, color.g, color.b, 0.35), 1.6)
-	tail.position.z = length * 1.1
+	var tail := Mats.box(Vector3(0.065 * size, 0.065 * size, length * 1.9), Color(color.r, color.g, color.b, 0.45), true)
+	tail.material_override = Mats.glow(Color(color.r, color.g, color.b, 0.45), 1.8)
+	tail.position.z = length * 1.3
 	add_child(tail)
 
 

@@ -1719,9 +1719,13 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 		squad.rally()
 		sfx.play("rally")
 		_punch(5.0)
+		if not smoke:
+			Fx.confetti(world, squad.position + Vector3(0.0, 2.2, -1.5), 22)
 	elif after > before:
 		sfx.play("gate_good")
 		_punch(3.0)
+		if not smoke:
+			Fx.confetti(world, squad.position + Vector3(0.0, 2.0, -1.5), 10)
 	else:
 		sfx.play("gate_bad", -4.0)
 
@@ -1765,6 +1769,7 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 
 func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	_shake = minf(1.0, _shake + (0.5 if heavy else 0.2))
+	squad.squash()
 	sfx.play("bite", 0.0 if heavy else -6.0)
 	Burst.spawn(world, squad.position + Vector3(0.0, 0.9, -0.5), Soldier.BODY, mini(bite * 3, 24), 0.12, 4.5)
 	hud.show_float("-%d" % bite, false)
@@ -2419,6 +2424,8 @@ func _on_gate_perfect(_gate, _index: int) -> void:
 	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
 	sfx.play("level_clear", -8.0, 1.5)
 	_punch(2.0)
+	if not smoke:
+		Fx.confetti(world, squad.position + Vector3(0.0, 2.4, -2.0), 30)
 
 
 func _on_count_changed(new_count: int) -> void:

@@ -57,6 +57,7 @@ var _cling_ring: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _arms: Array[Node3D] = []
 var _hit_t := 0.0
+var _head: MeshInstance3D
 var _base_scale := 1.0
 var _phase := randf() * TAU
 
@@ -157,15 +158,15 @@ func _build() -> void:
 			shirt = Color(0.3, 0.1, 0.25)
 	var ink := 0.03
 
-	# Shambling legs, bare feet.
+	# Shambling thick legs, bare feet.
 	for side in [-1.0, 1.0]:
 		var hip := Node3D.new()
-		hip.position = Vector3(side * 0.11, 0.5, 0.0)
-		var leg := Mats.pill(0.085, 0.36, PANTS)
+		hip.position = Vector3(side * 0.14, 0.5, 0.0)
+		var leg := Mats.pill(0.1, 0.36, PANTS)
 		leg.position.y = -0.2
 		Mats.ink(leg, ink)
 		hip.add_child(leg)
-		var foot := Mats.ball(0.08, skin.darkened(0.2))
+		var foot := Mats.ball(0.1, skin.darkened(0.2))
 		foot.position = Vector3(0.0, -0.42, -0.04)
 		foot.scale = Vector3(1.0, 0.6, 1.3)
 		hip.add_child(foot)
@@ -173,51 +174,52 @@ func _build() -> void:
 		_legs.append(hip)
 
 	# A hunched torso, torn shirt, a rib of darker cloth.
-	var torso := Mats.ball(0.24, shirt)
-	torso.position = Vector3(0.0, 0.74, 0.06)
-	torso.scale = Vector3(1.0, 1.15, 0.85)
+	var torso := Mats.ball(0.29, shirt)
+	torso.position = Vector3(0.0, 0.76, 0.06)
+	torso.scale = Vector3(1.08, 1.1, 0.9)
 	torso.rotation.x = 0.55 if is_runner() else 0.3
 	Mats.ink(torso, ink)
 	_body.add_child(torso)
-	var tear := Mats.ball(0.1, skin)
-	tear.position = Vector3(0.09, 0.62, -0.13)
+	var tear := Mats.ball(0.12, skin)
+	tear.position = Vector3(0.1, 0.62, -0.17)
 	tear.scale = Vector3(1.0, 1.4, 0.4)
 	_body.add_child(tear)
 
 	# A big round head, sunken glowing eyes, a slack jaw.
-	var head := Mats.ball(0.2, skin)
-	head.position = Vector3(0.0, 1.14, 0.16)
+	var head := Mats.ball(0.25, skin)
+	head.position = Vector3(0.0, 1.16, 0.16)
 	Mats.ink(head, ink)
 	_body.add_child(head)
-	var eye_r := 0.055 if brute else 0.04
+	_head = head
+	var eye_r := 0.07 if brute else 0.05
 	for side in [-1.0, 1.0]:
-		var socket := Mats.ball(eye_r + 0.02, skin.darkened(0.45))
-		socket.position = Vector3(side * 0.075, 1.17, 0.31)
+		var socket := Mats.ball(eye_r + 0.025, skin.darkened(0.45))
+		socket.position = Vector3(side * 0.09, 1.19, 0.37)
 		socket.scale = Vector3(1.0, 1.0, 0.5)
 		_body.add_child(socket)
 		var eye := Mats.sphere(eye_r, EYE)
-		eye.material_override = Mats.glow(EYE, 2.0)
-		eye.position = Vector3(side * 0.075, 1.17, 0.34)
+		eye.material_override = Mats.glow(EYE, 2.2)
+		eye.position = Vector3(side * 0.09, 1.19, 0.4)
 		_body.add_child(eye)
-	var jaw := Mats.ball(0.08, skin.darkened(0.3))
-	jaw.position = Vector3(0.0, 1.0, 0.3)
-	jaw.scale = Vector3(1.3, 0.5, 0.7)
+	var jaw := Mats.ball(0.1, skin.darkened(0.3))
+	jaw.position = Vector3(0.0, 0.98, 0.36)
+	jaw.scale = Vector3(1.4, 0.5, 0.7)
 	_body.add_child(jaw)
-	var hair := Mats.ball(0.19, PANTS.darkened(0.2))
-	hair.position = Vector3(0.0, 1.24, 0.12)
+	var hair := Mats.ball(0.24, PANTS.darkened(0.2))
+	hair.position = Vector3(0.0, 1.28, 0.12)
 	hair.scale = Vector3(1.0, 0.45, 1.0)
 	_body.add_child(hair)
 
-	# Arms out front, hands open.
+	# Thick arms out front, big open hands.
 	for side in [-1.0, 1.0]:
 		var shoulder := Node3D.new()
-		shoulder.position = Vector3(side * 0.27, 0.96, 0.12)
+		shoulder.position = Vector3(side * 0.32, 0.98, 0.12)
 		shoulder.rotation_degrees.x = -80.0
-		var arm := Mats.pill(0.07, 0.4, skin)
+		var arm := Mats.pill(0.085, 0.4, skin)
 		arm.position.y = -0.2
 		Mats.ink(arm, ink)
 		shoulder.add_child(arm)
-		var hand := Mats.ball(0.075, skin.darkened(0.1))
+		var hand := Mats.ball(0.095, skin.darkened(0.1))
 		hand.position.y = -0.42
 		shoulder.add_child(hand)
 		_body.add_child(shoulder)
@@ -225,11 +227,11 @@ func _build() -> void:
 
 	if brute:
 		for side in [-1.0, 1.0]:
-			var pad := Mats.box(Vector3(0.32, 0.16, 0.32), PLATE)
-			pad.position = Vector3(side * 0.3, 1.04, 0.06)
+			var pad := Mats.box(Vector3(0.36, 0.18, 0.36), PLATE)
+			pad.position = Vector3(side * 0.36, 1.08, 0.06)
 			Mats.ink(pad, ink)
 			_body.add_child(pad)
-		var belt := Mats.torus(0.22, 0.27, PLATE.darkened(0.2))
+		var belt := Mats.torus(0.26, 0.32, PLATE.darkened(0.2))
 		belt.position = Vector3(0.0, 0.52, 0.04)
 		_body.add_child(belt)
 	elif is_tank():
@@ -260,10 +262,10 @@ func _build() -> void:
 	# The health bar only shows once something has been taken off: a
 	# black bar over every healthy head was the heaviest thing on screen.
 	_bar_bg = Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
-	_bar_bg.position.y = 1.6
+	_bar_bg.position.y = 1.72
 	_body.add_child(_bar_bg)
 	_bar = Mats.box(Vector3(0.8, 0.08, 0.12), BAR_FG, true)
-	_bar.position.y = 1.6
+	_bar.position.y = 1.72
 	_body.add_child(_bar)
 	_refresh_bar()
 
@@ -330,16 +332,20 @@ func _process(delta: float) -> void:
 		return
 	# A stumbling lurch so a wave reads as a crowd, not a grid.
 	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() or latched else 7.0) + _phase
-	_body.rotation.z = sin(t * 0.8) * 0.08
-	_body.position.y = absf(sin(t * 0.5)) * 0.05
+	_body.rotation.z = sin(t * 0.8) * 0.1
+	_body.position.y = absf(sin(t * 0.5)) * 0.07
+	if _head != null:
+		_head.rotation.z = sin(t * 0.5 + 1.0) * 0.12
+	var swing := 0.65 if is_runner() or is_thief() else 0.5
 	for i in range(_legs.size()):
-		_legs[i].rotation.x = sin(t + PI * i) * 0.45
+		_legs[i].rotation.x = sin(t + PI * i) * swing
 	for i in range(_arms.size()):
-		_arms[i].rotation_degrees.x = -80.0 + sin(t * 0.7 + i) * 10.0
+		_arms[i].rotation_degrees.x = -80.0 + sin(t * 0.7 + i) * 14.0
 	if _cling_ring != null:
 		_cling_ring.scale = Vector3.ONE * (1.0 + 0.18 * sin(t * 1.2))
 		_cling_ring.rotation.y = t * 0.3
 	if _hit_t > 0.0:
-		# Squash: wider and shorter for a moment, then back.
+		# Squash: wider and shorter for a moment, knocked back a step.
 		_hit_t = maxf(0.0, _hit_t - delta * 8.0)
-		_body.scale = Vector3(1.0 + 0.22 * _hit_t, 1.0 - 0.18 * _hit_t, 1.0 + 0.22 * _hit_t) * _base_scale
+		_body.scale = Vector3(1.0 + 0.32 * _hit_t, 1.0 - 0.26 * _hit_t, 1.0 + 0.32 * _hit_t) * _base_scale
+		_body.position.z = -0.22 * _hit_t

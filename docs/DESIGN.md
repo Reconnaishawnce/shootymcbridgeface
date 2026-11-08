@@ -317,6 +317,12 @@ cap; the player's own report always goes. A failed send that was not a
 rejection waits in the save (`PENDING_MAX`) and goes on the next title.
 The install id is random and separate from the leaderboard id.
 
+The smoke bot's `SMOKE_PERF` line is the first reading: a busy endless
+run peaks at about 7,300 nodes with 175 zombies alive, and nightmare
+at 6,000 with 128. `check.sh` holds the wipe-and-retry run under a
+9,000-node budget. Those counts, not the renderer, are the likeliest
+cause of the busy-screen freezes; the reports will say.
+
 On the Worker, `report()` checks the signature, the size, the kind and
 a per-install daily cap, and stores the row under a zero-padded
 timestamp key with a thirty-day TTL so KV's listing is chronological;

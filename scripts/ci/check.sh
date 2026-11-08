@@ -35,4 +35,9 @@ echo "== wipe and retry (nightmare, seed 11, a forced wipe at frame 4500: the re
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=11 --nightmare --smoke-retry --smoke-wipe-at=4500 2>&1 | tee "$LOG"
 fail_on_script_errors "wipe and retry"
 grep -q "SMOKE_RETRY" "$LOG" || { echo "::error::the bot never reached the results screen and played again"; exit 1; }
+# The busiest the scene got: a budget on nodes, so a change that doubles
+# the bodies on screen (the busy-screen freezes on phones) is caught here.
+peak_nodes="$(grep SMOKE_PERF "$LOG" | tail -1 | sed 's/SMOKE_PERF //' | python3 -c 'import sys,json; print(json.load(sys.stdin)["nodes"])')"
+echo "peak nodes: $peak_nodes"
+[ "$peak_nodes" -le 9000 ] || { echo "::error::the scene peaked at $peak_nodes nodes, over the 9000 budget"; exit 1; }
 echo "== all checks passed"

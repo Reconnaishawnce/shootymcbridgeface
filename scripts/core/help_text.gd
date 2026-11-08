@@ -118,14 +118,15 @@ static func sections() -> Array:
 			"DAILY: the same road for everyone today, no upgrades, rifles only. Best of the day counts and you can copy your result to share.\n" +
 			"WEEKLY: the same road for everyone all week, on hard, no upgrades."},
 		{"title": "SQUADS", "body":
-			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. " +
+			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. SNIPERS (from %d trophies on the ROAD, or the SHOP) fire slowly, hit more than twice as hard, and every shot goes through one more zombie. " % int(Road.UNLOCKS["snipers"]) +
 			"The front %d soldiers' worth of guns count toward firepower one for one; past that every extra soldier adds a little less (500 soldiers shoot like %d). A bigger squad is mostly extra health, and the crowds grow to match its guns, so a huge squad is never a free ride." % [Progression.DPS_CAP_SOLDIERS, Progression.firing_count(500)]},
 		{"title": "THE HERO MOVE", "body":
 			"Tap the squad, or the HERO button bottom left, and the squad does its move. Rifles fire a VOLLEY: one hard shot per soldier dead ahead (up to %d), each through the first thing it meets. Shotguns burst a SHOCKWAVE: everything within %d metres takes %.1f seconds of the squad's fire and is thrown back. Medics send a HEAL PULSE: %d%% of the squad back on their feet (at least %d) and a shield for %d seconds. " % [Abilities.VOLLEY_MAX_SHOTS, int(Abilities.SHOCKWAVE_RADIUS), Abilities.SHOCKWAVE_SECONDS, int(Abilities.HEAL_FRACTION * 100.0), Abilities.HEAL_MIN, int(Abilities.HEAL_SHIELD_SECONDS)] +
+			"Snipers fire a LONGSHOT: one beam down the squad's line, %d seconds of its fire into everything in it. " % int(Abilities.LONGSHOT_SECONDS) +
 			"Then it recharges: %d seconds, and the button fills as it does. HERO POWER in the SHOP takes %d seconds off per level and adds %d%% to the move."  % [int(Abilities.COOLDOWN_BASE), int(Abilities.COOLDOWN_PER_LEVEL), int(Abilities.POWER_PER_LEVEL * 100.0)]},
 		{"title": "THE TROPHY ROAD", "body":
 			"Every run adds trophies and nothing takes them away: %d for every level you reach, more for good grades, double on hard, triple on nightmare. " % Road.PER_LEVEL +
-			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"])] +
+			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d, the SNIPERS squad at %d, then named locker items every 500 to the end. The home screen shows a bar to the next milestone. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"]), int(Road.UNLOCKS["snipers"])] +
 			"Every %d is a checkpoint: where you stand for good." % Road.CHECKPOINT},
 		{"title": "STUCK ON A LEVEL", "body":
 			"Wiped out? The results card gives you one TIP about how it went, and once a run you can RETRY the level you died on, from its first gate, with the squad you walked into it with. Everything else (perks, bounty, the convoy) stays. The daily, the weekly and endless have no retry."},
@@ -134,6 +135,7 @@ static func sections() -> Array:
 			"Take it or let them go, and either way the comeback brings ten seconds of AGRO: double fire, double damage, nothing bites. Not in the daily or the weekly, where everyone shares one road. SECOND WIND from the shop is the free version and fires first."},
 		{"title": "QUESTS AND THE SEASON", "body":
 			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
+			"Every quest done also pays %d coins per point, and a day with all three done pays %d more. Play on consecutive days for a STREAK: %d%% more coins at the end of every run for each day after the first, up to %d%%; miss a day and it starts over. " % [Quests.COINS_PER_POINT, Quests.ALL_DONE_BONUS, int(Streak.BONUS_PER_DAY * 100.0), int(Streak.BONUS_CAP * 100.0)] +
 			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +
 			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play."},
 		{"title": "LEADERBOARD", "body":

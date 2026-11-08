@@ -5,6 +5,9 @@ extends RefCounted
 ## hands in a day number and a run's numbers.
 
 const PER_DAY := 3
+## Coins a quest pays on top of its points, and the bonus for all three.
+const COINS_PER_POINT := 3
+const ALL_DONE_BONUS := 300
 ## Templates: a title with one number, the run stat it watches, the
 ## targets to pick from and the points each pays. "max" templates track
 ## the best single run instead of adding up.
@@ -62,6 +65,23 @@ static func advance(state: Dictionary, day: int, run: Dictionary) -> Dictionary:
 			st.done.append(q.id)
 			completed.append(q)
 	return {"state": st, "completed": completed}
+
+
+## Coins a completed quest pays.
+static func coins_for(q: Dictionary) -> int:
+	return int(q.points) * COINS_PER_POINT
+
+
+static func coins_for_all(completed: Array) -> int:
+	var n := 0
+	for q in completed:
+		n += coins_for(q)
+	return n
+
+
+## True when [param state] has every quest of its day done.
+static func all_done(state: Dictionary) -> bool:
+	return (state.get("done", []) as Array).size() >= PER_DAY
 
 
 static func points_for(completed: Array) -> int:

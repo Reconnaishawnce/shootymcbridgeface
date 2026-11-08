@@ -215,6 +215,7 @@ func _ready() -> void:
 	lessons_seen = SaveData.load_lessons_seen()
 	lessons_on = SaveData.load_lessons_on()
 	lb = SaveData.load_leaderboard()
+	streak = SaveData.load_streak()
 	if not lb.has("id"):
 		lb.id = Leaderboard.new_id()
 	if modifier != "normal" and not _feature_open(modifier):
@@ -914,6 +915,7 @@ func show_title() -> void:
 		"shotgun_unlocked": meta.shotgun_unlocked() or meta.squad_unlocked("medic"),
 		"stars": wardrobe.stars, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"modifier": modifier, "mode_hint": hint,
+		"streak_line": Streak.line(streak, Daily.day_number(int(Time.get_unix_time_from_system()))),
 	})
 
 
@@ -1312,7 +1314,13 @@ func end_run() -> void:
 	_game_over_frame = _frames
 	Diag.mark("end_run:records")
 	var run_bounty := Meta.coins_for_run(bounty, bosses_killed, gates_passed)
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult()))
+	var today := Daily.day_number(int(Time.get_unix_time_from_system()))
+	var streak_after := Streak.advance(streak, today) if not smoke else streak
+	var streak_days := Streak.days(streak_after, today)
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult() * Streak.bonus_mult(streak_days)))
+	if not smoke:
+		streak = streak_after
+		SaveData.save_streak(streak)
 	_last_result = {"mode": mode, "score": score, "level": world.level, "distance": int(total_distance), "kills": kills, "peak": peak_squad, "grades": " ".join(grades), "modifier": world.modifier}
 	# The auto-player must not pollute a real player's records or wallet.
 	var records := {"new_best_score": false, "new_best_level": false, "new_best_endless": false}
@@ -1380,12 +1388,15 @@ func end_run() -> void:
 	var day := Daily.day_number(int(Time.get_unix_time_from_system()))
 	var qa := Quests.advance(quest_state, day, run_stats)
 	quests_done = qa.completed
+	var quest_coins := 0
 	if not quests_done.is_empty():
 		var sa := Season.advance(season_state, Season.number(day), Quests.points_for(quests_done))
 		season_rewards = sa.rewards
+		quest_coins = Quests.coins_for_all(quests_done) + (Quests.ALL_DONE_BONUS if Quests.all_done(qa.state) else 0)
 		if smoke:
-			print("SMOKE_QUESTS ", JSON.stringify({"done": quests_done.size(), "rewards": season_rewards.size(), "frame": _frames}))
+			print("SMOKE_QUESTS ", JSON.stringify({"done": quests_done.size(), "rewards": season_rewards.size(), "coins": quest_coins, "frame": _frames}))
 		else:
+			coins = SaveData.add_coins(quest_coins)
 			season_state = sa.state
 			SaveData.save_season(season_state)
 			for rw in season_rewards:
@@ -1420,6 +1431,10 @@ func end_run() -> void:
 						coins = SaveData.add_coins(int(rw.amount))
 					"stars":
 						stars_earned += int(rw.amount)
+					"unlock":
+						if str(rw.id) == "snipers" and meta.level("sniper") < 1:
+							meta.levels["sniper"] = 1
+							SaveData.save_upgrades(meta.levels)
 					"item":
 						if wardrobe.is_owned(str(rw.id)):
 							rw.owned = true
@@ -1455,6 +1470,8 @@ func end_run() -> void:
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
 		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
 		"trophies_earned": trophies_earned, "road_rewards": road_rewards,
+		"quest_coins": quest_coins, "streak_days": streak_days, "streak_percent": Streak.bonus_percent(streak_days),
+		"trophies_total": trophies, "all_quests_done": Quests.all_done(qa.state),
 		"tip": Tips.for_wipe({
 			"level": world.level, "in_boss": world.phase == World.Phase.BOSS,
 			"boss_kind": world.boss.kind_name() if world.boss != null else "walker",
@@ -1574,6 +1591,13 @@ func use_ability() -> void:
 			_shake = minf(1.0, _shake + 0.5)
 			hud.show_float("SHOCKWAVE  x%d" % hits, true)
 			_punch(6.0)
+		"longshot":
+			var hits := world.longshot(squad.position.x, Abilities.LONGSHOT_HALF_WIDTH, Abilities.longshot_damage(squad.dps(), level), Abilities.LONGSHOT_RANGE)
+			sfx.play("rally", -2.0, 0.7)
+			_shake = minf(1.0, _shake + 0.3)
+			hud.flash(0.12)
+			hud.show_float("LONGSHOT  x%d" % hits, true)
+			_punch(5.0)
 		"heal":
 			var n := Abilities.heal_amount(squad.count, level)
 			squad.add(n)
@@ -2023,6 +2047,8 @@ var _lb_from_over := false
 ## The last wipe card, so BACK from the leaderboard can show it again.
 var _last_over: Dictionary = {}
 var _lb_teaser_at := -1000.0
+## The day streak (Streak), kept in the save.
+var streak: Dictionary = {}
 ## One free retry of a level per run, with the squad you entered it with.
 var _level_retry_used := false
 var _level_entry_count := 1
@@ -2873,6 +2899,8 @@ func _shots_walkthrough() -> void:
 		stats.runs = 3
 		trophies = 640
 		modifier = "hard"
+		var today_q := Daily.day_number(int(Time.get_unix_time_from_system()))
+		streak = {"days": 4, "last_day": today_q - 1, "best": 4}
 		show_title()
 		await _capture("q1_title_full.png", 5)
 		character_mode = true

@@ -790,6 +790,41 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
+## The run meta (0.48)
+
+Four things that give a finished run a reason to come back tomorrow.
+
+Quests pay coins now, not only season points: `Quests.coins_for` is
+`COINS_PER_POINT` times the quest's points, and a day with all three
+done (`all_done`) pays `ALL_DONE_BONUS` on top. The quests page says
+the coins beside the points; the wipe card lists them.
+
+`Streak` (pure) counts consecutive days with a finished run: `advance`
+grows it when the day follows the last, holds it on the same day, and
+starts over otherwise; `alive` and `days` make a lapsed streak show as
+nothing. `bonus_mult` pays `BONUS_PER_DAY` more coins per day after the
+first, up to `BONUS_CAP`, applied to the run's converted bounty in
+`end_run`. The home screen carries `Streak.line` under the wallet (it
+asks for today's run while yesterday's streak is still alive); the
+wipe card names the day and the percent.
+
+The next-unlock bar: `Road.progress_to_next` is the fraction of the
+current milestone walked, drawn as a gold bar under the road line on
+the home screen; the wipe card says how many trophies to the next one.
+
+The later road: `UNLOCKS` gains the SNIPERS squad at 2000 (the game
+sets the shop's `sniper` level when the milestone passes, and the shop
+also sells it), and `FIXED_ITEMS` names a locker item every 500 from
+2500 to the end (crown, galaxy, wings, halo, gold, luna), so the last
+half of the road is no longer a repeating pattern. Snipers
+(`Squad.is_sniper`) fire at `SNIPER_FIRE_MULT` with
+`SNIPER_DAMAGE_MULT` and one more pierce, wear dark green with a long
+barrel, and their hero move is the LONGSHOT: `World.longshot` puts
+`LONGSHOT_SECONDS` of the squad's fire into everything within
+`LONGSHOT_HALF_WIDTH` of the squad's line for `LONGSHOT_RANGE`, walls
+and the boss included, with a glowing beam that thins out. CI's smoke
+runs the sniper squad too.
+
 ## The hero move (0.47)
 
 `Abilities` (pure) is the rulebook: one move per squad type

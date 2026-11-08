@@ -14,7 +14,10 @@ const PER_LEVEL := 10
 const GRADE_TROPHIES := {"S": 15, "A": 10, "B": 5, "C": 2, "D": 0}
 const MODE_MULT := {"normal": 1.0, "hard": 2.0, "nightmare": 3.0}
 ## Features and where they open.
-const UNLOCKS := {"endless": 300, "hard": 600, "weekly": 900, "nightmare": 1500}
+## The fixed unlocks along the road, and the later milestones filled in:
+## the SNIPERS squad at 2000, named locker items past that.
+const UNLOCKS := {"endless": 300, "hard": 600, "weekly": 900, "nightmare": 1500, "snipers": 2000}
+const FIXED_ITEMS := {2500: "crown", 3000: "galaxy", 3500: "wings", 4000: "halo", 4500: "gold", 5000: "luna"}
 const ITEM_POOL := ["beanie", "ocean", "wood", "cape_blue", "zuri", "headband", "lava", "ice", "jetpack", "ada", "party", "galaxy", "gold", "rex", "wizard", "snow", "mei", "halo"]
 
 
@@ -40,6 +43,14 @@ static func next_milestone(trophies: int) -> int:
 	return mini((trophies / MILESTONE + 1) * MILESTONE, LENGTH)
 
 
+## How far along the current milestone the road is, 0 to 1.
+static func progress_to_next(trophies: int) -> float:
+	if trophies >= LENGTH:
+		return 1.0
+	var prev := (trophies / MILESTONE) * MILESTONE
+	return clampf(float(trophies - prev) / float(MILESTONE), 0.0, 1.0)
+
+
 static func is_unlocked(feature: String, trophies: int) -> bool:
 	return trophies >= int(UNLOCKS.get(feature, 0))
 
@@ -50,6 +61,8 @@ static func reward(k: int) -> Dictionary:
 	for feature in UNLOCKS:
 		if int(UNLOCKS[feature]) == at:
 			return {"kind": "unlock", "id": feature, "at": at}
+	if FIXED_ITEMS.has(at):
+		return {"kind": "item", "id": str(FIXED_ITEMS[at]), "at": at}
 	if k % 5 == 0:
 		return {"kind": "item", "id": ITEM_POOL[(k / 5 - 1) % ITEM_POOL.size()], "at": at}
 	if k % 2 == 0:
@@ -60,7 +73,7 @@ static func reward(k: int) -> Dictionary:
 static func reward_text(r: Dictionary) -> String:
 	match str(r.kind):
 		"unlock":
-			return {"endless": "ENDLESS opens", "hard": "HARD mode opens", "weekly": "the WEEKLY opens", "nightmare": "NIGHTMARE opens"}.get(str(r.id), str(r.id))
+			return {"endless": "ENDLESS opens", "hard": "HARD mode opens", "weekly": "the WEEKLY opens", "nightmare": "NIGHTMARE opens", "snipers": "the SNIPERS squad opens"}.get(str(r.id), str(r.id))
 		"item":
 			return "%s (locker)" % Wardrobe.title(str(r.id))
 		"stars":

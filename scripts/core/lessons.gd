@@ -37,7 +37,7 @@ const CATALOG := {
 	"pitstop": {"title": "PIT STOP",
 		"body": "A pit lane pulls off the right side of the road: a ramp with yellow chevrons, a pit wall, a garage and a crew waving you in. Steer right onto the ramp and ride the lane to the garage. The road waits while you spend this run's bounty on this run's gear, and the crew clears the road ahead for you. What you spend here you do not take home."},
 	"ability": {"title": "THE HERO MOVE",
-		"body": "Tap the squad, or the HERO button bottom left, for your move: rifles fire a VOLLEY dead ahead, shotguns burst a SHOCKWAVE that throws everything back, medics send a HEAL PULSE that brings soldiers back under a shield. Then it recharges. HERO POWER in the shop makes it faster and bigger."},
+		"body": "Tap the squad, or the HERO button bottom left, for your move: rifles fire a VOLLEY dead ahead, shotguns burst a SHOCKWAVE that throws everything back, medics send a HEAL PULSE that brings soldiers back under a shield, snipers fire a LONGSHOT down the lane. Then it recharges. HERO POWER in the shop makes it faster and bigger."},
 	"barricade": {"title": "WALLS",
 		"body": "A wall across half the road. Shoot it down before it reaches you, or steer onto the open half. Run into it and it shatters, and takes a slice of the squad with it."},
 	"splitter": {"title": "SPLITTERS",

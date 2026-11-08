@@ -5,6 +5,9 @@ func test_quests_for_day() -> void:
 	var a := Quests.for_day(12)
 	var b := Quests.for_day(12)
 	check_eq(a.size(), Quests.PER_DAY, "three a day")
+	check_eq(Quests.coins_for(a[0]), int(a[0].points) * Quests.COINS_PER_POINT, "a quest pays coins with its points")
+	check(not Quests.all_done(Quests.blank(12)), "nothing done at the start")
+	check(Quests.all_done({"day": 12, "progress": {}, "done": [a[0].id, a[1].id, a[2].id]}), "all three done")
 	check_eq(a[0].title, b[0].title, "same for everyone")
 	var ids := {}
 	for q in a:

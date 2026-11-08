@@ -310,9 +310,9 @@ shipped and measured on its own.
 6. Mechanics, part two (0.47, done): the hero move, on a button or a
    tap on the squad, one per squad type (volley, shockwave, heal pulse),
    HERO POWER in the shop, a lesson.
-7. Mechanics, part three: the run meta. Daily missions with coin
-   rewards, a streak counter, a between-run "next unlock" bar, and the
-   trophy road's later milestones filled in (skins, a fourth squad).
+7. Mechanics, part three (0.48, done): quest coin rewards, the day
+   streak with its coin bonus, the next-milestone bar, the later road
+   filled in with named items, and the SNIPERS squad with the LONGSHOT.
 8. Mechanics, part four: events. Weekend modifiers (double bounty, fog
    road, saw storm), a boss rush mode, and a weekly challenge with its
    own board.

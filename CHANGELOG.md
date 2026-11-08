@@ -3,6 +3,25 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.48 (the run meta: quest coins, the streak, the bar, the snipers)
+
+- Quests pay coins as well as points: three coins per point, and 300
+  more on a day with all three done. The quests page and the wipe card
+  say so.
+- A day STREAK: finish a run on consecutive days and every run's coins
+  grow five percent per day, up to fifty; miss a day and it starts
+  over. The home screen shows the streak under the wallet and asks for
+  today's run while yesterday's streak still stands.
+- A gold bar under the road line on the home screen fills toward the
+  next milestone; the wipe card says how many trophies are left to it.
+- The road's later milestones are filled in: the SNIPERS squad opens
+  at 2000 trophies (the shop sells it too), and from 2500 every 500 is
+  a named locker item to the end of the road.
+- SNIPERS: a fourth squad that fires slowly, hits more than twice as
+  hard, and goes through one more zombie with every shot, in dark green
+  with long barrels. Their hero move is the LONGSHOT, one beam down the
+  squad's line through everything in it, walls and the boss included.
+
 ## 0.47 (the hero move)
 
 - Every squad has a move, on the HERO button above the bomb or a tap

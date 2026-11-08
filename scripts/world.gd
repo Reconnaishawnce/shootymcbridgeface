@@ -1554,6 +1554,43 @@ func shockwave(at: Vector3, radius: float, damage: float, push: float) -> int:
 	return hits
 
 
+## The longshot: a beam down the lane at [param x]. Everything within
+## [param half_width] of it, ahead, takes [param damage]; the boss too.
+## Returns how many were hit.
+func longshot(x: float, half_width: float, damage: float, range_z: float) -> int:
+	var hits := 0
+	for z in zombies.duplicate():
+		if z.latched or z.position.z < -range_z or z.position.z > 1.0 or absf(z.position.x - x) > half_width + z.radius * 0.5:
+			continue
+		hits += 1
+		if z.take_damage(damage):
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			_split(z)
+			z.die()
+	for w in _barricades.duplicate():
+		if not w.passed and w.position.z > -range_z and w.covers_x(x):
+			if w.take_damage(damage):
+				_barricades.erase(w)
+				barricade_broken.emit(w.global_position)
+				w.shatter()
+	if boss != null and boss.alive and boss.position.z > -range_z and absf(boss.position.x - x) <= half_width + Boss.BODY_RADIUS:
+		var core := boss.is_core_hit(x)
+		if boss.take_damage(damage, core):
+			_on_boss_dead()
+		hits += 1
+	# The beam itself: a glowing bar down the lane that fades.
+	var beam := Mats.box(Vector3(half_width * 2.0, 0.5, range_z), Color(0.7, 1.0, 0.8), true)
+	beam.material_override = Mats.glow(Color(0.7, 1.0, 0.8), 3.0).duplicate()
+	beam.position = Vector3(x, 0.9, -range_z * 0.5 + 1.0)
+	add_child(beam)
+	var tw := beam.create_tween()
+	tw.tween_property(beam, "scale:x", 0.05, 0.3).set_trans(Tween.TRANS_QUAD)
+	tw.tween_callback(beam.queue_free)
+	return hits
+
+
 ## A splitter's death lets its runners out, into the same wave.
 func _split(z: Zombie) -> void:
 	if not z.is_splitter():

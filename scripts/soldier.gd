@@ -20,6 +20,7 @@ extends Node3D
 const BODY := Palette.SOLDIER
 const SHOTGUN_BODY := Color(0.95, 0.52, 0.16)
 const MEDIC_BODY := Color(0.92, 0.92, 0.9)
+const SNIPER_BODY := Color(0.2, 0.58, 0.38)
 const CROSS := Color(0.9, 0.15, 0.15)
 const SKIN := Color(0.93, 0.76, 0.6)
 const SKIN_DARK := Color(0.42, 0.28, 0.2)
@@ -114,6 +115,8 @@ func _vest_for_type() -> Color:
 		return SHOTGUN_BODY
 	if squad_type == "medic":
 		return MEDIC_BODY
+	if squad_type == "sniper":
+		return SNIPER_BODY
 	return BODY
 
 
@@ -434,7 +437,7 @@ func _add_gun(weapon: String) -> void:
 	if glow:
 		barrel = Mats.box(Vector3(0.11, 0.11, 0.4) if shotgun else Vector3(0.085, 0.085, 0.58), main, true)
 	else:
-		barrel = Mats.pill(0.065 if shotgun else 0.05, 0.4 if shotgun else 0.58, main)
+		barrel = Mats.pill(0.065 if shotgun else 0.05, 0.4 if shotgun else (0.82 if squad_type == "sniper" else 0.58), main)
 		barrel.rotation_degrees.x = 90.0
 	barrel.position.z = -0.24
 	_gun.add_child(barrel)

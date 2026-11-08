@@ -6,6 +6,8 @@ func test_rules() -> void:
 	check_eq(Abilities.for_type("shotgun"), "shockwave", "shotguns shock")
 	check_eq(Abilities.for_type("medic"), "heal", "medics heal")
 	check_eq(Abilities.for_type("nonsense"), "volley", "unknown squads volley")
+	check_eq(Abilities.for_type("sniper"), "longshot", "snipers longshot")
+	check(Abilities.longshot_damage(100.0, 1) > Abilities.longshot_damage(100.0, 0), "power scales the longshot")
 	check_near(Abilities.cooldown(0), Abilities.COOLDOWN_BASE, 0.001, "base cooldown")
 	check(Abilities.cooldown(3) < Abilities.cooldown(0), "the shop shortens the wait")
 	check(Abilities.cooldown(99) >= 8.0, "never faster than eight seconds")

@@ -205,6 +205,16 @@ static func save_trophies(n: int) -> void:
 	_write(STATS, "trophies", maxi(0, n))
 
 
+## The day streak (Streak).
+static func load_streak() -> Dictionary:
+	var v = _read(STATS, "streak", {})
+	return v if v is Dictionary else {}
+
+
+static func save_streak(d: Dictionary) -> void:
+	_write(STATS, "streak", d)
+
+
 static func load_quests() -> Dictionary:
 	var v = _read(STATS, "quests", {})
 	return v if v is Dictionary else {}

@@ -16,9 +16,10 @@ const CATALOG := {
 	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 1250, "unit": "squad"},
 	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 1600, "unit": "squad"},
 	"hero": {"name": "HERO POWER", "desc": "A shorter wait and a bigger hit for the hero move", "max": 3, "base": 900, "unit": "move"},
+	"sniper": {"name": "SNIPERS", "desc": "Unlock the sniper squad (free at 2000 trophies)", "max": 1, "base": 2200, "unit": "squad"},
 }
-const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "hero", "slayer", "magnet", "scout", "shotgun", "medic"]
-const SQUAD_TYPES := ["rifle", "shotgun", "medic"]
+const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "hero", "slayer", "magnet", "scout", "shotgun", "medic", "sniper"]
+const SQUAD_TYPES := ["rifle", "shotgun", "medic", "sniper"]
 const COST_GROWTH := 1.6
 ## Soldiers a second wind brings back.
 const SECOND_WIND_SOLDIERS := 8
@@ -141,7 +142,7 @@ static func effect_text(id: String, lvl: int) -> String:
 			return "%d at start" % lvl
 		"wind":
 			return "one comeback" if lvl >= 1 else "none"
-		"shotgun", "medic":
+		"shotgun", "medic", "sniper":
 			return "unlocked" if lvl >= 1 else "locked"
 		"hero":
 			return "%d s, x%.2f" % [int(Abilities.cooldown(lvl)), Abilities.power(lvl)]
@@ -164,6 +165,8 @@ func squad_unlocked(type: String) -> bool:
 			return level("shotgun") >= 1
 		"medic":
 			return level("medic") >= 1
+		"sniper":
+			return level("sniper") >= 1
 	return false
 
 

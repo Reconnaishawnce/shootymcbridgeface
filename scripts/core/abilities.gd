@@ -10,8 +10,14 @@ const CATALOG := {
 	"volley": {"name": "VOLLEY", "desc": "Every soldier fires a burst dead ahead, hard and through the first thing it meets"},
 	"shockwave": {"name": "SHOCKWAVE", "desc": "A ring bursts out of the squad: everything near it is hit hard and thrown back"},
 	"heal": {"name": "HEAL PULSE", "desc": "Soldiers back on their feet and a shield for a moment"},
+	"longshot": {"name": "LONGSHOT", "desc": "One beam down the lane, through everything in it"},
 }
-const BY_TYPE := {"rifle": "volley", "shotgun": "shockwave", "medic": "heal"}
+const BY_TYPE := {"rifle": "volley", "shotgun": "shockwave", "medic": "heal", "sniper": "longshot"}
+## The longshot: everything within this half-width of the squad's line,
+## ahead, takes this many seconds of the squad's fire.
+const LONGSHOT_HALF_WIDTH := 1.1
+const LONGSHOT_SECONDS := 4.0
+const LONGSHOT_RANGE := 60.0
 ## Seconds between uses, and how much each HERO POWER level takes off.
 const COOLDOWN_BASE := 20.0
 const COOLDOWN_PER_LEVEL := 3.0
@@ -76,6 +82,10 @@ static func shockwave_damage(squad_dps: float, level: int) -> float:
 
 static func shockwave_radius(level: int) -> float:
 	return SHOCKWAVE_RADIUS * (1.0 + 0.1 * float(level))
+
+
+static func longshot_damage(squad_dps: float, level: int) -> float:
+	return squad_dps * LONGSHOT_SECONDS * power(level)
 
 
 static func heal_amount(count: int, level: int) -> int:

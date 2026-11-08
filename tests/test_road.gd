@@ -17,6 +17,13 @@ func test_milestones_and_unlocks() -> void:
 	check_eq(Road.checkpoint(1240), 1000, "checkpoint floor")
 	check(not Road.is_unlocked("hard", 599) and Road.is_unlocked("hard", 600), "hard at 600")
 	check(Road.is_unlocked("endless", 300) and not Road.is_unlocked("nightmare", 1499), "endless at 300, nightmare at 1500")
+	check(Road.is_unlocked("snipers", 2000) and not Road.is_unlocked("snipers", 1999), "snipers at 2000")
+	check_eq(str(Road.reward(20).id), "snipers", "milestone twenty is the sniper squad")
+	check_eq(str(Road.reward(25).id), "crown", "the later milestones are named items")
+	check(Road.reward_text(Road.reward(20)).contains("SNIPERS"), "and say so")
+	check_near(Road.progress_to_next(250), 0.5, 0.001, "halfway to the next milestone")
+	check_near(Road.progress_to_next(300), 0.0, 0.001, "fresh past one")
+	check_near(Road.progress_to_next(Road.LENGTH), 1.0, 0.001, "the end of the road is full")
 	for feature in Road.UNLOCKS:
 		var k := int(Road.UNLOCKS[feature]) / Road.MILESTONE
 		check_eq(Road.reward(k).kind, "unlock", "the unlock sits on its milestone: %s" % feature)

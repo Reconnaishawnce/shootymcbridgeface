@@ -1,0 +1,27 @@
+extends TestCase
+
+
+func test_streak() -> void:
+	var s := Streak.blank()
+	s = Streak.advance(s, 100)
+	check_eq(int(s.days), 1, "first day")
+	s = Streak.advance(s, 100)
+	check_eq(int(s.days), 1, "the same day does not count twice")
+	s = Streak.advance(s, 101)
+	s = Streak.advance(s, 102)
+	check_eq(int(s.days), 3, "three days running")
+	check_eq(int(s.best), 3, "best kept")
+	check(Streak.alive(s, 103) and not Streak.alive(s, 104), "alive today and tomorrow, gone the day after")
+	check_eq(Streak.days(s, 104), 0, "a lapsed streak shows nothing")
+	s = Streak.advance(s, 105)
+	check_eq(int(s.days), 1, "a missed day starts over")
+	check_eq(int(s.best), 3, "but the best stays")
+	check_near(Streak.bonus_mult(1), 1.0, 0.001, "no bonus on day one")
+	check_near(Streak.bonus_mult(5), 1.2, 0.001, "five percent a day")
+	check_near(Streak.bonus_mult(40), 1.0 + Streak.BONUS_CAP, 0.001, "capped")
+	check_eq(Streak.bonus_percent(3), 10, "percent for the line")
+	check(Streak.line(Streak.blank(), 10) == "", "no line without a streak")
+	var t := Streak.advance(Streak.blank(), 10)
+	t = Streak.advance(t, 11)
+	check(Streak.line(t, 11).contains("DAY 2") and Streak.line(t, 11).contains("+5%"), "the line names the day and the bonus")
+	check(Streak.line(t, 12).contains("keep it"), "and asks for today's run")

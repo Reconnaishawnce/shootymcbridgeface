@@ -40,6 +40,9 @@ grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"shockwave"' || { echo "::error::the
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=900 --smoke-squad=medic 2>&1 | tee "$LOG"
 fail_on_script_errors "medic smoke"
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"heal"' || { echo "::error::the medic squad never sent its heal pulse"; exit 1; }
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=900 --smoke-squad=sniper 2>&1 | tee "$LOG"
+fail_on_script_errors "sniper smoke"
+grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"longshot"' || { echo "::error::the sniper squad never fired its longshot"; exit 1; }
 
 echo "== wipe and retry (nightmare, seed 11, a forced wipe at frame 4500: the results screen and the restart)"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=11 --nightmare --smoke-retry --smoke-wipe-at=4500 2>&1 | tee "$LOG"

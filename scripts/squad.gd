@@ -32,6 +32,10 @@ const SHOTGUN_SPREAD := 1.6
 ## Medics trade a little damage for a steady trickle of revived soldiers
 ## and tougher skin against brutes.
 const MEDIC_DAMAGE_MULT := 0.85
+## Snipers: slow, heavy, and through one more.
+const SNIPER_DAMAGE_MULT := 2.3
+const SNIPER_FIRE_MULT := 0.45
+const SNIPER_PIERCE := 1
 const MEDIC_REVIVE_SECONDS := 3.0
 const MEDIC_BITE_MULT := 0.75
 
@@ -408,6 +412,10 @@ func is_medic() -> bool:
 	return squad_type == "medic"
 
 
+func is_sniper() -> bool:
+	return squad_type == "sniper"
+
+
 ## Extra multiplier on what a brute or tank takes.
 func bite_mult() -> float:
 	return (MEDIC_BITE_MULT if is_medic() else 1.0) * veterans.bite_mult() * pit.bite_mult()
@@ -417,6 +425,8 @@ func _fire_mult() -> float:
 	var m := perks.fire_rate_mult() if perks != null else 1.0
 	if powerups != null:
 		m *= powerups.fire_rate_mult(now)
+	if is_sniper():
+		m *= SNIPER_FIRE_MULT
 	return m * pit.fire_mult()
 
 
@@ -426,6 +436,8 @@ func _damage_mult() -> float:
 		m *= SHOTGUN_DAMAGE_MULT
 	elif is_medic():
 		m *= MEDIC_DAMAGE_MULT
+	elif is_sniper():
+		m *= SNIPER_DAMAGE_MULT
 	if powerups != null:
 		m *= powerups.damage_mult(now)
 	return m * veterans.damage_mult() * pit.damage_mult()
@@ -712,6 +724,6 @@ func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> vo
 	b.vx = vx
 	b.world = world
 	b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0
-	b.hits_left = 1 + (perks.pierce() if perks != null else 0) + b.hits_left_bonus
+	b.hits_left = 1 + (perks.pierce() if perks != null else 0) + b.hits_left_bonus + (SNIPER_PIERCE if is_sniper() else 0)
 	world.bullets.add_child(b)
 	b.global_position = origin

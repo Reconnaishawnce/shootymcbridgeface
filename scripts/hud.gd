@@ -98,6 +98,9 @@ var _more_button: Button
 var _more_card: Control
 var _road_button: Button
 var _road_line: Label
+var _road_bar_fill: ColorRect
+var _road_bar: Control
+var _streak_line: Label
 var _road_card: Control
 var _road_box: VBoxContainer
 var _revive_card: Control
@@ -880,6 +883,28 @@ func _build_title(root: Control) -> void:
 	_road_line = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_road_line.add_theme_color_override("font_color", COIN)
 	_pin(t, _road_line, 0.5, 1.0, Vector2(520.0, 40.0), Vector2(0.5, 1.0), Vector2(0.0, -226.0))
+	# The bar to the next milestone, under the road line.
+	_road_bar = Control.new()
+	_road_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pin(t, _road_bar, 0.5, 1.0, Vector2(420.0, 10.0), Vector2(0.5, 1.0), Vector2(0.0, -190.0))
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color(1.0, 1.0, 1.0, 0.16)
+	bar_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_road_bar.add_child(bar_bg)
+	_road_bar_fill = ColorRect.new()
+	_road_bar_fill.color = COIN
+	_road_bar_fill.anchor_top = 0.0
+	_road_bar_fill.anchor_bottom = 1.0
+	_road_bar_fill.anchor_left = 0.0
+	_road_bar_fill.anchor_right = 0.0
+	_road_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_road_bar.add_child(_road_bar_fill)
+	# The day streak, under the wallet.
+	_streak_line = _label(20, HORIZONTAL_ALIGNMENT_LEFT)
+	_streak_line.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
+	_pin(t, _streak_line, 0.0, 0.0, Vector2(440.0, 30.0), Vector2(0.0, 0.0), Vector2(22.0, 112.0))
+	_track_top(_streak_line)
 	_goal = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
 	_goal.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_goal.modulate = Color(0.92, 0.92, 0.96)
@@ -1758,6 +1783,10 @@ func show_title(t: Dictionary) -> void:
 	_road_line.visible = bool(buttons.get("road", false))
 	var nxt := Road.next_milestone(trophies)
 	_road_line.text = "%d trophies   ·   next at %d: %s" % [trophies, nxt, Road.reward_text(Road.reward(nxt / Road.MILESTONE))]
+	_road_bar.visible = _road_line.visible
+	_road_bar_fill.offset_right = 420.0 * Road.progress_to_next(trophies)
+	_streak_line.text = str(t.get("streak_line", ""))
+	_streak_line.visible = _streak_line.text != ""
 	_title_card.visible = true
 	_pause_button.visible = false
 	_boss_box.visible = false
@@ -1776,7 +1805,7 @@ func show_title(t: Dictionary) -> void:
 	_mode_button.add_theme_color_override("font_color", {"normal": Color(0.97, 0.97, 1.0), "hard": Color(1.0, 0.75, 0.3), "nightmare": Color(1.0, 0.4, 0.4)}.get(modifier, Color.WHITE))
 	_endless_button.disabled = not endless_unlocked
 	_squad_button.visible = shotgun_unlocked
-	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS"}.get(squad_type, "RIFLES")
+	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS", "sniper": "SNIPERS"}.get(squad_type, "RIFLES")
 	_coins_title.text = str(coins)
 	_stars_title.text = "%d   ·   %s" % [stars, hero_name] if hero_name != "" else str(stars)
 
@@ -1797,7 +1826,7 @@ func show_quests(day: int, quest_rows: Array, season: int, season_state: Diction
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD
 		l.custom_minimum_size.x = 620.0
 		var state := "DONE" if q.done else "%d / %d" % [int(q.progress), int(q.target)]
-		l.text = "%s   ·   %s   ·   %d pts" % [q.title, state, int(q.points)]
+		l.text = "%s   ·   %s   ·   %d pts, %d coins" % [q.title, state, int(q.points), int(q.points) * Quests.COINS_PER_POINT]
 		l.modulate = Color(1, 1, 1) if q.done else Color(0.85, 0.85, 0.9)
 		_quests_box.add_child(l)
 	var points := int(season_state.get("points", 0))
@@ -1810,7 +1839,7 @@ func show_quests(day: int, quest_rows: Array, season: int, season_state: Diction
 	bar.text = "%d / %d points to tier %d" % [Season.tier_progress(points), Season.POINTS_PER_TIER, mini(tier + 1, Season.TIERS)] if tier < Season.TIERS else "Track complete. New season in %d days." % (Season.DAYS - Season.day_in_season(day) + 1)
 	_quests_box.add_child(bar)
 	var blurb := _label(21, HORIZONTAL_ALIGNMENT_LEFT)
-	blurb.text = "Quest points climb the track. Every tier pays, nothing to buy.\n"
+	blurb.text = "Quest points climb the track and every quest pays coins; all three in a day pay %d more. Every tier pays, nothing to buy.\n" % Quests.ALL_DONE_BONUS
 	blurb.modulate = Color(0.8, 0.8, 0.86)
 	_quests_box.add_child(blurb)
 	for t in range(1, Season.TIERS + 1):
@@ -2019,7 +2048,14 @@ func show_game_over(r: Dictionary) -> void:
 	var road: Array = r.get("road_rewards", [])
 	var trophies_earned := int(r.get("trophies_earned", 0))
 	if trophies_earned > 0:
-		coins_line += "\n+%d trophies on the road" % trophies_earned
+		var total := int(r.get("trophies_total", 0))
+		coins_line += "\n+%d trophies on the road  ·  %d to the next milestone" % [trophies_earned, Road.next_milestone(total) - total]
+	if int(r.get("streak_percent", 0)) > 0:
+		coins_line += "\nDAY %d STREAK: +%d%% coins" % [int(r.get("streak_days", 0)), int(r.get("streak_percent", 0))]
+	elif int(r.get("streak_days", 0)) == 1:
+		coins_line += "\nDay 1: play tomorrow for +%d%% coins" % Streak.bonus_percent(2)
+	if int(r.get("quest_coins", 0)) > 0:
+		coins_line += "\nQUESTS: +%d coins%s" % [int(r.get("quest_coins", 0)), "  (all three done!)" if bool(r.get("all_quests_done", false)) else ""]
 	var extras := unlocked.size() + quests.size() + rewards.size() + road.size()
 	if extras <= 4:
 		for rw in road:

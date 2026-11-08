@@ -307,9 +307,9 @@ shipped and measured on its own.
    (pit stop and supply panels, fire outside the squad's cap), walls
    across half the road to shoot down or steer round, and the splitter
    that bursts into runners. Shielding was already the tank.
-6. Mechanics, part two: hero abilities. A tap-the-hero ability with a
-   cooldown per squad type (rifles: volley; shotgun: shockwave; medic:
-   heal pulse), upgradeable in the shop, with a lesson each.
+6. Mechanics, part two (0.47, done): the hero move, on a button or a
+   tap on the squad, one per squad type (volley, shockwave, heal pulse),
+   HERO POWER in the shop, a lesson.
 7. Mechanics, part three: the run meta. Daily missions with coin
    rewards, a streak counter, a between-run "next unlock" bar, and the
    trophy road's later milestones filled in (skins, a fourth squad).

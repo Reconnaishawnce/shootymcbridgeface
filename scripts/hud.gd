@@ -21,6 +21,8 @@ signal sound_toggled(on: bool)
 signal music_toggled(on: bool)
 signal formation_pressed
 signal bomb_pressed
+## The HERO button, or a tap on the squad.
+signal ability_pressed
 signal quit_pressed
 signal settings_opened
 signal records_opened
@@ -172,6 +174,9 @@ var _sound_button: Button
 var _music_button: Button
 var _formation_button: Button
 var _bomb_button: Button
+var _ability_button: Button
+var _ability_fill: ColorRect
+var _ability_ready := true
 var _powers: Label
 var _pause_perks: Label
 var _lesson_card: Control
@@ -425,6 +430,32 @@ func _init() -> void:
 	_bomb_button.pressed.connect(func() -> void: bomb_pressed.emit())
 	_bomb_button.visible = false
 	root.add_child(_bomb_button)
+	# The HERO button above the bomb: a bar fills along its bottom edge
+	# while the move recharges, and the label lights when it is ready.
+	_ability_button = _button("VOLLEY", 26)
+	_ability_button.anchor_top = 1.0
+	_ability_button.anchor_bottom = 1.0
+	_ability_button.offset_left = 20.0
+	_ability_button.offset_right = 220.0
+	_ability_button.offset_top = -172.0
+	_ability_button.offset_bottom = -104.0
+	_ability_button.pivot_offset = Vector2(100.0, 34.0)
+	_ability_button.clip_contents = true
+	_ability_button.pressed.connect(func() -> void: ability_pressed.emit())
+	_ability_button.visible = false
+	_ability_fill = ColorRect.new()
+	_ability_fill.color = Color(1.0, 0.85, 0.3, 0.35)
+	_ability_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ability_fill.anchor_top = 1.0
+	_ability_fill.anchor_bottom = 1.0
+	_ability_fill.anchor_left = 0.0
+	_ability_fill.anchor_right = 0.0
+	_ability_fill.offset_top = -8.0
+	_ability_fill.offset_bottom = 0.0
+	_ability_fill.offset_left = 0.0
+	_ability_fill.offset_right = 0.0
+	_ability_button.add_child(_ability_fill)
+	root.add_child(_ability_button)
 	_powers = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _powers, 0.15, 0.85, 124.0)
 	_powers.add_theme_color_override("font_color", Color(0.8, 0.6, 1.0))
@@ -1084,6 +1115,7 @@ func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
 	_pit_card.visible = true
 	_formation_button.visible = false
 	_bomb_button.visible = false
+	_ability_button.visible = false
 	_bounty_row.visible = false
 	_pit_sub.text = "The crew has you. The road waits."
 	_pit_funds.text = "BOUNTY  %d   ·   gear for this run only" % funds
@@ -1578,6 +1610,27 @@ func set_bombs(n: int) -> void:
 	_bomb_button.text = "BOMB x%d" % n
 
 
+## The HERO button: its name, how charged it is (0 to 1), whether it
+## shows at all.
+func set_ability(title: String, charge: float, shown: bool) -> void:
+	_ability_button.visible = shown and _pause_button.visible
+	_ability_button.text = title
+	_ability_fill.offset_right = 200.0 * clampf(charge, 0.0, 1.0)
+	var ready := charge >= 1.0
+	if ready != _ability_ready:
+		_ability_ready = ready
+		_ability_button.add_theme_color_override("font_color", COIN if ready else Color(0.75, 0.75, 0.8))
+		if ready:
+			var tw := create_tween()
+			tw.tween_property(_ability_button, "scale", Vector2(1.12, 1.12), 0.1).set_trans(Tween.TRANS_BACK)
+			tw.tween_property(_ability_button, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	if ready:
+		var t := Time.get_ticks_msec() * 0.001
+		_ability_button.modulate = Color(1.0, 1.0, 1.0, 0.92 + 0.08 * sin(t * 6.0))
+	else:
+		_ability_button.modulate = Color.WHITE
+
+
 ## The button asks for the throw when a heavy or the boss is in reach.
 func set_bomb_hint(on: bool) -> void:
 	if on:
@@ -1643,6 +1696,7 @@ func _hide_cards() -> void:
 	_formation_button.visible = false
 	_bounty_row.visible = false
 	_bomb_button.visible = false
+	_ability_button.visible = false
 	_powers.text = ""
 	_fork_box.visible = false
 	_lesson_card.visible = false

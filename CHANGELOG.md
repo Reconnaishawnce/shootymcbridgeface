@@ -3,6 +3,20 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.47 (the hero move)
+
+- Every squad has a move, on the HERO button above the bomb or a tap
+  on the squad itself. Rifles fire a VOLLEY: one hard shot per soldier
+  dead ahead, through the first thing it meets. Shotguns burst a
+  SHOCKWAVE that hits everything near the squad for seconds of its
+  fire and throws the survivors back. Medics send a HEAL PULSE that
+  brings a slice of the squad back under a shield. Twenty seconds to
+  recharge, with the button filling as it does.
+- HERO POWER in the SHOP: three levels, each three seconds off the
+  wait and a quarter more on the move.
+- A lesson the first time the squad is big enough to matter, a HOW TO
+  PLAY section, and the bot uses it.
+
 ## 0.46 (the turret, the wall, the splitter)
 
 - The GOLD TURRET: a gun that rides the curb beside you, keeps

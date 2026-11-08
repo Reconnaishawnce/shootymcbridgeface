@@ -15,8 +15,9 @@ const CATALOG := {
 	"wind": {"name": "SECOND WIND", "desc": "Once a run, a wipe becomes a comeback", "max": 1, "base": 1500, "unit": "comeback"},
 	"shotgun": {"name": "SHOTGUNNERS", "desc": "Unlock the shotgun squad", "max": 1, "base": 1250, "unit": "squad"},
 	"medic": {"name": "MEDICS", "desc": "Unlock the medic squad", "max": 1, "base": 1600, "unit": "squad"},
+	"hero": {"name": "HERO POWER", "desc": "A shorter wait and a bigger hit for the hero move", "max": 3, "base": 900, "unit": "move"},
 }
-const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "slayer", "magnet", "scout", "shotgun", "medic"]
+const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "hero", "slayer", "magnet", "scout", "shotgun", "medic"]
 const SQUAD_TYPES := ["rifle", "shotgun", "medic"]
 const COST_GROWTH := 1.6
 ## Soldiers a second wind brings back.
@@ -142,6 +143,8 @@ static func effect_text(id: String, lvl: int) -> String:
 			return "one comeback" if lvl >= 1 else "none"
 		"shotgun", "medic":
 			return "unlocked" if lvl >= 1 else "locked"
+		"hero":
+			return "%d s, x%.2f" % [int(Abilities.cooldown(lvl)), Abilities.power(lvl)]
 	return ""
 
 

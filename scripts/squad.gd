@@ -672,6 +672,26 @@ func _fire(delta: float) -> void:
 		s.flash()
 
 
+## The volley: one hard, piercing shot from each soldier (to a cap),
+## straight ahead, every muzzle lit at once.
+func volley(shots: int, damage_mult: float, pierce: int) -> void:
+	if _soldiers.is_empty() or world == null:
+		return
+	var per := damage_per_shot() * damage_mult
+	for i in range(shots):
+		var s: Soldier = _soldiers[i % _soldiers.size()]
+		var origin := s.muzzle_world_position()
+		var b := Bullet.new(1.3, Color(1.0, 0.95, 0.5))
+		b.damage = per
+		b.vx = randf_range(-0.3, 0.3)
+		b.world = world
+		b.radius_mult = perks.bullet_radius_mult() if perks != null else 1.0
+		b.hits_left = 1 + pierce + (perks.pierce() if perks != null else 0)
+		world.bullets.add_child(b)
+		b.global_position = origin + Vector3(0.0, 0.0, -0.3 * float(i / _soldiers.size()))
+		s.flash()
+
+
 func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> void:
 	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0))
 	b.damage = damage

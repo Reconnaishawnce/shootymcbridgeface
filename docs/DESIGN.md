@@ -790,6 +790,26 @@ Grouped by what they add. Starred items are the first to build.
 - Named, persistent soldiers you can lose and rescue.
 - Pass-and-play: two people alternate gate picks on one phone.
 
+## The hero move (0.47)
+
+`Abilities` (pure) is the rulebook: one move per squad type
+(`BY_TYPE`), a cooldown that the shop's HERO POWER shortens
+(`cooldown`, floor eight seconds) and a power it raises (`power`), the
+numbers for each move, and `is_hero_tap`, which says whether a touch
+was a tap on the squad (near it on screen, quick, barely moved) rather
+than the start of a steer. `Game.use_ability` fires the move:
+`Squad.volley` puts one hard piercing shot from every soldier (to
+`VOLLEY_MAX_SHOTS`) straight ahead with every muzzle lit;
+`World.shockwave` damages everything within a radius by seconds of the
+squad's fire, throws survivors back, and reaches clingers and the boss
+(at half); the heal adds `heal_amount` soldiers and grants the shield
+power-up. The HUD's HERO button sits above the bomb, fills along its
+bottom edge as the move recharges and pops when ready; a tap on the
+squad does the same (press and release judged in
+`_unhandled_input`, drags excluded). The bot fires it whenever it is
+charged and something is close, and prints `SMOKE_ABILITY`. A lesson
+teaches it once the squad has eight soldiers.
+
 ## The turret, the wall, the splitter (0.46)
 
 Three mechanics that give the road more to do, each scale-aware.

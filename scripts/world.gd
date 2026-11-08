@@ -1519,6 +1519,41 @@ func nearest_saw(max_range: float) -> Saw:
 
 ## Saws roll at the squad; one that reaches it takes a slice unless the
 ## squad is dashing or shielded. They cut zombies on the way.
+## The shockwave: everything within [param radius] of [param at] takes
+## [param damage] and is thrown [param push] metres up the road. Returns
+## how many were hit.
+func shockwave(at: Vector3, radius: float, damage: float, push: float) -> int:
+	var hits := 0
+	for z in zombies.duplicate():
+		if z.latched:
+			continue
+		var d := Vector2(z.position.x - at.x, z.position.z - at.z).length()
+		if d > radius:
+			continue
+		hits += 1
+		if z.take_damage(damage):
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			_split(z)
+			z.die()
+		else:
+			z.position.z -= push * (1.0 - d / radius * 0.5)
+	for z in _latched.duplicate():
+		if z.take_damage(damage):
+			_latched.erase(z)
+			zombies.erase(z)
+			zombie_killed.emit(z)
+			_note_wave_death(z)
+			z.die()
+			hits += 1
+	if boss != null and boss.alive and Vector2(boss.position.x - at.x, boss.position.z - at.z).length() <= radius + Boss.BODY_RADIUS:
+		if boss.take_damage(damage * 0.5, false):
+			_on_boss_dead()
+		hits += 1
+	return hits
+
+
 ## A splitter's death lets its runners out, into the same wave.
 func _split(z: Zombie) -> void:
 	if not z.is_splitter():

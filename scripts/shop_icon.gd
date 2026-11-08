@@ -75,6 +75,8 @@ func _draw() -> void:
 			_rifle(c, s, dim)
 		"turret":
 			_turret(c, s, dim)
+		"hero":
+			_hero(c, s, dim)
 		_:
 			draw_circle(c, s * 0.5, GOLD * dim)
 
@@ -219,6 +221,15 @@ func _cross(c: Vector2, s: float, dim: float) -> void:
 	draw_rect(Rect2(c.x - s * 0.6, c.y - s * 0.2, s * 1.2, s * 0.4), _col(RED, dim))
 	var pulse := 0.9 + 0.1 * sin(_t * 4.0)
 	draw_arc(c, s * 0.9 * pulse, 0.0, TAU, 32, Color(1.0, 0.4, 0.4, 0.35 * dim), s * 0.05)
+
+
+func _hero(c: Vector2, s: float, dim: float) -> void:
+	# A blue soldier with a burst of rays: the move.
+	var pulse := 1.0 + 0.08 * sin(_t * 4.0)
+	for i in range(8):
+		var a := float(i) * TAU / 8.0 + _t * 0.6
+		draw_line(c + Vector2(cos(a), sin(a)) * s * 0.55 * pulse, c + Vector2(cos(a), sin(a)) * s * (0.95 + 0.08 * sin(_t * 7.0 + float(i))) * pulse, _col(GOLD, dim), s * 0.07)
+	_soldier(c + Vector2(0.0, s * 0.1), s * 1.05, BLUE, dim)
 
 
 func _turret(c: Vector2, s: float, dim: float) -> void:

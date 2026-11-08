@@ -67,6 +67,14 @@ var _run_time := 0.0
 ## without one the road stops rewarding fire: panels do not climb.
 var _last_input_at := 0.0
 var _hands_hint_shown := false
+## The hero move: when it last fired (run time), and the tap that may
+## become one (screen position, time, movement).
+var _ability_last := -1000.0
+var _ability_uses := 0
+var _tap_start := Vector2.ZERO
+var _tap_time := 0.0
+var _tap_moved := 0.0
+var _tap_index := -1
 ## Telemetry: reports that go on their own. The toggle, this phone's
 ## random id, and the caps for this session and run.
 var reports_on := true
@@ -128,6 +136,8 @@ var _smoke_upgrades := false
 var _smoke_idle := false
 ## --smoke-idle-from=N: the bot plays until level N, then does nothing.
 var _smoke_idle_from := 0
+## --smoke-squad=shotgun|medic: the bot plays that squad (unlocked for it).
+var _smoke_squad := ""
 ## The busiest the scene got this run: nodes, zombies, live effects.
 var _smoke_peak := {"nodes": 0, "zombies": 0, "fx": 0}
 var _shots_dir := ""
@@ -187,6 +197,8 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
+		elif a.begins_with("--smoke-squad="):
+			_smoke_squad = a.get_slice("=", 1)
 		elif a.begins_with("--smoke-idle-from="):
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
@@ -216,6 +228,9 @@ func _ready() -> void:
 		for id in Meta.ORDER:
 			meta.levels[id] = Meta.max_level(id)
 	squad_type = SaveData.load_squad_type()
+	if _smoke_squad in Meta.SQUAD_TYPES:
+		meta.levels[_smoke_squad] = Meta.max_level(_smoke_squad) if _smoke_squad != "rifle" else 0
+		squad_type = _smoke_squad
 	if not meta.squad_unlocked(squad_type):
 		squad_type = "rifle"
 	daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
@@ -464,6 +479,7 @@ func _build_scene() -> void:
 	hud.music_toggled.connect(_on_music_toggled)
 	hud.formation_pressed.connect(cycle_formation)
 	hud.bomb_pressed.connect(throw_bomb)
+	hud.ability_pressed.connect(use_ability)
 	hud.settings_opened.connect(open_settings)
 	hud.records_opened.connect(open_records)
 	hud.quests_opened.connect(open_quests)
@@ -571,6 +587,8 @@ func _check_lessons() -> void:
 		if _teach("basics"):
 			return
 	if squad.count >= 12 and _teach("fire_modes"):
+		return
+	if squad.count >= 8 and _run_time > 6.0 and _teach("ability"):
 		return
 	if kills >= 10 and _teach("bounty"):
 		return
@@ -1174,6 +1192,8 @@ func toggle_squad() -> void:
 
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
+	_ability_last = -1000.0
+	_ability_uses = 0
 	_tele_freezes_run = 0
 	_last_input_at = 0.0
 	_hands_hint_shown = false
@@ -1528,6 +1548,44 @@ func cycle_formation() -> void:
 	sfx.play("click")
 
 
+## The hero move for this squad type, if it is charged.
+func use_ability() -> void:
+	if state != State.RUNNING or get_tree().paused or _warming:
+		return
+	var level := meta.level("hero")
+	if not Abilities.ready(_run_time, _ability_last, level):
+		sfx.play("gate_bad", -10.0)
+		return
+	_ability_last = _run_time
+	_ability_uses += 1
+	var id := Abilities.for_type(squad.squad_type)
+	Diag.note("ability", {"id": id, "level": level, "squad": squad.count})
+	if smoke:
+		print("SMOKE_ABILITY ", JSON.stringify({"id": id, "uses": _ability_uses, "level": world.level, "frame": _frames}))
+	match id:
+		"volley":
+			squad.volley(Abilities.volley_shots(squad.count), Abilities.VOLLEY_DAMAGE_MULT * Abilities.power(level), Abilities.VOLLEY_PIERCE)
+			sfx.play("rally", -2.0, 1.3)
+			_punch(4.0)
+		"shockwave":
+			var hits := world.shockwave(squad.position, Abilities.shockwave_radius(level), Abilities.shockwave_damage(squad.dps(), level), Abilities.SHOCKWAVE_PUSH)
+			squad.rally()
+			sfx.play("explosion", -4.0, 0.8)
+			_shake = minf(1.0, _shake + 0.5)
+			hud.show_float("SHOCKWAVE  x%d" % hits, true)
+			_punch(6.0)
+		"heal":
+			var n := Abilities.heal_amount(squad.count, level)
+			squad.add(n)
+			powerups.grant("shield", _run_time)
+			squad.rally()
+			sfx.play("gate_good", -2.0, 1.1)
+			hud.show_float("HEAL PULSE  +%d" % n, true)
+	hud.show_banner(Abilities.title(id), 0.6)
+	if not smoke:
+		Fx.confetti(world, squad.position + Vector3(0.0, 1.6, -1.0), 12)
+
+
 func throw_bomb() -> void:
 	if state != State.RUNNING or not powerups.take_bomb():
 		return
@@ -1560,6 +1618,7 @@ func _tick_run(delta: float) -> void:
 			if _cling_touch.is_empty() and not _touches.values().has("focus"):
 				squad.clear_focus()
 	_check_lessons()
+	hud.set_ability(Abilities.title(Abilities.for_type(squad.squad_type)), Abilities.charge(_run_time, _ability_last, meta.level("hero")), true)
 	# Hands off the road: panels stop climbing, and the first time it
 	# happens in a run the HUD says why.
 	# A finger held still is still a hand on the road.
@@ -1618,6 +1677,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_try_retry()
+			if state == State.RUNNING and _tap_index < 0:
+				_tap_index = event.index
+				_tap_start = event.position
+				_tap_time = _run_time
+				_tap_moved = 0.0
 			if state == State.RUNNING:
 				var zone := "focus" if event.position.y < get_viewport().get_visible_rect().size.y * FOCUS_ZONE else "steer"
 				# A touch on a clinger aims at it wherever it is, and sticks.
@@ -1631,6 +1695,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				if zone == "focus":
 					squad.set_focus(_road_point(event.position))
 		else:
+			if event.index == _tap_index:
+				_tap_index = -1
+				if state == State.RUNNING and _touches.get(event.index, "") == "steer":
+					var on_screen := camera.unproject_position(squad.global_position + Vector3(0.0, 0.6, 0.0))
+					var px_scale := get_viewport().get_visible_rect().size.x / 720.0
+					if Abilities.is_hero_tap(on_screen.distance_to(event.position) / px_scale, _run_time - _tap_time, _tap_moved / px_scale):
+						use_ability()
 			if _touches.get(event.index, "") in ["focus", "cling"]:
 				squad.clear_focus()
 			_touches.erase(event.index)
@@ -1640,6 +1711,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_preview_yaw += event.relative.x * 0.012
 		_preview_drag_until = Time.get_ticks_msec() * 0.001 + 1.5
 	elif event is InputEventScreenDrag and state == State.RUNNING:
+		if event.index == _tap_index:
+			_tap_moved += event.relative.length()
 		var zone: String = _touches.get(event.index, "steer")
 		if zone == "cling":
 			pass
@@ -2692,6 +2765,8 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
+	if near != null and near.position.z > -14.0 and Abilities.ready(_run_time, _ability_last, meta.level("hero")):
+		use_ability()
 	# A saw rolling at us outranks everything, the boss included: step
 	# round it, and dash if it is close.
 	var saw := world.nearest_saw(18.0)
@@ -2901,6 +2976,8 @@ func _shots_walkthrough() -> void:
 		squad.set_count(12)
 		squad.set_spread(1.1)
 		hud.show_running()
+		hud.set_bombs(2)
+		hud.set_ability("VOLLEY", 0.65, true)
 		await _capture("q16_crowd.png", 8)
 		crowd.queue_free()
 		show_title()

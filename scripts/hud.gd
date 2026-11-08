@@ -39,6 +39,8 @@ signal crash_dismissed
 signal lesson_closed
 signal learn_pressed
 signal lessons_toggled(on: bool)
+## NOTCH ROOM cycled: "auto", "on" or "off".
+signal notch_changed(mode: String)
 signal pit_buy(id: String)
 signal pit_leave
 signal retry_level_pressed
@@ -71,6 +73,12 @@ var _bounty_label: Label
 var _bounty_tween: Tween
 var _pause_button: Button
 var _boss_box: Control
+## Controls along the top edge that a camera cutout can hide; each keeps
+## its built offsets in meta and is pushed down by the safe-area inset.
+var _top_edge: Array[Control] = []
+var _top_inset := 0.0
+var _notch_mode := "auto"
+var _settings_notch: Button
 var _boss_fill: ColorRect
 var _boss_label: Label
 
@@ -340,6 +348,8 @@ func _init() -> void:
 	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boss_box.visible = false
 	root.add_child(_boss_box)
+	for c in [_level, _count, _bounty_row, _subline, _pause_button, _boss_box]:
+		_track_top(c)
 	var boss_bg := ColorRect.new()
 	boss_bg.color = BOSS_BAR_BG
 	boss_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -553,6 +563,63 @@ func set_lessons(on: bool) -> void:
 	_settings_lessons.text = "LESSONS: %s" % ("ON" if on else "OFF")
 
 
+## Remembers a top-edge control's built offsets so the inset can move it.
+func _track_top(c: Control) -> void:
+	c.set_meta("top0", c.offset_top)
+	c.set_meta("bottom0", c.offset_bottom)
+	_top_edge.append(c)
+
+
+## The safe-area inset in HUD units: what the phone reports under a
+## camera cutout, scaled from screen pixels to this canvas. Zero on a
+## desktop or a phone without one.
+func _reported_inset() -> float:
+	var safe := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y <= 0 or safe.position.y <= 0:
+		return 0.0
+	var vis := get_viewport().get_visible_rect().size.y if get_viewport() != null else 1280.0
+	return float(safe.position.y) * vis / float(win.y)
+
+
+## NOTCH ROOM: "auto" uses what the phone reports, "on" forces at least
+## FORCED_INSET, "off" uses none. Pushes the top-edge controls down.
+const FORCED_INSET := 64.0
+
+
+func set_notch_mode(mode: String) -> void:
+	_notch_mode = mode
+	_settings_notch.text = "NOTCH ROOM: %s" % mode.to_upper()
+	var inset := 0.0
+	match mode:
+		"auto":
+			inset = _reported_inset()
+		"on":
+			inset = maxf(_reported_inset(), FORCED_INSET)
+	apply_top_inset(inset)
+
+
+func apply_top_inset(inset: float) -> void:
+	_top_inset = inset
+	for c in _top_edge:
+		c.offset_top = float(c.get_meta("top0", 0.0)) + inset
+		c.offset_bottom = float(c.get_meta("bottom0", 0.0)) + inset
+
+
+func top_inset() -> float:
+	return _top_inset
+
+
+func notch_mode() -> String:
+	return _notch_mode
+
+
+func _notification(what: int) -> void:
+	# A fold, a rotation or a new window: the cutout can move.
+	if what == NOTIFICATION_WM_SIZE_CHANGED and _settings_notch != null:
+		set_notch_mode(_notch_mode)
+
+
 ## The black box's one-tap offer after a crash.
 func _build_crash(root: Control) -> void:
 	_crash_card = _card(root)
@@ -712,6 +779,7 @@ func _build_title(root: Control) -> void:
 	wallet.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wallet.add_theme_constant_override("separation", 2)
 	_pin(t, wallet, 0.0, 0.0, Vector2(240.0, 90.0), Vector2(0.0, 0.0), Vector2(22.0, 24.0))
+	_track_top(wallet)
 	_coins_row = _currency("coin", 26, COIN)
 	_coins_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	wallet.add_child(_coins_row)
@@ -723,6 +791,7 @@ func _build_title(root: Control) -> void:
 	_plus_button = _chip("+", 26)
 	_plus_button.pressed.connect(func() -> void: shop_opened.emit())
 	_pin(t, _plus_button, 0.0, 0.0, Vector2(52.0, 46.0), Vector2(0.0, 0.0), Vector2(180.0, 26.0))
+	_track_top(_plus_button)
 
 	# Top right: shop and locker.
 	var shops := VBoxContainer.new()
@@ -730,6 +799,7 @@ func _build_title(root: Control) -> void:
 	shops.add_theme_constant_override("separation", 8)
 	shops.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_pin(t, shops, 1.0, 0.0, Vector2(150.0, 130.0), Vector2(1.0, 0.0), Vector2(-22.0, 22.0))
+	_track_top(shops)
 	_shop_button = _chip("SHOP", 26)
 	_shop_button.pressed.connect(func() -> void: shop_opened.emit())
 	shops.add_child(_shop_button)
@@ -1112,8 +1182,14 @@ func _build_settings(root: Control) -> void:
 		set_safe_graphics(on)
 		safe_graphics_toggled.emit(on))
 	box.add_child(_settings_safe)
+	_settings_notch = _button("NOTCH ROOM: AUTO", 34)
+	_settings_notch.pressed.connect(func() -> void:
+		var next: String = {"auto": "on", "on": "off", "off": "auto"}[_notch_mode]
+		set_notch_mode(next)
+		notch_changed.emit(next))
+	box.add_child(_settings_notch)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch."
+	blurb.text = "Characters on: pick a hero, outfits, hats, weapons and more in the LOCKER.\nSafe graphics: no glow, fog, shadows or smoothing, for phones that glitch.\nNotch room: moves the soldier count and the top buttons down from under a camera cutout. AUTO asks the phone; ON forces it."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb.custom_minimum_size.x = 520.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)

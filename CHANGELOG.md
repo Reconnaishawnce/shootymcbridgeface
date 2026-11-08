@@ -3,6 +3,33 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.42 (the balance pass: a huge squad is not a free ride)
+
+- Measured with a new idle bot (`--smoke-idle`, `--smoke-idle-from=N`):
+  before this build a squad left alone from level 6 in endless was
+  still running thirteen levels later; in levels mode it died within
+  two. Endless had nothing that scaled with the squad. Now: firepower
+  grows past 40 soldiers with diminishing returns (500 shoot like 69)
+  and crowds carry health to match, so they arrive as often against a
+  big squad as a small one; multiplier panels cap at x2 for a mid
+  squad and x1.5 for a big one, so random panels shrink a squad instead
+  of holding it; the last gate of every endless level is an ELITE wave
+  (three brutes or more, a tank, extra latchers) in place of the boss
+  endless never had; latchers eat a slice of the squad per bite, not
+  one soldier; the first saw of every level is thrown at where you
+  stand; bosses are sized for the squad that meets them; and past level
+  10 the road speeds up again while crowds keep growing. After:
+  MEASURED_AFTER
+- The pit lane is painted yellow, ramps and all, with yellow arrows and
+  PIT painted on the road for sixteen metres before the ramp and a lit
+  strip where the lane leaves the road.
+- NOTCH ROOM in SETTINGS: AUTO moves the soldier count, the level, the
+  bounty, the pause button and the home screen's top chips down from
+  under a camera cutout by what the phone reports; ON forces it for
+  phones that do not report one; OFF for none.
+- The soak script imports the project first, so it cannot hang on a
+  fresh cache.
+
 ## 0.41 (a leaderboard that closes, a pit lane, a shop with pictures)
 
 - Fixed: the LEADERBOARD page could not be dismissed. BACK showed the

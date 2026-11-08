@@ -63,6 +63,11 @@ var powerups := Powerups.new()
 var waves_cleared := 0
 var perfect_gates := 0
 var _run_time := 0.0
+## Run time of the last touch (or bot decision). Past HANDS_OFF_SECONDS
+## without one the road stops rewarding fire: panels do not climb.
+var _last_input_at := 0.0
+var _hands_hint_shown := false
+const HANDS_OFF_SECONDS := 4.0
 var _level_peak := 1
 ## The upgrades in force for the current run: the real ones, or a blank
 ## set for the daily so everyone plays the same game.
@@ -111,6 +116,11 @@ var _smoke_endless := false
 var _smoke_daily := false
 var _smoke_weekly := false
 var _smoke_upgrades := false
+## --smoke-idle: the bot does nothing at all, to measure what a squad
+## left alone gets away with.
+var _smoke_idle := false
+## --smoke-idle-from=N: the bot plays until level N, then does nothing.
+var _smoke_idle_from := 0
 var _shots_dir := ""
 var _shots_quick := false
 var _game_over_at := 0
@@ -157,6 +167,7 @@ func _ready() -> void:
 	_smoke_weekly = args.has("--weekly")
 	# --smoke-upgrades: play with every shop upgrade maxed, to exercise them.
 	_smoke_upgrades = args.has("--smoke-upgrades")
+	_smoke_idle = args.has("--smoke-idle")
 	# --smoke-retry: after a wipe, tap through the results and play again,
 	# so the game-over screen and the restart run in CI too.
 	_smoke_retry = args.has("--smoke-retry")
@@ -167,6 +178,8 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--smoke-frames="):
 			_smoke_frames = maxi(60, int(a.get_slice("=", 1)))
+		elif a.begins_with("--smoke-idle-from="):
+			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-wipe-at="):
@@ -223,6 +236,7 @@ func _ready() -> void:
 	hud.set_characters(character_mode)
 	hud.set_shadows(SaveData.load_shadows_on())
 	hud.set_safe_graphics(SaveData.load_safe_graphics())
+	hud.set_notch_mode(SaveData.load_notch_mode())
 	hud.set_lessons(lessons_on)
 	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
@@ -454,6 +468,10 @@ func _build_scene() -> void:
 	hud.lessons_toggled.connect(func(on: bool) -> void:
 		lessons_on = on
 		SaveData.save_lessons_on(on)
+		sfx.play("click"))
+	hud.notch_changed.connect(func(mode: String) -> void:
+		SaveData.save_notch_mode(mode)
+		Diag.note("notch_mode", {"mode": mode, "inset": hud.top_inset()})
 		sfx.play("click"))
 	hud.crash_dismissed.connect(func() -> void:
 		hud.hide_crash_card()
@@ -1002,6 +1020,8 @@ func toggle_squad() -> void:
 
 func start_run(p_mode: String = "levels") -> void:
 	mode = p_mode
+	_last_input_at = 0.0
+	_hands_hint_shown = false
 	_cam_pull = 0.0
 	camera.position = CAM_HOME
 	run_seed = _smoke_seed if smoke else randi()
@@ -1385,6 +1405,14 @@ func _tick_run(delta: float) -> void:
 			if _cling_touch.is_empty() and not _touches.values().has("focus"):
 				squad.clear_focus()
 	_check_lessons()
+	# Hands off the road: panels stop climbing, and the first time it
+	# happens in a run the HUD says why.
+	# A finger held still is still a hand on the road.
+	var hands_on: bool = not _touches.is_empty() or _run_time - _last_input_at < HANDS_OFF_SECONDS
+	if world.hands_on and not hands_on and world.phase == World.Phase.GATES and not _hands_hint_shown and not smoke:
+		_hands_hint_shown = true
+		hud.show_hint("HANDS ON THE ROAD\nPANELS ONLY CLIMB WHILE YOU STEER OR AIM", 3.0)
+	world.hands_on = hands_on
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
 	score = int((total_distance + float(bonus)) * world.mod("score"))
@@ -1430,6 +1458,8 @@ func _tick_run(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_last_input_at = _run_time
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_try_retry()
@@ -2399,7 +2429,11 @@ func _smoke_tick() -> void:
 			print("SMOKE_WIPE ", JSON.stringify({"frame": _frames, "level": world.level}))
 			squad.set_count(0)
 			return
-		_bot_steer()
+		if _smoke_idle_from > 0 and world.level >= _smoke_idle_from and not _smoke_idle:
+			_smoke_idle = true
+			print("SMOKE_IDLE ", JSON.stringify({"frame": _frames, "level": world.level, "squad": squad.count}))
+		if not _smoke_idle:
+			_bot_steer()
 		return
 	if _shots_dir != "":
 		return
@@ -2444,6 +2478,7 @@ func _smoke_tick() -> void:
 ## Play like a person: track the boss core, shoot whatever is close,
 ## otherwise line up the better panel of the next gate.
 func _bot_steer() -> void:
+	_last_input_at = _run_time
 	# Spread for crowds, tighten for gates and the boss; bomb the heavies.
 	var near := world.nearest_zombie(18.0)
 	var heavy_near := false

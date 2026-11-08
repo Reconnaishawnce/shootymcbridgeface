@@ -125,6 +125,9 @@ var now := 0.0
 ## Endless: no bosses, no squad reset, gates forever. Levels tick every
 ## GATES_PER_LEVEL gates for difficulty and the HUD.
 var endless := false
+## False once the player has had no hand on the road for a few seconds:
+## panels stop climbing, so a squad left to itself takes what is printed.
+var hands_on := true
 
 var level := 1
 var level_distance := 0.0
@@ -572,6 +575,8 @@ func try_hit(b: Bullet) -> bool:
 			continue
 		var i := g.panel_index_at_x(b.position.x)
 		if i >= 0:
+			if not hands_on:
+				return true
 			var dmg := b.damage * (Progression.HOT_MULT if g.is_hot(i, now) else 1.0)
 			if g.register_hit(i, dmg, _step_cost(), Economy.mul_cap_for(squad.count if squad != null else 0)):
 				gate_stepped.emit(g, i)
@@ -579,7 +584,8 @@ func try_hit(b: Bullet) -> bool:
 	for rg in route_gates:
 		if rg.passed or rg.position.z < z_lo or rg.position.z > z_hi or not rg.covers_x(b.position.x):
 			continue
-		rg.register_hit(b.damage * (Progression.HOT_MULT if rg.is_hot(now) else 1.0), _step_cost(), Economy.mul_cap_for(squad.count if squad != null else 0))
+		if hands_on:
+			rg.register_hit(b.damage * (Progression.HOT_MULT if rg.is_hot(now) else 1.0), _step_cost(), Economy.mul_cap_for(squad.count if squad != null else 0))
 		return true
 	return false
 
@@ -663,7 +669,8 @@ func _spawn() -> void:
 	for plan in _saw_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
-			spawn_saw(float(plan.x) * road_half, -(Difficulty.saw_distance(n) - level_distance))
+			var sx := squad.position.x if (bool(plan.get("aim", false)) and squad != null) else float(plan.x) * road_half
+			spawn_saw(sx, -(Difficulty.saw_distance(n) - level_distance))
 			_saw_plan.erase(plan)
 	for plan in _crate_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
@@ -678,7 +685,7 @@ func _spawn() -> void:
 		_boss_spawned = true
 		boss = Boss.new()
 		var convoy := squad.vehicles_alive() if squad != null else 0
-		boss.setup(Difficulty.boss_hp(level, perk_count) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)) * Difficulty.band_boss(band()), Difficulty.boss_kind(level))
+		boss.setup(Difficulty.boss_hp(level, perk_count, squad.count if squad != null else 0) * mod("boss") * (1.0 + Difficulty.CONVOY_BOSS_HP_PER_VEHICLE * float(convoy)) * Difficulty.band_boss(band()), Difficulty.boss_kind(level))
 		boss.core_mult = Boss.CORE_MULT + (perks.core_mult_bonus() if perks != null else 0.0) + (meta.core_mult_bonus() if meta != null else 0.0)
 		boss.position = Vector3(0.0, 0.0, -(Difficulty.boss_distance() - level_distance))
 		add_child(boss)
@@ -736,7 +743,7 @@ func _note_wave_id(n: int, wave: int) -> void:
 ## A wave spec with the modifier applied: more bodies, more health.
 func _spec(p_level: int, index: int, count: int) -> Dictionary:
 	var convoy := squad.vehicles_alive() if squad != null else 0
-	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV)
+	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV, Difficulty.is_elite(endless, index))
 	var bw := Difficulty.band_wave(band())
 	var w := mod("wave") * bw
 	var h := mod("hp") * bw
@@ -1087,8 +1094,9 @@ func _tick_latched(delta: float, z: Zombie, p_squad: Squad) -> void:
 		z.latch_timer = Difficulty.LATCH_INTERVAL
 		if p_squad.is_shielded():
 			return
-		p_squad.add(-Difficulty.LATCH_BITE)
-		squad_bitten.emit(Difficulty.LATCH_BITE, false)
+		var bite := Difficulty.latch_bite(p_squad.count)
+		p_squad.add(-bite)
+		squad_bitten.emit(bite, false)
 		if p_squad.count <= 0:
 			_latched.erase(z)
 			zombies.erase(z)

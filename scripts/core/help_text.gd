@@ -36,7 +36,7 @@ static func sections() -> Array:
 			"GOLD panels are SUPPLY: pay coins out of this run's bounty, right there at the gate, for a few soldiers or a power-up now. What you spend on the road you do not take home to the shop, so it is a real choice. Not enough bounty and the panel does nothing.\n" +
 			"GREY panels with a ? are hidden until you get close or shoot them."},
 		{"title": "SHOOT THE PANELS", "body":
-			"Your bullets hit the panels too. Every bit of fire steps a panel up: a +2 becomes a +3, a x2 becomes x2.5, a trade gets cheaper. " +
+			"Your bullets hit the panels too. Every bit of fire steps a panel up: a +2 becomes a +3, a x2 becomes x2.5, a trade gets cheaper. Only while your hand is on the road, though: a few seconds without a touch and panels stop climbing, so a squad left to itself takes what is printed. " +
 			"Shoot a panel up at least %d steps before you walk through it and you get a PERFECT worth %d points. " % [Difficulty.PERFECT_STEPS, Difficulty.PERFECT_BONUS] +
 			"From level %d some panels flash white: hits during the flash count triple. " % Progression.HOT_LEVEL +
 			"But bullets spent on panels are bullets not spent on zombies. That is the whole game."},
@@ -67,11 +67,12 @@ static func sections() -> Array:
 		{"title": "THE ROAD WATCHES YOU", "body":
 			"Every level expects a squad of a certain size. Run bigger than that and the zombies come a little thicker and bite a little harder, up to half again as much. " +
 			"Run smaller and they ease off, up to a quarter. It is a nudge, not a wall: a strong player stays busy, a new one gets a chance. " +
-			"The convoy counts toward the read. A won bet pays at most %d soldiers, and a big squad finds flat gains at the fork instead of multipliers." % Difficulty.BET_WIN_CAP},
+			"The convoy counts toward the read. A won bet pays at most %d soldiers, and a big squad finds flat gains at the fork instead of multipliers. A mid squad can push a shot multiplier to x%d and a big one to x%.1f, so a squad left to take panels at random shrinks rather than holds. " % [Difficulty.BET_WIN_CAP, int(Economy.MUL_CAP_MID), Economy.MUL_CAP_BIG] +
+			"Bosses are sized for the squad that meets them (%d%% of it when that is more than the level expects), the first saw of every level is thrown at where you stand, and the crowds carry health to match your guns." % int(Difficulty.BOSS_SQUAD_FRACTION * 100.0)},
 		{"title": "ZOMBIES", "body":
 			"Walkers shamble at you. Runners are fast and thin and find you. Brutes are big, soak a lot of fire, and take a slice of the squad when they reach you. " +
 			"Tanks are bullet sponges that shield whatever is behind them. Thieves sprint for the next gate and knock its number down, so shoot them first. " +
-			"Purple latchers, and from level %d any walker or runner that reaches you, cling to your flanks and eat a soldier every so often until you tap them or dash. " % Progression.CLING_LEVEL +
+			"Purple latchers, and from level %d any walker or runner that reaches you, cling to your flanks and eat until you tap them or dash: a soldier a bite on a small squad, a slice of %d in a thousand on a big one, so a squad nobody is steering gets eaten. " % [Progression.CLING_LEVEL, int(Difficulty.LATCH_BITE_FRACTION * 1000.0)] +
 			"On wide roads, flankers hop the curbs beside you. " +
 			"From level %d a buzz SAW rolls down the bridge at you now and then, wobbling across its lane: steer round it or dash through it, or it takes a slice (%d%% of the squad). It cuts zombies too. " % [Difficulty.SAW_LEVEL, int(Difficulty.SAW_BITE_FRACTION * 100.0)] +
 			"Zombies that get past you without being killed break your wave streak."},
@@ -112,12 +113,12 @@ static func sections() -> Array:
 		{"title": "MODES", "body":
 			"NORMAL is the road as it comes. HARD opens at %d trophies: bigger waves, meaner bosses, 1.5x score and coins. " % int(Road.UNLOCKS["hard"]) +
 			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +
-			"ENDLESS opens at %d trophies: no bosses, no reset, the road just keeps getting harder.\n" % int(Road.UNLOCKS["endless"]) +
+			"ENDLESS opens at %d trophies: no bosses, no reset, the road just keeps getting harder. The last gate of every endless level brings an ELITE wave instead of a boss: three brutes or more, a tank, extra latchers. From level %d the road speeds up again and the crowds keep growing.\n" % [int(Road.UNLOCKS["endless"]), Difficulty.LATE_LEVEL] +
 			"DAILY: the same road for everyone today, no upgrades, rifles only. Best of the day counts and you can copy your result to share.\n" +
 			"WEEKLY: the same road for everyone all week, on hard, no upgrades."},
 		{"title": "SQUADS", "body":
 			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. " +
-			"Only the front %d soldiers' worth of guns count toward firepower; past that, a bigger squad is extra health, not extra damage." % Progression.DPS_CAP_SOLDIERS},
+			"The front %d soldiers' worth of guns count toward firepower one for one; past that every extra soldier adds a little less (500 soldiers shoot like %d). A bigger squad is mostly extra health, and the crowds grow to match its guns, so a huge squad is never a free ride." % [Progression.DPS_CAP_SOLDIERS, Progression.firing_count(500)]},
 		{"title": "THE TROPHY ROAD", "body":
 			"Every run adds trophies and nothing takes them away: %d for every level you reach, more for good grades, double on hard, triple on nightmare. " % Road.PER_LEVEL +
 			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"])] +

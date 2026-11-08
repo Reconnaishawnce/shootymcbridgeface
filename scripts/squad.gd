@@ -431,10 +431,10 @@ func _damage_mult() -> float:
 	return m * veterans.damage_mult() * pit.damage_mult()
 
 
-## Soldiers that count toward firepower. Past the cap, more soldiers are
-## more to lose, not more damage.
+## Soldiers that count toward firepower: one for one to the cap, then
+## with diminishing returns (Progression.firing_count).
 func firing_count() -> int:
-	return mini(count, Progression.DPS_CAP_SOLDIERS)
+	return Progression.firing_count(count)
 
 
 ## Damage per second of the whole squad. Linear in count up to the cap.

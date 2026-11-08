@@ -115,6 +115,16 @@ const DASH_COOLDOWN := 1.1
 const DASH_FLICK_SPEED := 2200.0
 const DODGE_BONUS := 40
 
-## Firepower stops growing past this many soldiers: beyond it, soldiers are
-## health, not damage, and a big squad is something to protect.
+## Firepower grows one for one up to this many soldiers. Past it, extra
+## soldiers still add fire, but at DPS_TAIL_EXPONENT: a squad of 100
+## shoots like 50, 200 like 56, 500 like 69. A big squad is mostly
+## something to protect, and the road scales its crowds to the same
+## curve (Difficulty.fire_scale), so it never outgrows the game.
 const DPS_CAP_SOLDIERS := 40
+const DPS_TAIL_EXPONENT := 0.55
+
+
+static func firing_count(count: int) -> int:
+	if count <= DPS_CAP_SOLDIERS:
+		return maxi(count, 0)
+	return DPS_CAP_SOLDIERS + int(pow(float(count - DPS_CAP_SOLDIERS), DPS_TAIL_EXPONENT))

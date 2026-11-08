@@ -17,8 +17,11 @@ const GOLD_EXPONENT := 0.75
 const SQUAD_CAP := 500
 ## How far a shot multiplier panel can be pushed, by squad size.
 const MUL_CAP_SMALL := 5.0
-const MUL_CAP_MID := 3.0
-const MUL_CAP_BIG := 2.0
+## A mid squad doubles at most, a big one gets half as much again: with
+## the bad panel's x0.5 that makes a squad left to take random panels
+## shrink instead of holding, which is what kept idle endless runs alive.
+const MUL_CAP_MID := 2.0
+const MUL_CAP_BIG := 1.5
 const MUL_MID_SQUAD := 150
 const MUL_BIG_SQUAD := 300
 

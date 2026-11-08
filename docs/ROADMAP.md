@@ -268,8 +268,66 @@ goes first because nothing else can be judged on a phone that crawls.
 11. The 0.41 fixes (done): the leaderboard page that would not close,
     the pit lane with the camera that pulls back for it, the shop as
     tiles with drawn pictures.
-12. Next: a balance and feedback pass on the new economy and the first
-    week of the board.
+12. The balance pass (0.42, done): see "The ten-pass arc" below.
+
+## The ten-pass arc (0.42 onward)
+
+The owner's brief, November 2026: a balance pass; a pit stop you cannot
+miss; crash and freeze reports that reach us without the player doing
+anything (Galaxy S23 Ultra freezes when the screen is busy, and the
+mailto reports are not arriving); a late game that cannot be left to
+play itself; the soldier count hidden under camera cutouts; graphics
+with the saturation and chunk of the games this one competes with; and
+new mechanics that make it harder to put down. One pass per item, each
+shipped and measured on its own.
+
+1. Balance (0.42, done). An idle bot (`--smoke-idle`,
+   `--smoke-idle-from=N`) measures what a squad left alone gets away
+   with, before and after. Firepower keeps growing past the old cap
+   with diminishing returns, bosses scale with the squad that meets
+   them, latchers eat in proportion to the squad they hang on, one saw
+   a level is thrown at where you stand, and the late levels keep
+   climbing. The pit lane is painted yellow with lead-in arrows on the
+   road. NOTCH ROOM in SETTINGS moves the top of the HUD out from under
+   a camera cutout (AUTO reads the phone's safe area).
+2. Telemetry. Crash and freeze reports go to the leaderboard Worker on
+   their own: a `/report` route with the same signature scheme, a size
+   cap, a rate limit and a 30-day KV TTL; the game sends the Diag bundle
+   (device, GPU, OS, renderer, frame-time history, event ring, state
+   breadcrumbs, node counts) after a bad exit, a stall, or a long frame,
+   with a SEND REPORTS toggle that defaults on and says what leaves the
+   phone. A `/reports` admin route lists them. Then a perf pass driven
+   by what comes back: shader pre-warm of every material, caps on
+   bullets, globs and effects at once, and a busy-screen soak on the
+   bot that counts nodes and frame times.
+3. Look, part one: colour. A palette pass toward the saturated,
+   high-contrast reference (deep blue bridge, hot red crowds, gold
+   turrets, purple multipliers): a graded sky and fog, sun and fill
+   tuned for punch, ink outlines thicker and darker, gate panels as lit
+   signs, coins and bounty gold that glows.
+4. Look, part two: bodies. Chunkier soldiers and zombies (bigger heads,
+   helmets, visible rifles, fatter silhouettes), a two-frame run cycle,
+   squash-and-stretch on hits, bigger muzzle flashes and tracer trails,
+   confetti on gates, and screen-space shake and flash budgets.
+5. Mechanics, part one: the turret and the wall. Gold turrets you buy
+   with bounty that ride the curb and fire on their own; walls and
+   barricades across half the road that must be shot down or steered
+   around; zombie types that split or shield.
+6. Mechanics, part two: hero abilities. A tap-the-hero ability with a
+   cooldown per squad type (rifles: volley; shotgun: shockwave; medic:
+   heal pulse), upgradeable in the shop, with a lesson each.
+7. Mechanics, part three: the run meta. Daily missions with coin
+   rewards, a streak counter, a between-run "next unlock" bar, and the
+   trophy road's later milestones filled in (skins, a fourth squad).
+8. Mechanics, part four: events. Weekend modifiers (double bounty, fog
+   road, saw storm), a boss rush mode, and a weekly challenge with its
+   own board.
+9. Feel pass. Haptics, hit-stop on big kills, slow-motion on a boss
+   kill, squad cheers, music layers that build with the combo, a
+   results card that counts up with sound.
+10. Second balance pass with the telemetry: what the reports and the
+    boards say about where runs end, where they never end, and what
+    nobody buys.
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 

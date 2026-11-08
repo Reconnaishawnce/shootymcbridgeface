@@ -233,6 +233,70 @@ modifiers multiply on top. Compounding is capped at its sources:
 `BIG_SQUAD` swaps multipliers for flat gains of at most
 `BIG_FORK_ADD_CAP`.
 
+## Scale: why a huge squad is not a free ride (0.42)
+
+The idle bot (`++ --smoke --smoke-idle`, or `--smoke-idle-from=N` to
+play well until level N and then do nothing) measures what a squad
+left alone gets away with. Before 0.42: in levels mode an idle squad
+died within two levels, because bosses stop the road and bite in
+fractions; in endless, which has no bosses, a squad idled from level 6
+was still alive thirteen levels and four and a half minutes later with
+hundreds of soldiers, and would have gone on for ever. Three things
+kept it alive: firepower was capped at 40 soldiers while bites were
+fractions of the squad, so nothing scaled; x2 and x0.5 panels taken at
+random cancel out exactly; and the crowds were sized for the level, not
+the squad, so a capped squad mowed them before they arrived.
+
+The fixes are all scale-aware, so a small squad feels nothing:
+
+- `Progression.firing_count` grows past `DPS_CAP_SOLDIERS` with
+  `DPS_TAIL_EXPONENT` (500 soldiers shoot like 69), and
+  `Difficulty.fire_scale` multiplies wave health by the same curve, so
+  a crowd takes the same seconds to mow whatever the squad's size and
+  its runners arrive as often.
+- `Economy.MUL_CAP_MID` is x2 and `MUL_CAP_BIG` x1.5: against the bad
+  panel's x0.5 a squad taking panels at random now drifts down.
+- Endless gets `Difficulty.is_elite` on the last gate of every level:
+  twice the brutes (three at least, over the cap by
+  `ELITE_EXTRA_BRUTES`), an extra tank, more latchers. Brutes and tanks
+  already carry health per soldier and bite in fractions, so this is
+  the wall a boss would have been.
+- `Difficulty.latch_bite` is `LATCH_BITE_FRACTION` of the squad (floor
+  one): a latcher on 500 eats three every `LATCH_INTERVAL`. Latchers
+  need a tap or a dash, which is exactly what an idle squad does not do.
+- The first saw of every level is thrown at where the squad stands when
+  it is released (`saws_for_level` marks it `aim`); the rest roll a
+  fixed line.
+- `boss_hp` models `BOSS_SQUAD_FRACTION` of the squad that turns up when
+  that beats the level's expected squad, so a boss fight against 500
+  lasts long enough for its attacks to matter.
+- Past level 10 `world_speed` keeps climbing to `LATE_SPEED_CAP`, and
+  from `LATE_LEVEL` wave health grows `LATE_HP_GROWTH` a level.
+- Hands on the road. The trace of the one idle run that survived all of
+  the above showed the real engine: the squad's own passive fire shot
+  every multiplier panel in its lane up to the x5 catch-up cap each
+  time it dipped under 150, so it bounced between 150 and 500 for ever.
+  `World.hands_on` is false once `Game.HANDS_OFF_SECONDS` have passed
+  with no touch and no finger held (the bot counts as a hand), and
+  `World._hit_gate` then lets bullets through panels without stepping
+  them: a squad nobody is steering takes what is printed. The HUD says
+  so once per run the first time it happens.
+
+The measurements before and after are in CHANGELOG 0.42; the bot's own
+runs in `scripts/ci/check.sh` and `soak.sh` guard the active player's
+side of the curve.
+
+## The top edge of the screen
+
+Some phones draw the game under the camera cutout, and the soldier
+count sits exactly there. `Hud._track_top` records the built offsets of
+every control on the top edge (count, level, bounty, subline, pause,
+boss bar; wallet, plus and shop chips on the title) and
+`apply_top_inset` pushes them down. `set_notch_mode` picks the inset:
+AUTO converts `DisplayServer.get_display_safe_area` from screen pixels
+to canvas units, ON forces at least `FORCED_INSET`, OFF none; a window
+size change re-applies it. Saved as `notch_mode`.
+
 ## Quests and the season
 
 `Quests.for_day` draws three templates and targets from the day number,

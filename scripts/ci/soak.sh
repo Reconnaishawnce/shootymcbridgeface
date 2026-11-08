@@ -33,5 +33,14 @@ for mode in "" "--endless" "--daily" "--weekly"; do
     done
   done
 done
+# A squad left alone must die: the bot plays endless to level 4 with every
+# upgrade, then takes its hands off. 14000 frames is about four minutes.
+echo "== idle: a squad left alone from level 4 must not outlive the run"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=14000 --smoke-seed=1 --endless --smoke-upgrades --smoke-idle-from=4 >"$LOG" 2>&1 || true
+idle_state="$(grep SMOKE_RESULT "$LOG" | tail -1 | sed 's/SMOKE_RESULT //' | python3 -c 'import sys,json; print(json.load(sys.stdin)["state"])' 2>/dev/null || echo none)"
+if [ "$idle_state" != "2" ]; then
+  fails=$((fails + 1))
+  echo "::error::an idle squad was still alive at the end of the run (state=$idle_state)"
+fi
 echo "== soak: $runs runs, $fails with errors"
 [ "$fails" -eq 0 ]

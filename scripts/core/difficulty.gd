@@ -57,6 +57,8 @@ const RICH_TRAP_CHANCE := 0.5
 const CRATES_PER_LEVEL := 2
 const CRATE_OFFSET := 14.0
 const MAX_BRUTES := 6
+## An elite wave may carry this many brutes over the cap.
+const ELITE_EXTRA_BRUTES := 3
 const BRUTE_BITE_FRACTION := 0.08
 const BRUTE_HP_PER_SOLDIER := 2.0
 const TANK_HP_PER_SOLDIER := 6.0
@@ -66,6 +68,10 @@ const MAX_LATCHERS := 4
 ## Soldiers a latched zombie eats per LATCH_INTERVAL.
 const LATCH_BITE := 1
 const LATCH_INTERVAL := 0.7
+## A latcher eats this fraction of the squad per bite, at least LATCH_BITE:
+## on a squad of 500 that is 3 soldiers every LATCH_INTERVAL, per latcher.
+## Tap them off; a squad nobody is steering is eaten.
+const LATCH_BITE_FRACTION := 0.006
 ## Thieves sprint away from the squad toward the next gate at this absolute
 ## speed; the world scrolls the other way, so they close on the gate at
 ## roughly this minus the world speed.
@@ -120,9 +126,45 @@ static func boss_distance() -> float:
 	return gate_distance(GATES_PER_LEVEL - 1) + BOSS_LEAD
 
 
-## Metres per second the world scrolls toward the squad during gates.
+## Metres per second the world scrolls toward the squad during gates:
+## half a metre a level to 14 at level 10, then a slower climb to
+## LATE_SPEED_CAP, so a late endless run keeps asking for faster hands.
+const LATE_SPEED_CAP := 16.5
+
+
 static func world_speed(level: int) -> float:
+	if level > 10:
+		return minf(14.0 + float(level - 10) * 0.15, LATE_SPEED_CAP)
 	return clampf(9.5 + float(level - 1) * 0.5, 9.5, 14.0)
+
+
+## From LATE_LEVEL on, wave health also grows by LATE_HP_GROWTH a level, so
+## the road keeps getting harder past the point where the squad is capped.
+const LATE_LEVEL := 8
+const LATE_HP_GROWTH := 1.05
+
+
+static func late_growth(level: int) -> float:
+	return pow(LATE_HP_GROWTH, float(maxi(0, level - LATE_LEVEL + 1)))
+
+
+## How much more fire a squad of [param squad_count] puts out than one at
+## the firepower cap: wave health follows it, so a crowd takes the same
+## seconds to mow whatever the squad's size.
+static func fire_scale(squad_count: int) -> float:
+	return maxf(1.0, float(Progression.firing_count(squad_count)) / float(Progression.DPS_CAP_SOLDIERS))
+
+
+## Endless has no bosses; instead the last gate of every level brings an
+## elite wave: twice the brutes (three at least), an extra tank, more
+## latchers. The wall a boss would have been.
+static func is_elite(endless: bool, index: int) -> bool:
+	return endless and index == GATES_PER_LEVEL - 1
+
+
+## A latcher's bite on a squad of [param squad_count].
+static func latch_bite(squad_count: int) -> int:
+	return maxi(LATCH_BITE, int(float(squad_count) * LATCH_BITE_FRACTION))
 
 
 ## Runners are released the moment a gate is passed, this far ahead. They
@@ -153,7 +195,7 @@ static func effective_step_cost(level: int, squad_dps: float) -> float:
 ## squad's current size so a huge squad meets a huge crowd (rubber band).
 ## The squad restarts at one soldier every level, so waves ramp mainly with
 ## the gate index inside the level and only modestly with the level itself.
-static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary:
+static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool = false) -> Dictionary:
 	var lv := float(level - 1)
 	var ix := float(index)
 	# Brutes from the fourth gate of level 1, more with level and depth.
@@ -184,6 +226,12 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 		hp = 0.8 + lv * 0.15
 		count = 3 + int(lv * 0.5)
 		runners = 1
+	# The crowd keeps pace with the squad's guns and the late levels.
+	hp *= fire_scale(squad_count) * late_growth(level)
+	if elite:
+		brutes = maxi(brutes * 2, 3)
+		tanks += 1
+		latchers += 2
 	return {
 		"count": mini(count + int(squad_count / 10.0), MAX_WAVE),
 		"hp": hp,
@@ -195,7 +243,7 @@ static func wave_for(level: int, index: int, squad_count: int = 1) -> Dictionary
 		"thief_hp": hp * 1.5,
 		"runner_hp": hp * 0.6,
 		"speed": 2.0 + minf(lv * 0.15 + ix * 0.05, 1.5),
-		"brutes": mini(brutes, MAX_BRUTES),
+		"brutes": mini(brutes, MAX_BRUTES + (ELITE_EXTRA_BRUTES if elite else 0)),
 		"thieves": mini(thieves, MAX_THIEVES),
 		"tanks": tanks,
 		"latchers": mini(latchers, MAX_LATCHERS),
@@ -272,8 +320,16 @@ static func band_boss(p: float) -> float:
 	return 1.0 + p * 0.5
 
 
-static func boss_hp(level: int, perk_count: int = 0) -> float:
-	var base := float(expected_squad(level)) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
+## A boss is modelled as BOSS_SECONDS_OF_FIRE of the squad the level
+## expects, or of BOSS_SQUAD_FRACTION of the squad that actually turns
+## up when that is bigger: a squad of 500 meets a boss sized for 200, so
+## the fight lasts long enough for its attacks to matter.
+const BOSS_SQUAD_FRACTION := 0.4
+
+
+static func boss_hp(level: int, perk_count: int = 0, squad_count: int = 0) -> float:
+	var model := maxi(expected_squad(level), int(float(squad_count) * BOSS_SQUAD_FRACTION))
+	var base := float(model) * DPS_PER_SOLDIER * BOSS_SECONDS_OF_FIRE
 	if boss_kind(level) == Boss.Kind.SPITTER:
 		base *= SPITTER_HP_MULT
 	elif boss_kind(level) == Boss.Kind.STORM:
@@ -772,5 +828,7 @@ func saws_for_level(level: int) -> Array:
 		while used.has(index) or is_fork_gate(index):
 			index = 1 + (index % (GATES_PER_LEVEL - 2))
 		used[index] = true
-		out.append({"index": index, "x": rng.randf_range(-0.7, 0.7)})
+		# The first saw of a level is thrown at wherever the squad stands
+		# when it is released; the rest roll down a fixed line.
+		out.append({"index": index, "x": rng.randf_range(-0.7, 0.7), "aim": i == 0})
 	return out

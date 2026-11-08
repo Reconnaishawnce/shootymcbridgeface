@@ -7,10 +7,15 @@ extends Node3D
 ## brings you back. Steer onto the ramp as it passes and the road waits
 ## at the garage. The crew keeps moving while the game is paused.
 
-const APRON := Color(0.2, 0.21, 0.24)
-const RAMP := Color(0.24, 0.25, 0.28)
-const STRIP := Color(0.98, 0.78, 0.2, 0.9)
-const CHEVRON := Color(1.0, 0.85, 0.25)
+## The lane and its ramps are painted yellow, so the pit reads from the
+## far end of the screen; the lead-in arrows on the road itself too.
+const APRON := Color(0.93, 0.72, 0.12)
+const RAMP := Color(0.96, 0.78, 0.18)
+const STRIP := Color(0.08, 0.08, 0.1, 0.9)
+const CHEVRON := Color(0.08, 0.08, 0.1)
+const LEAD := Color(1.0, 0.82, 0.2)
+## Lead-in arrows start this far before the entry ramp.
+const LEAD_LENGTH := 16.0
 const CONE := Color(1.0, 0.45, 0.1)
 const WALL := Color(0.92, 0.92, 0.9)
 const WALL_RED := Color(0.85, 0.15, 0.15)
@@ -48,7 +53,7 @@ func setup(p_road_half: float) -> void:
 	var cx := road_edge + WIDTH * 0.5 + 0.1
 	# The lane: tarmac over the curb's line and out to the far side, a
 	# dashed gold line where it leaves the road, a rumble edge beyond.
-	var apron := Mats.gbox(Vector3(WIDTH + 0.4, 0.06, LENGTH), APRON, 0.3, 0.3, 1)
+	var apron := Mats.gbox(Vector3(WIDTH + 0.4, 0.06, LENGTH), APRON, 0.25, 0.18, 1)
 	apron.position = Vector3(cx, 0.0, 0.0)
 	add_child(apron)
 	for i in range(8):
@@ -58,7 +63,7 @@ func setup(p_road_half: float) -> void:
 	# Two ramps: slabs that peel off the road ahead and rejoin it behind,
 	# with chevrons pointing the way in.
 	for end in [-1.0, 1.0]:
-		var ramp := Mats.gbox(Vector3(WIDTH + 0.4, 0.06, RAMP_LENGTH + 0.6), RAMP, 0.3, 0.3, 2)
+		var ramp := Mats.gbox(Vector3(WIDTH + 0.4, 0.06, RAMP_LENGTH + 0.6), RAMP, 0.25, 0.18, 2)
 		ramp.position = Vector3(cx, -0.005, end * (LENGTH * 0.5 + RAMP_LENGTH * 0.5))
 		add_child(ramp)
 		var wedge := Mats.box(Vector3(WIDTH * 0.5, 0.05, RAMP_LENGTH * 0.9), RAMP.darkened(0.15))
@@ -70,6 +75,29 @@ func setup(p_road_half: float) -> void:
 			chev.position = Vector3(road_edge + 1.0 + float(i) * 0.75, 0.04, end * (LENGTH * 0.5 + 1.4 + float(i) * 1.6))
 			chev.rotation.y = -end * 0.6
 			add_child(chev)
+	# Lead-in paint on the road itself: yellow arrows down the right half
+	# pointing at the ramp, and PIT written on the asphalt.
+	for i in range(4):
+		var zl := -LENGTH * 0.5 - RAMP_LENGTH - 2.0 - float(i) * (LEAD_LENGTH / 4.0)
+		for leg in [-1.0, 1.0]:
+			var stroke := Mats.box(Vector3(1.1, 0.02, 0.26), LEAD, true)
+			stroke.position = Vector3(road_edge * 0.5 + leg * 0.35, 0.03, zl - leg * 0.3)
+			stroke.rotation.y = leg * 0.75
+			add_child(stroke)
+	var paint := Label3D.new()
+	paint.text = "PIT"
+	paint.font_size = 160
+	paint.pixel_size = 0.012
+	paint.modulate = LEAD
+	paint.outline_size = 0
+	paint.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+	paint.position = Vector3(road_edge * 0.5, 0.04, -LENGTH * 0.5 - RAMP_LENGTH - LEAD_LENGTH - 3.0)
+	add_child(paint)
+	# A glow strip where the lane leaves the road.
+	var edge := Mats.box(Vector3(0.12, 0.03, LENGTH + RAMP_LENGTH * 2.0), LEAD, true)
+	edge.material_override = Mats.glow(LEAD, 1.6)
+	edge.position = Vector3(road_edge - 0.1, 0.035, 0.0)
+	add_child(edge)
 	# The pit wall along the far side: white blocks, every other red.
 	for i in range(11):
 		var block := Mats.box(Vector3(0.3, 0.7, 1.8), WALL_RED if i % 2 == 0 else WALL)

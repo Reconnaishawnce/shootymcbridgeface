@@ -9,7 +9,7 @@ const CATALOG := {
 	"basics": {"title": "STEER AND SHOOT",
 		"body": "Drag low on the screen to steer. Your squad fires ahead on its own. Every gate has one panel per lane: walk through the one you want. Blue grows the squad, red shrinks it. Hold a finger on the road to aim every gun at that spot."},
 	"shoot_panels": {"title": "SHOOT THE PANELS",
-		"body": "Bullets that hit a panel push its number up. Shoot a -4 enough and it becomes a +2. But bullets spent on panels never reach the zombies behind them. That trade is the whole game."},
+		"body": "Bullets that hit a panel push its number up. Shoot a -4 enough and it becomes a +2. But bullets spent on panels never reach the zombies behind them. That trade is the whole game. Panels only climb while your hand is on the road."},
 	"fire_modes": {"title": "FIRE MODES",
 		"body": "The button at the bottom right cycles TIGHT, NORMAL, WIDE and STRAIGHT. Wide covers the road and kills more, so it earns more bounty. Straight sends everything out of the middle, harder and through one more body: the drill for what is in front of you."},
 	"bounty": {"title": "THE BOUNTY",

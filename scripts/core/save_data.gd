@@ -251,6 +251,16 @@ static func save_lessons_on(on: bool) -> void:
 	_write(SETTINGS, "lessons_on", on)
 
 
+## NOTCH ROOM: "auto", "on" or "off".
+static func load_notch_mode() -> String:
+	var m := str(_read(SETTINGS, "notch_mode", "auto"))
+	return m if m in ["auto", "on", "off"] else "auto"
+
+
+static func save_notch_mode(mode: String) -> void:
+	_write(SETTINGS, "notch_mode", mode)
+
+
 static func load_achievements() -> Array:
 	var v = _read(STATS, "achievements", [])
 	return v if v is Array else []

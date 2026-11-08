@@ -820,6 +820,37 @@ falling over (a tween on the body), tracers carry a translucent tail,
 and the camera sits on a rig that sways with the steering so the framing
 code is untouched. The HUD theme's default font is Lilita One (OFL).
 
+## Art direction (graphics pass 4: colour)
+
+The brief was the look of the games this one competes with: a
+saturated blue deck, hot red crowds, gold and purple accents, hard
+contrast. `Palette` (pure) holds every scene colour in one place and
+`tests/test_palette.gd` holds the relations that make the screen read
+at a glance: curbs and lines more than 0.4 luma above the deck,
+soldiers and zombies on opposite hues, each zombie kind apart from the
+others by hue or brightness, blue and red panels far apart, purple
+neither. Change a colour and the test says whether it still reads.
+
+The world became the bridge its name promised. `World._build_dressing`
+hangs navy girders under the deck's edges, lays a concrete walkway
+outside each curb (the wrecks and rubble stand there now), puts a far
+shore at `SHORE_X` for the skyline and the dead trees, and floods the
+rest with `Mats.water`: an unshaded shader of two moving bands of blue
+with foam on the crests, no texture, so it costs nothing and looks the
+same with safe graphics on. The girders and walkways follow the road
+when it widens. The pit lane stands on a pier.
+
+The deck is a saturated blue with cream curbs and yellow lines; zombies
+are a hot red family (brutes darker, runners orange, thieves yellow,
+tanks steel, latchers purple); soldiers a brighter blue. Panels are
+lit signs: the face is unshaded, so it shows its own colour whatever
+the sky does (a glossy face had reflected the brighter sky and read
+grey), with a little emission, and the strip's glow is up, so a row of
+gates reads from the far end of the screen. The
+sky is a deeper blue over a peach horizon, the fog a light haze, the
+sun a touch stronger, the fill bluer, and the grade pushes saturation
+to 1.2. The ink line is thicker (`Palette.INK_WIDTH`) and darker.
+
 ## Art direction (original notes)
 
 Flat-shaded low-poly primitives on purpose, but assembled into characters:

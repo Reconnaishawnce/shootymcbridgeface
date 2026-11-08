@@ -17,7 +17,7 @@ extends Node3D
 ## chef, none), weapon (standard, wood, candy, ice, neon, gold), back
 ## (pack, cape_red, cape_blue, wings, jetpack, balloon, shell, none), crew.
 
-const BODY := Color(0.22, 0.45, 0.85)
+const BODY := Palette.SOLDIER
 const SHOTGUN_BODY := Color(0.95, 0.52, 0.16)
 const MEDIC_BODY := Color(0.92, 0.92, 0.9)
 const CROSS := Color(0.9, 0.15, 0.15)

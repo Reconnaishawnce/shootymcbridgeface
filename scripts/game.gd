@@ -275,11 +275,11 @@ func _build_scene() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.18, 0.28, 0.48)
-	sky_mat.sky_horizon_color = Color(0.72, 0.62, 0.58)
-	sky_mat.sky_curve = 0.18
-	sky_mat.ground_bottom_color = Color(0.12, 0.11, 0.1)
-	sky_mat.ground_horizon_color = Color(0.5, 0.42, 0.36)
+	sky_mat.sky_top_color = Palette.SKY_TOP
+	sky_mat.sky_horizon_color = Palette.SKY_HORIZON
+	sky_mat.sky_curve = 0.16
+	sky_mat.ground_bottom_color = Palette.GROUND_BOTTOM
+	sky_mat.ground_horizon_color = Palette.GROUND_HORIZON
 	sky_mat.sun_angle_max = 20.0
 	sky_mat.sun_curve = 0.12
 	var sky := Sky.new()
@@ -293,17 +293,17 @@ func _build_scene() -> void:
 	e.tonemap_exposure = 1.05
 	e.tonemap_white = 6.0
 	e.glow_enabled = true
-	e.glow_intensity = 0.45
+	e.glow_intensity = 0.55
 	e.glow_bloom = 0.04
 	e.glow_hdr_threshold = 1.0
 	e.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	e.adjustment_enabled = true
-	e.adjustment_contrast = 1.05
-	e.adjustment_saturation = 1.08
+	e.adjustment_contrast = 1.08
+	e.adjustment_saturation = 1.2
 	# Fog only takes the far distance, in the sky's own haze colour.
 	e.fog_enabled = true
-	e.fog_light_color = Color(0.66, 0.6, 0.6)
-	e.fog_density = 0.0055
+	e.fog_light_color = Palette.FOG
+	e.fog_density = 0.005
 	e.fog_sky_affect = 0.15
 	env.environment = e
 	_env = e
@@ -311,8 +311,8 @@ func _build_scene() -> void:
 
 	_sun = DirectionalLight3D.new()
 	_sun.rotation_degrees = Vector3(-52.0, 34.0, 0.0)
-	_sun.light_color = Color(1.0, 0.92, 0.8)
-	_sun.light_energy = 1.35
+	_sun.light_color = Palette.SUN
+	_sun.light_energy = 1.5
 	_sun.shadow_enabled = SaveData.load_shadows_on() and not smoke
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	_sun.directional_shadow_max_distance = 70.0
@@ -322,8 +322,8 @@ func _build_scene() -> void:
 	add_child(_sun)
 	var fill := DirectionalLight3D.new()
 	fill.rotation_degrees = Vector3(-30.0, -140.0, 0.0)
-	fill.light_color = Color(0.55, 0.65, 0.9)
-	fill.light_energy = 0.35
+	fill.light_color = Palette.FILL
+	fill.light_energy = 0.45
 	add_child(fill)
 
 	# The camera rides a rig: the rig sways with the steering and leans
@@ -2798,6 +2798,28 @@ func _shots_walkthrough() -> void:
 		await _capture("q12_lb_board.png", 5)
 		_lb_close()
 		await _capture("q14_lb_closed.png", 5)
+		# A crowd of every kind and a gate pair, for the palette.
+		var crowd := Node3D.new()
+		world.add_child(crowd)
+		var kx := -2.6
+		for k in Zombie.Kind.values():
+			for j in range(2):
+				var zb := Zombie.new()
+				zb.setup(10.0, 0.0, k)
+				zb.position = Vector3(kx + float(j) * 0.9 - 0.4, 0.0, -7.0 - float(j) * 2.2 - float(k) * 0.6)
+				crowd.add_child(zb)
+			kx += 1.3
+		var pair := Gate.new()
+		pair.setup([GateMath.mul(2.0), GateMath.add(-6)])
+		pair.position = Vector3(0.0, 0.0, -17.0)
+		crowd.add_child(pair)
+		pair.reveal_all()
+		squad.set_count(12)
+		squad.set_spread(1.1)
+		hud.show_running()
+		await _capture("q16_crowd.png", 8)
+		crowd.queue_free()
+		show_title()
 		open_shop()
 		await _capture("q15_shop.png", 8)
 		_quit_with(0)

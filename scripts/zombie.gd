@@ -9,13 +9,13 @@ extends Node3D
 
 enum Kind { NORMAL, BRUTE, THIEF, TANK, RUNNER, LATCHER }
 
-const SKIN := Color(0.45, 0.65, 0.35)
-const SKIN_PALE := Color(0.62, 0.72, 0.45)
-const BRUTE_SKIN := Color(0.46, 0.34, 0.3)
-const THIEF_SKIN := Color(0.85, 0.75, 0.3)
-const TANK_SKIN := Color(0.35, 0.4, 0.45)
-const RUNNER_SKIN := Color(0.75, 0.45, 0.35)
-const LATCHER_SKIN := Color(0.7, 0.3, 0.6)
+const SKIN := Palette.ZOMBIE
+const SKIN_PALE := Palette.ZOMBIE_PALE
+const BRUTE_SKIN := Palette.BRUTE
+const THIEF_SKIN := Palette.THIEF
+const TANK_SKIN := Palette.TANK
+const RUNNER_SKIN := Palette.RUNNER
+const LATCHER_SKIN := Palette.LATCHER
 const SHIRTS := [
 	Color(0.5, 0.2, 0.2), Color(0.35, 0.35, 0.4), Color(0.4, 0.3, 0.2),
 	Color(0.35, 0.2, 0.4), Color(0.2, 0.35, 0.3), Color(0.55, 0.45, 0.2),
@@ -52,6 +52,7 @@ var latch_timer := 0.0
 
 var _body: Node3D
 var _bar: MeshInstance3D
+var _bar_bg: MeshInstance3D
 var _cling_ring: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _arms: Array[Node3D] = []
@@ -256,9 +257,11 @@ func _build() -> void:
 				claw.rotation_degrees.x = 90.0
 				_body.add_child(claw)
 
-	var bar_bg := Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
-	bar_bg.position.y = 1.6
-	_body.add_child(bar_bg)
+	# The health bar only shows once something has been taken off: a
+	# black bar over every healthy head was the heaviest thing on screen.
+	_bar_bg = Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
+	_bar_bg.position.y = 1.6
+	_body.add_child(_bar_bg)
 	_bar = Mats.box(Vector3(0.8, 0.08, 0.12), BAR_FG, true)
 	_bar.position.y = 1.6
 	_body.add_child(_bar)
@@ -291,6 +294,8 @@ func die() -> void:
 	if _cling_ring != null:
 		_cling_ring.visible = false
 	_bar.visible = false
+	if _bar_bg != null:
+		_bar_bg.visible = false
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(_body, "rotation:x", -1.45, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -316,6 +321,8 @@ func _refresh_bar() -> void:
 	_bar.scale.x = maxf(ratio, 0.001)
 	_bar.position.x = -(1.0 - ratio) * 0.4
 	_bar.visible = ratio < 0.999
+	if _bar_bg != null:
+		_bar_bg.visible = _bar.visible
 
 
 func _process(delta: float) -> void:

@@ -297,11 +297,9 @@ shipped and measured on its own.
    are capped, saws and the pit lane joined the warm-up, and the bot
    reports the busiest the scene got. The perf fixes themselves wait
    for the first reports: what the S23 Ultra sends decides them.
-3. Look, part one: colour. A palette pass toward the saturated,
-   high-contrast reference (deep blue bridge, hot red crowds, gold
-   turrets, purple multipliers): a graded sky and fog, sun and fill
-   tuned for punch, ink outlines thicker and darker, gate panels as lit
-   signs, coins and bounty gold that glows.
+3. Look, part one: colour (0.44, done). `Palette` with contrast tests,
+   the bridge over water (girders, walkways, a far shore, a water
+   shader), the red crowd, lit panels, a deeper sky, thicker ink.
 4. Look, part two: bodies. Chunkier soldiers and zombies (bigger heads,
    helmets, visible rifles, fatter silhouettes), a two-frame run cycle,
    squash-and-stretch on hits, bigger muzzle flashes and tracer trails,

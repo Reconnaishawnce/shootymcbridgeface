@@ -3,6 +3,27 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.44 (colour: the bridge, the water, the red crowd)
+
+- The world is a bridge over water. Girders under the deck, a concrete
+  walkway outside each curb where the wrecks now stand, moving water
+  below with foam on the crests, and a far shore the skyline and the
+  dead trees stand on. The pit lane stands on a pier.
+- The palette, in one place (`Palette`) with tests that hold the
+  contrasts: a saturated blue deck, cream curbs, yellow lines, a hot
+  red zombie family (brutes darker, runners orange, thieves yellow,
+  tanks steel, latchers purple), brighter blue soldiers, panels that
+  glow like lit signs, a deeper sky over a peach horizon, a stronger
+  sun, a bluer fill, more saturation in the grade, and a thicker,
+  darker ink line round everything.
+- Fixed: gate panels showed as grey slabs with a coloured strip. Since
+  0.34 the panel's dark frame had reached past its face toward the
+  camera and hidden the colour, so BLUE and RED were only the strip.
+  The frame sits behind the face now, and the face is unshaded, so a
+  panel is a solid lit sign in its colour whatever the sky does.
+- Zombie health bars only appear once a zombie has taken damage; a
+  black bar over every healthy head was the heaviest thing on screen.
+
 ## 0.43 (reports that send themselves)
 
 - Crash, freeze and slow-start reports go to the game's server on

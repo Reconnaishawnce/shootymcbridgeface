@@ -42,13 +42,13 @@ static func flat(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 ## The ink line round characters and things: an inverted hull drawn as a
 ## second pass, front faces culled, pushed out along the normal. Cheap,
 ## and it works on the Compatibility renderer.
-static func outline(width: float = 0.028) -> ShaderMaterial:
+static func outline(width: float = Palette.INK_WIDTH) -> ShaderMaterial:
 	var cache := _cache()
 	var key := "outline|%.3f" % width
 	if cache.has(key):
 		return cache[key]
 	var sh := Shader.new()
-	sh.code = "shader_type spatial; render_mode cull_front, unshaded, depth_draw_opaque; uniform float width = 0.028; uniform vec4 ink : source_color = vec4(0.06, 0.05, 0.08, 1.0); void vertex() { VERTEX += NORMAL * width; } void fragment() { ALBEDO = ink.rgb; }"
+	sh.code = "shader_type spatial; render_mode cull_front, unshaded, depth_draw_opaque; uniform float width = 0.028; uniform vec4 ink : source_color = vec4(0.03, 0.03, 0.07, 1.0); void vertex() { VERTEX += NORMAL * width; } void fragment() { ALBEDO = ink.rgb; }"
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	m.set_shader_parameter("width", width)
@@ -58,7 +58,7 @@ static func outline(width: float = 0.028) -> ShaderMaterial:
 
 ## A soft material with the ink line: characters and things that should
 ## read as drawn.
-static func inked(color: Color, width: float = 0.028) -> StandardMaterial3D:
+static func inked(color: Color, width: float = Palette.INK_WIDTH) -> StandardMaterial3D:
 	var cache := _cache()
 	var key := "inked|%s|%.3f" % [color.to_html(true), width]
 	if cache.has(key):
@@ -70,7 +70,7 @@ static func inked(color: Color, width: float = 0.028) -> StandardMaterial3D:
 
 
 ## A flat material with the ink line, for things built from boxes.
-static func inked_flat(color: Color, width: float = 0.028) -> StandardMaterial3D:
+static func inked_flat(color: Color, width: float = Palette.INK_WIDTH) -> StandardMaterial3D:
 	var cache := _cache()
 	var key := "inkedflat|%s|%.3f" % [color.to_html(true), width]
 	if cache.has(key):
@@ -82,7 +82,7 @@ static func inked_flat(color: Color, width: float = 0.028) -> StandardMaterial3D
 
 
 ## Give an existing mesh the ink line, whatever its material.
-static func ink(mi: MeshInstance3D, width: float = 0.028) -> MeshInstance3D:
+static func ink(mi: MeshInstance3D, width: float = Palette.INK_WIDTH) -> MeshInstance3D:
 	var base := mi.material_override
 	if base is StandardMaterial3D:
 		var key := "ink|%s|%.3f" % [base.get_instance_id(), width]
@@ -93,6 +93,23 @@ static func ink(mi: MeshInstance3D, width: float = 0.028) -> MeshInstance3D:
 			cache[key] = dup
 		mi.material_override = cache[key]
 	return mi
+
+
+## Water: two moving bands of blue with a little foam on the crests, no
+## textures, unshaded so it costs nothing and looks the same everywhere.
+static func water() -> ShaderMaterial:
+	var cache := _cache()
+	if cache.has("water"):
+		return cache["water"]
+	var sh := Shader.new()
+	sh.code = "shader_type spatial; render_mode unshaded, cull_back; uniform vec4 deep : source_color; uniform vec4 light : source_color; uniform vec4 foam : source_color; varying vec3 wpos; void vertex() { wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; } void fragment() { float w1 = sin(wpos.x * 0.35 + wpos.z * 0.6 + TIME * 0.9); float w2 = sin(wpos.x * 0.9 - wpos.z * 0.4 + TIME * 1.4); float t = 0.5 + 0.25 * w1 + 0.25 * w2; vec3 c = mix(deep.rgb, light.rgb, t); float crest = smoothstep(0.86, 0.98, t); ALBEDO = mix(c, foam.rgb, crest * 0.6); }"
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("deep", Palette.WATER_DEEP)
+	m.set_shader_parameter("light", Palette.WATER_LIGHT)
+	m.set_shader_parameter("foam", Palette.FOAM)
+	cache["water"] = m
+	return m
 
 
 ## Something that gives off light: bullets, the boss core, neon, lamps.

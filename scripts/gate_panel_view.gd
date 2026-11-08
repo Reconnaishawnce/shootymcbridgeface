@@ -6,19 +6,19 @@ const WIDTH := 3.1
 const HEIGHT := 2.0
 const CENTER_X := 1.62
 
-const GOOD := Color(0.2, 0.52, 1.0, 0.82)
-const BAD := Color(0.92, 0.22, 0.22, 0.82)
-const HIDDEN := Color(0.5, 0.5, 0.56, 0.85)
+const GOOD := Palette.GOOD
+const BAD := Palette.BAD
+const HIDDEN := Palette.HIDDEN
 const CHOSEN := Color(1.0, 0.95, 0.5, 1.0)
-const POWER := Color(0.6, 0.35, 0.9, 0.85)
+const POWER := Palette.POWER
 ## Sum panels: neither blue nor red. You have to work it out.
-const THINK := Color(0.15, 0.7, 0.68, 0.85)
+const THINK := Palette.THINK
 ## Trades and bets: amber. A deal, not a number.
-const DEAL := Color(0.95, 0.6, 0.15, 0.85)
+const DEAL := Palette.DEAL
 ## Convoy panels: olive steel. Soldiers in, a vehicle out.
-const CONVOY := Color(0.5, 0.56, 0.38, 0.9)
+const CONVOY := Palette.CONVOY
 ## Supply: gold, the colour of the bounty it spends.
-const SUPPLY := Color(0.98, 0.78, 0.2, 0.9)
+const SUPPLY := Palette.SUPPLY
 
 var _mesh: MeshInstance3D
 var _strip: MeshInstance3D
@@ -36,8 +36,10 @@ func _init(p_width: float = WIDTH) -> void:
 	width = p_width
 	# A dark bevelled frame behind a glossy coloured face, and a thin
 	# glowing strip along the top so the row of panels reads from far off.
-	var frame := Mats.box(Vector3(width + 0.16, HEIGHT + 0.16, 0.2), Color(0.09, 0.09, 0.12))
-	frame.position.z = 0.04
+	var frame := Mats.box(Vector3(width + 0.16, HEIGHT + 0.16, 0.2), Palette.PANEL_FRAME)
+	# Behind the face: the camera looks at the +z side, and a frame that
+	# reached past the face hid its colour.
+	frame.position.z = -0.1
 	Mats.ink(frame, 0.02)
 	add_child(frame)
 	_mesh = MeshInstance3D.new()
@@ -46,10 +48,11 @@ func _init(p_width: float = WIDTH) -> void:
 	_mesh.mesh = bm
 	_mat = StandardMaterial3D.new()
 	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_mat.roughness = 0.35
-	_mat.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+	# A lit sign: the face shows its own colour whatever the sky does (a
+	# glossy face reflected the sky and read grey), and glows a little.
+	_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_mat.emission_enabled = true
-	_mat.emission_energy_multiplier = 0.25
+	_mat.emission_energy_multiplier = 0.35
 	_mesh.material_override = _mat
 	add_child(_mesh)
 	_strip = Mats.box(Vector3(width + 0.16, 0.08, 0.22), Color.WHITE)
@@ -92,7 +95,7 @@ func refresh(panel: GateMath.GatePanel) -> void:
 	if not _hot:
 		_mat.albedo_color = color
 	_mat.emission = Color(color.r, color.g, color.b)
-	_strip.material_override = Mats.glow(Color(color.r, color.g, color.b).lightened(0.3), 1.8)
+	_strip.material_override = Mats.glow(Color(color.r, color.g, color.b).lightened(0.3), 2.4)
 
 
 ## Little bounce when a shot steps the value up.

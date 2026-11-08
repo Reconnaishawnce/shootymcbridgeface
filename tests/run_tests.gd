@@ -31,6 +31,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_tips.gd",
 	"res://tests/test_leaderboard.gd",
 	"res://tests/test_telemetry.gd",
+	"res://tests/test_palette.gd",
 	"res://tests/test_combo.gd",
 	"res://tests/test_powerups.gd",
 	"res://tests/test_progression.gd",

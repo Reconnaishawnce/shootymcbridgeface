@@ -51,6 +51,10 @@ func setup(p_road_half: float) -> void:
 	position = Vector3(0.0, 0.0, 0.0)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var cx := road_edge + WIDTH * 0.5 + 0.1
+	# The pier the whole pit stands on, out over the water.
+	var pier := Mats.gbox(Vector3(WIDTH + 8.6, 0.6, LENGTH + RAMP_LENGTH * 2.0 + 2.0), Palette.PIER, 0.4, 0.3, 4)
+	pier.position = Vector3(road_edge + (WIDTH + 8.6) * 0.5 - 0.3, -0.33, 0.0)
+	add_child(pier)
 	# The lane: tarmac over the curb's line and out to the far side, a
 	# dashed gold line where it leaves the road, a rumble edge beyond.
 	var apron := Mats.gbox(Vector3(WIDTH + 0.4, 0.06, LENGTH), APRON, 0.25, 0.18, 1)

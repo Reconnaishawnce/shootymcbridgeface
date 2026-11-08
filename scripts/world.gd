@@ -101,10 +101,16 @@ const BOSS_CHEW_Z := -2.4
 const BOSS_WALK_SPEED := 2.2
 const CLEAR_SECONDS := 2.2
 
-const ROAD := Color(0.19, 0.2, 0.23)
-const CURB := Color(0.6, 0.58, 0.52)
-const DASH := Color(0.8, 0.78, 0.6)
-const POST := Color(0.35, 0.3, 0.26)
+const ROAD := Palette.ROAD
+const CURB := Palette.CURB
+const DASH := Palette.DASH
+const POST := Palette.POST
+## The walkway outside each curb, where the wrecks stand; water beyond.
+const WALK_WIDTH := 2.6
+## The far shore starts this far out; the skyline stands on it.
+const SHORE_X := 20.0
+var _sides: Array[MeshInstance3D] = []
+var _walks: Array[MeshInstance3D] = []
 
 var gates: Array[Gate] = []
 var perk_gates: Array[PerkGate] = []
@@ -237,6 +243,10 @@ func _apply_road_width(h: float) -> void:
 	for i in range(_posts.size()):
 		var side := -1.0 if i % 2 == 0 else 1.0
 		_posts[i].position.x = side * (h + 0.65)
+	for g in _sides:
+		g.position.x = float(g.get_meta("side", 1.0)) * (h + 1.0)
+	for w in _walks:
+		w.position.x = float(w.get_meta("side", 1.0)) * (h + 1.0 + WALK_WIDTH * 0.5)
 
 
 func _clear_bet() -> void:
@@ -1658,10 +1668,9 @@ func _build_horde() -> void:
 	add_child(_horde)
 
 
-const GROUND := Color(0.27, 0.25, 0.2)
-const BUILDING := Color(0.16, 0.17, 0.21)
-const WINDOW := Color(1.0, 0.75, 0.4)
-const WRECK_COLORS := [Color(0.45, 0.2, 0.18), Color(0.25, 0.3, 0.38), Color(0.5, 0.45, 0.3), Color(0.2, 0.22, 0.2)]
+const BUILDING := Palette.BUILDING
+const WINDOW := Palette.WINDOW
+const WRECK_COLORS := Palette.WRECKS
 var _scenery: Array[Node3D] = []
 const SCENERY_SPAN := 240.0
 
@@ -1671,10 +1680,29 @@ func _build_dressing() -> void:
 	_road = Mats.gbox(Vector3(7.2, 0.2, 260.0), ROAD, 1.1, 0.18, 1)
 	_road.position = Vector3(0.0, -0.1, -100.0)
 	add_child(_road)
-	# Dirt either side of the road, out to the horizon.
-	var ground := Mats.gbox(Vector3(140.0, 0.2, 300.0), GROUND, 0.18, 0.4, 2)
-	ground.position = Vector3(0.0, -0.22, -110.0)
-	add_child(ground)
+	# A bridge: girders under the deck's edges, a concrete walkway outside
+	# each curb, water below, and a far shore the skyline stands on.
+	for side in [-1.0, 1.0]:
+		var girder := Mats.gbox(Vector3(0.6, 1.1, 260.0), Palette.DECK_SIDE, 0.6, 0.2, 2)
+		girder.position = Vector3(side * (road_half + 1.0), -0.6, -100.0)
+		girder.set_meta("side", side)
+		add_child(girder)
+		_sides.append(girder)
+		var walk := Mats.gbox(Vector3(WALK_WIDTH, 0.3, 260.0), Palette.WALK, 0.5, 0.25, 3)
+		walk.position = Vector3(side * (road_half + 1.0 + WALK_WIDTH * 0.5), -0.15, -100.0)
+		walk.set_meta("side", side)
+		add_child(walk)
+		_walks.append(walk)
+		var shore := Mats.gbox(Vector3(60.0, 0.8, 320.0), Palette.SHORE, 0.12, 0.35, 6)
+		shore.position = Vector3(side * (SHORE_X + 30.0), -1.0, -110.0)
+		add_child(shore)
+	var water := MeshInstance3D.new()
+	var wm := BoxMesh.new()
+	wm.size = Vector3(160.0, 0.2, 320.0)
+	water.mesh = wm
+	water.material_override = Mats.water()
+	water.position = Vector3(0.0, -1.5, -110.0)
+	add_child(water)
 	# Curbs in ten-metre segments that scroll and wrap, so a lay-by can
 	# open a gap in one as it goes by.
 	for side in [-1.0, 1.0]:
@@ -1725,7 +1753,7 @@ func _build_scenery() -> void:
 			var h := rng.randf_range(6.0, 22.0)
 			var w := rng.randf_range(5.0, 11.0)
 			var b := Mats.gbox(Vector3(w, h, rng.randf_range(6.0, 12.0)), BUILDING.lightened(rng.randf() * 0.08), 0.08, 0.2, 4)
-			b.position = Vector3(side * rng.randf_range(24.0, 48.0), h * 0.5 - 0.2, 10.0 - float(i) * (SCENERY_SPAN / 14.0) - rng.randf_range(0.0, 6.0))
+			b.position = Vector3(side * rng.randf_range(24.0, 48.0), h * 0.5 - 0.6, 10.0 - float(i) * (SCENERY_SPAN / 14.0) - rng.randf_range(0.0, 6.0))
 			add_child(b)
 			_scenery.append(b)
 			for k in range(rng.randi_range(1, 4)):
@@ -1733,15 +1761,19 @@ func _build_scenery() -> void:
 				win.material_override = Mats.glow(WINDOW.lerp(Color(0.6, 0.9, 1.0), rng.randf()), 1.4)
 				win.position = Vector3(-side * (w * 0.5 + 0.02) + 0.0, rng.randf_range(1.0, h - 1.0) - h * 0.5, rng.randf_range(-2.0, 2.0))
 				b.add_child(win)
-		# Shoulders: wrecked cars, rubble, dead trees.
+		# The walkway: wrecked cars and rubble. The shore: dead trees.
 		for i in range(10):
 			var z := 6.0 - float(i) * (SCENERY_SPAN / 10.0) - rng.randf_range(0.0, 10.0)
-			var x: float = float(side) * rng.randf_range(road_half + 2.5, road_half + 9.0)
 			var kind := rng.randi_range(0, 2)
+			var x: float = float(side) * (road_half + 1.0 + WALK_WIDTH * 0.5 + rng.randf_range(-0.25, 0.25))
+			var y := 0.0
+			if kind == 2:
+				x = float(side) * rng.randf_range(SHORE_X + 1.5, SHORE_X + 9.0)
+				y = -0.6
 			var piece := Node3D.new()
-			piece.position = Vector3(x, 0.0, z)
+			piece.position = Vector3(x, y, z)
 			piece.set_meta("side", side)
-			piece.rotation.y = rng.randf_range(-0.6, 0.6)
+			piece.rotation.y = rng.randf_range(-0.25, 0.25) if kind == 0 else rng.randf_range(-0.6, 0.6)
 			match kind:
 				0:
 					var body := Mats.gbox(Vector3(1.9, 0.8, 4.0), WRECK_COLORS[rng.randi_range(0, WRECK_COLORS.size() - 1)], 0.6, 0.3, 5)
@@ -1775,7 +1807,7 @@ func _build_scenery() -> void:
 			_scenery.append(piece)
 	# Cracks and patches on the asphalt.
 	for i in range(18):
-		var crack := Mats.box(Vector3(rng.randf_range(0.12, 0.3), 0.015, rng.randf_range(1.0, 3.5)), ROAD.darkened(0.45))
+		var crack := Mats.box(Vector3(rng.randf_range(0.12, 0.3), 0.015, rng.randf_range(1.0, 3.5)), Palette.ROAD_CRACK)
 		crack.position = Vector3(rng.randf_range(-7.5, 7.5), 0.012, 4.0 - float(i) * (SCENERY_SPAN / 18.0))
 		crack.rotation.y = rng.randf_range(-0.5, 0.5)
 		add_child(crack)

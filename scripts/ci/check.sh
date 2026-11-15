@@ -30,6 +30,7 @@ fail_on_script_errors "smoke play"
 grep -q "SMOKE_RESULT" "$LOG" || { echo "::error::smoke run produced no result line"; exit 1; }
 grep "SMOKE_LB" "$LOG" | grep -q '"closed":true' && grep "SMOKE_LB" "$LOG" | grep -q '"opened":true' || { echo "::error::the leaderboard page did not open and close over the home screen"; exit 1; }
 grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"fits":true' && grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"signed":true' || { echo "::error::the crash report did not build, fit and sign"; exit 1; }
+grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"traced":true' || { echo "::error::the report carries no performance trace with game gauges"; exit 1; }
 
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"volley"' || { echo "::error::the rifle squad never fired its volley"; exit 1; }
 

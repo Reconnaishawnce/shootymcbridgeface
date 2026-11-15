@@ -86,6 +86,10 @@ var reports_on := true
 var _tele_id := ""
 var _tele_sent := 0
 var _tele_freezes_run := 0
+## Shake to report: the detector, and whether the card paused the run.
+var _shaker := Shake.new()
+var _problem_paused := false
+var _fps_shown := false
 var _tele_crash_sent := false
 const HANDS_OFF_SECONDS := 4.0
 var _level_peak := 1
@@ -278,6 +282,8 @@ func _ready() -> void:
 	reports_on = SaveData.load_reports_on()
 	hud.set_reports(reports_on)
 	haptics_on = SaveData.load_haptics_on()
+	_fps_shown = SaveData.load_show_fps()
+	hud.set_show_fps(_fps_shown)
 	hud.set_haptics(haptics_on)
 	_tele_id = SaveData.load_telemetry_id()
 	if _tele_id == "":
@@ -517,6 +523,12 @@ func _build_scene() -> void:
 		Diag.note("safe_graphics", {"on": on})
 		sfx.play("click"))
 	hud.report_pressed.connect(_send_report)
+	hud.problem_sent.connect(_send_problem)
+	hud.problem_closed.connect(_close_problem)
+	hud.show_fps_toggled.connect(func(on: bool) -> void:
+		_fps_shown = on
+		SaveData.save_show_fps(on)
+		sfx.play("click"))
 	hud.pit_buy.connect(_pit_buy)
 	hud.pit_leave.connect(_pit_leave)
 	hud.retry_level_pressed.connect(_retry_level)
@@ -777,6 +789,10 @@ func _watch_fps() -> void:
 	var avg := Perf.average_fps(_fps_frames, seconds)
 	if avg < 40.0:
 		Diag.note("fps_low", {"avg": snappedf(avg, 0.1), "state": State.keys()[state]})
+	# A slow stretch in a run is a report on its own: the trace in it
+	# shows what was on screen while the frame rate sank.
+	if avg < Telemetry.SLOW_FPS and state == State.RUNNING and _run_time > Perf.SETTLE_SECONDS:
+		_telemetry("slow", "%.1f fps over %d s at level %d with %d zombies" % [avg, int(seconds), world.level, world.zombies.size()])
 	if Perf.should_degrade(avg, seconds, SaveData.load_safe_graphics(), SaveData.load_auto_safe_done()):
 		SaveData.save_safe_graphics(true)
 		SaveData.save_auto_safe_done(true)
@@ -839,7 +855,7 @@ func _telemetry(kind: String, note: String = "", done: Callable = Callable()) ->
 	if not Telemetry.allowed(reports_on, Leaderboard.configured(), kind, _tele_sent, _tele_freezes_run):
 		return false
 	_tele_sent += 1
-	if kind == "freeze":
+	if kind == "freeze" or kind == "slow":
 		_tele_freezes_run += 1
 	var p := Diag.bundle(_save_summary(), kind, note)
 	p.install = _tele_id
@@ -902,6 +918,48 @@ func _tele_report_crash() -> void:
 		return
 	SaveData.save_crash_reported(marker)
 	_tele_crash_sent = _telemetry("crash", "")
+
+
+## Shake to report. The accelerometer reads gravity plus motion; several
+## hard jolts in under a second open the problem card (the run pauses).
+## F9 does the same on a desktop.
+func _feed_shake() -> void:
+	if smoke or _shots_dir != "" or _warming or hud.problem_card_open():
+		return
+	var a := Input.get_accelerometer()
+	if not Shake.has_sensor(a):
+		return
+	if _shaker.feed(a, Time.get_ticks_msec() * 0.001):
+		open_problem_card(true)
+
+
+func open_problem_card(shaken: bool) -> void:
+	if hud.problem_card_open():
+		return
+	Diag.note("problem_card", {"shaken": shaken, "state": State.keys()[state]})
+	_problem_paused = false
+	if state == State.RUNNING and not get_tree().paused:
+		pause_game()
+		_problem_paused = true
+	_buzz("gate_good")
+	sfx.play("click")
+	hud.show_problem_card(shaken)
+
+
+func _close_problem() -> void:
+	if _problem_paused:
+		_problem_paused = false
+		resume_game()
+
+
+## A problem report: a manual report (always allowed) with the player's
+## pick and the performance trace. Mail is the fallback, as for the
+## settings button.
+func _send_problem(what: String, note: String) -> void:
+	var text := "[%s] %s" % [what, note.strip_edges()]
+	Diag.note("problem_sent", {"what": what})
+	_send_report(text.strip_edges())
+	_close_problem()
 
 
 func _on_long_frame(seconds: float, crumb: String) -> void:
@@ -1598,6 +1656,16 @@ func _process(delta: float) -> void:
 	_keyboard_steer(delta)
 	_apply_shake(delta)
 	_watch_fps()
+	_feed_shake()
+	if _frames % 15 == 0:
+		if _fps_shown:
+			hud.set_fps(Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
+		if state == State.RUNNING:
+			Diag.set_gauge("zombies", world.zombies.size())
+			Diag.set_gauge("squad", squad.count)
+			Diag.set_gauge("level", world.level)
+			Diag.set_gauge("fx", Fx.live_peak)
+			Diag.set_gauge("scale", snappedf(Engine.time_scale, 0.01))
 	if smoke:
 		_smoke_tick()
 
@@ -1811,6 +1879,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				resume_game()
 			else:
 				pause_game()
+		elif event.keycode == KEY_F9:
+			open_problem_card(true)
 		elif event.keycode == KEY_F:
 			cycle_formation()
 		elif event.keycode == KEY_B:
@@ -2899,7 +2969,9 @@ func _smoke_tick() -> void:
 		var bundle := Diag.bundle(_save_summary(), "crash", "smoke")
 		bundle.install = "0123456789abcdef"
 		var tele_text := Telemetry.text(bundle)
-		print("SMOKE_TELEMETRY ", JSON.stringify({"bytes": tele_text.length(), "kind": bundle.kind, "signed": Telemetry.body(tele_text, "x").sig.length() == 64, "fits": tele_text.length() <= Telemetry.MAX_BYTES}))
+		var tele_parsed: Dictionary = JSON.parse_string(tele_text)
+		var tele_trace: Array = tele_parsed.get("trace", [])
+		print("SMOKE_TELEMETRY ", JSON.stringify({"bytes": tele_text.length(), "kind": bundle.kind, "signed": Telemetry.body(tele_text, "x").sig.length() == 64, "fits": tele_text.length() <= Telemetry.MAX_BYTES, "trace": tele_trace.size(), "traced": tele_trace.size() > 0 and tele_trace[-1].has("zombies") and tele_trace[-1].has("proc")}))
 		print("SMOKE_RESULT ", JSON.stringify(summary))
 		var ok := gates_passed >= 3 and total_distance > 100.0
 		_quit_with(0 if ok else 1)
@@ -3135,6 +3207,15 @@ func _shots_walkthrough() -> void:
 		hud.set_bombs(2)
 		hud.set_ability("VOLLEY", 0.65, true)
 		await _capture("q16_crowd.png", 8)
+		hud.set_show_fps(true)
+		hud.set_fps(58.0, 14.2, 4120)
+		hud.show_paused(true)
+		await _capture("q17_pause.png", 8)
+		hud.show_problem_card(true)
+		await _capture("q18_problem.png", 8)
+		hud.hide_problem_card()
+		hud.show_paused(false)
+		hud.set_show_fps(false)
 		crowd.queue_free()
 		show_title()
 		open_shop()

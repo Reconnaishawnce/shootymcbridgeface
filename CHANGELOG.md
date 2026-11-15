@@ -3,6 +3,29 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.53 (shake to report)
+
+- Shake the phone hard (four jolts inside a second) and a card asks
+  what happened: IT FROZE, IT GOT SLOW, IT GLITCHED, SOMETHING ELSE,
+  with an optional line. Any button sends a report and the run pauses
+  while the card is up. REPORT A PROBLEM in the pause menu opens the
+  same card for phones without a usable accelerometer; F9 on a desktop.
+- Every report now carries a performance trace: one sample every half
+  second for the last forty seconds with the average frame time, the
+  script and physics time of the frame, node count, draw calls,
+  primitives, video memory, the game state, and the game's own gauges
+  (zombies on screen, squad size, level, live effects, time scale). A
+  slowdown report shows what was on screen while the frame rate sank.
+  Under the size limit the trace is trimmed first, oldest samples out.
+- Slowdowns report on their own: a five-second average under 30 fps
+  during a run sends a "slow" report (one per run, like freezes), and a
+  single frame of one second (was two) counts as a freeze.
+- SHOW FPS in SETTINGS puts fps, frame milliseconds and the node count
+  in the top corner.
+- A clinging zombie in the middle slot, or the focus laser aimed at the
+  squad's own feet, no longer logs a `look_at` engine error every frame
+  (found by the soak in weekly mode).
+
 ## 0.52 (the stability build)
 
 - Six reports from one Galaxy S23 Ultra all died two to five seconds

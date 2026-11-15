@@ -37,6 +37,10 @@ signal characters_toggled(on: bool)
 signal shadows_toggled(on: bool)
 signal safe_graphics_toggled(on: bool)
 signal report_pressed(note: String)
+## The problem card: what happened (froze / slow / glitch / other) and a line.
+signal problem_sent(what: String, note: String)
+signal problem_closed
+signal show_fps_toggled(on: bool)
 signal crash_dismissed
 signal lesson_closed
 signal learn_pressed
@@ -93,6 +97,11 @@ var _over_template := ""
 var _over_count_tween: Tween
 var _over_tick_at := 0.0
 var _crash_body: Label
+var _problem_card: Control
+var _problem_note: LineEdit
+var _problem_head: Label
+var _settings_fps: Button
+var _fps_label: Label
 var _boss_fill: ColorRect
 var _boss_label: Label
 
@@ -549,6 +558,7 @@ func _init() -> void:
 	_build_over(root)
 	_build_pause(root)
 	_build_crash(root)
+	_build_problem(root)
 	_build_lesson(root)
 	# Last, so it sits over everything while the game warms up.
 	_loading = Control.new()
@@ -699,6 +709,58 @@ func _build_crash(root: Control) -> void:
 	var no := _button("NOT NOW", 28)
 	no.pressed.connect(func() -> void: crash_dismissed.emit())
 	box.add_child(no)
+
+
+## Shake the phone (or REPORT A PROBLEM in the pause menu) and this asks
+## what went wrong. Every button sends; the report carries the last half
+## minute of frame times, scene counts and game gauges.
+func _build_problem(root: Control) -> void:
+	_problem_card = _card(root)
+	_problem_card.visible = false
+	_cards.append(_problem_card)
+	var box: VBoxContainer = _problem_card.get_meta("box")
+	_problem_head = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	_problem_head.text = "SOMETHING WRONG?"
+	box.add_child(_problem_head)
+	var body := _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.custom_minimum_size.x = 520.0
+	body.text = "Pick what happened. The report carries the last half minute of frame times and what was on screen, never your name."
+	body.modulate = Color(0.9, 0.9, 0.95)
+	box.add_child(body)
+	_problem_note = LineEdit.new()
+	_problem_note.placeholder_text = "A word about it (optional)..."
+	_problem_note.max_length = 300
+	_problem_note.custom_minimum_size = Vector2(520.0, 56.0)
+	_problem_note.add_theme_font_size_override("font_size", 22)
+	box.add_child(_problem_note)
+	for pair in [["IT FROZE", "froze"], ["IT GOT SLOW", "slow"], ["IT GLITCHED", "glitch"], ["SOMETHING ELSE", "other"]]:
+		var b := _button(pair[0], 30)
+		var what: String = pair[1]
+		b.pressed.connect(func() -> void:
+			problem_sent.emit(what, _problem_note.text)
+			_problem_note.text = ""
+			_problem_card.visible = false)
+		box.add_child(b)
+	var no := _button("NEVER MIND", 26)
+	no.pressed.connect(func() -> void:
+		_problem_card.visible = false
+		problem_closed.emit())
+	box.add_child(no)
+
+
+func show_problem_card(shaken: bool) -> void:
+	_problem_head.text = "FELT A SHAKE. SOMETHING WRONG?" if shaken else "SOMETHING WRONG?"
+	_problem_card.move_to_front()
+	_problem_card.visible = true
+
+
+func problem_card_open() -> bool:
+	return _problem_card.visible
+
+
+func hide_problem_card() -> void:
+	_problem_card.visible = false
 
 
 func show_crash_card(sent: bool = false) -> void:
@@ -1292,8 +1354,14 @@ func _build_settings(root: Control) -> void:
 		set_reports(on)
 		reports_toggled.emit(on))
 	box.add_child(_settings_reports)
+	_settings_fps = _button("SHOW FPS: OFF", 29)
+	_settings_fps.pressed.connect(func() -> void:
+		var on := not _settings_fps.text.ends_with("ON")
+		set_show_fps(on)
+		show_fps_toggled.emit(on))
+	box.add_child(_settings_fps)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Haptics: the phone buzzes with the game.  Send reports: crashes and freezes reach the developer on their own; never your name."
+	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Haptics: the phone buzzes with the game.  Send reports: crashes, freezes and slowdowns reach the developer on their own; never your name.  Shake the phone after a slowdown to send one yourself."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb.custom_minimum_size.x = 520.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
@@ -1502,6 +1570,18 @@ func _build_daily(root: Control) -> void:
 	var back := _button("BACK", 34)
 	back.pressed.connect(func() -> void: shop_closed.emit())
 	box.add_child(back)
+	_fps_label = _label(18, HORIZONTAL_ALIGNMENT_RIGHT)
+	_fps_label.anchor_left = 0.5
+	_fps_label.anchor_right = 1.0
+	_fps_label.anchor_top = 0.0
+	_fps_label.anchor_bottom = 0.0
+	_fps_label.offset_right = -10.0
+	_fps_label.offset_top = 4.0
+	_fps_label.offset_bottom = 28.0
+	_fps_label.modulate = Color(0.8, 1.0, 0.8, 0.85)
+	_fps_label.visible = false
+	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_fps_label)
 	_toast = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
 	_toast.anchor_left = 0.0
 	_toast.anchor_right = 1.0
@@ -1602,6 +1682,9 @@ func _build_pause(root: Control) -> void:
 	var help := _button("HOW TO PLAY", 34)
 	help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(help)
+	var problem := _button("REPORT A PROBLEM", 30)
+	problem.pressed.connect(func() -> void: show_problem_card(false))
+	box.add_child(problem)
 	var quit := _button("QUIT TO TITLE", 34)
 	quit.pressed.connect(func() -> void: quit_pressed.emit())
 	box.add_child(quit)
@@ -1938,6 +2021,18 @@ func show_settings() -> void:
 
 func set_safe_graphics(on: bool) -> void:
 	_settings_safe.text = "SAFE GRAPHICS: %s" % ("ON" if on else "OFF")
+
+
+func set_show_fps(on: bool) -> void:
+	_settings_fps.text = "SHOW FPS: %s" % ("ON" if on else "OFF")
+	_fps_label.visible = on
+
+
+## The frame counter: fps and the frame's cost in milliseconds, with the
+## scene's node count, so a tester can read a slowdown off the screen.
+func set_fps(fps: float, ms: float, nodes: int) -> void:
+	if _fps_label.visible:
+		_fps_label.text = "%d fps  %.0f ms  %d n" % [int(fps), ms, nodes]
 
 
 ## The locker: one tab of items. Owned items say so, the equipped one is

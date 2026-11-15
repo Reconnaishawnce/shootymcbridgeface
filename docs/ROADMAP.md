@@ -297,6 +297,9 @@ shipped and measured on its own.
    are capped, saws and the pit lane joined the warm-up, and the bot
    reports the busiest the scene got. The perf fixes themselves wait
    for the first reports: what the S23 Ultra sends decides them.
+   Follow-ups: 0.51 vibrate permission, 0.52 no threads and a 60 fps
+   cap, 0.53 shake to report with a performance trace in every report
+   and automatic slowdown reports.
 3. Look, part one: colour (0.44, done). `Palette` with contrast tests,
    the bridge over water (girders, walkways, a far shore, a water
    shader), the red crowd, lit panels, a deeper sky, thicker ink.

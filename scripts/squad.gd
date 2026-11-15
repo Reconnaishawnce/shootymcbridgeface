@@ -636,7 +636,8 @@ func _process(delta: float) -> void:
 		var to := focus_point + Vector3(0.0, 0.3, 0.0)
 		_laser.global_position = (from + to) * 0.5
 		_laser.scale = Vector3(1.0, 1.0, from.distance_to(to))
-		_laser.look_at(to, Vector3.UP)
+		if _laser.global_position.distance_squared_to(to) > 0.0001:
+			_laser.look_at(to, Vector3.UP)
 	if delta > 0.0:
 		velocity_x = lerpf(velocity_x, (position.x - _prev_x) / delta, 0.3)
 	_prev_x = position.x

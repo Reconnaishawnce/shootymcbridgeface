@@ -1169,7 +1169,12 @@ func _tick_latched(delta: float, z: Zombie, p_squad: Squad) -> void:
 	var target := p_squad.position + slot
 	z.position.x = lerpf(z.position.x, target.x, 1.0 - exp(-12.0 * delta))
 	z.position.z = lerpf(z.position.z, target.z, 1.0 - exp(-12.0 * delta))
-	z.look_at(p_squad.position + Vector3(0.0, 0.0, z.position.z - p_squad.position.z), Vector3.UP)
+	# Face the squad across the road. A clinger in the middle slot sits
+	# exactly on the squad's line, where look_at has no direction; it
+	# keeps its last facing then.
+	var face := p_squad.position + Vector3(0.0, 0.0, z.position.z - p_squad.position.z)
+	if face.distance_squared_to(z.position) > 0.0001:
+		z.look_at(face, Vector3.UP)
 	z.latch_timer -= delta
 	if z.latch_timer <= 0.0:
 		z.latch_timer = Difficulty.LATCH_INTERVAL

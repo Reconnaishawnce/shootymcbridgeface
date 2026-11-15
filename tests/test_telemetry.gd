@@ -30,10 +30,24 @@ func test_signature_and_rules() -> void:
 	check(Telemetry.allowed(false, true, "manual", 99, 99), "the player's own report always goes")
 	check(not Telemetry.allowed(false, true, "crash", 0, 0), "the toggle stops automatic ones")
 	check(Telemetry.allowed(true, true, "freeze", 0, 0) and not Telemetry.allowed(true, true, "freeze", 0, 1), "one freeze a run")
+	check(Telemetry.allowed(true, true, "slow", 0, 0) and not Telemetry.allowed(true, true, "slow", 0, 1), "one slowdown a run")
 	check(not Telemetry.allowed(true, true, "crash", Telemetry.PER_SESSION, 0), "a session cap")
 	check_eq(Telemetry.crash_marker({}), "", "no previous session, no marker")
 	check_eq(Telemetry.crash_marker({"version": "0.43.1", "last": 1700000000}), "0.43.1@1700000000", "the marker names the session")
 	check(Telemetry.summary({"kind": "crash", "version": "1", "device": "P", "state": "running", "crumb": "end_run"}).contains("running/end_run"), "summary line")
+
+
+func test_trace() -> void:
+	var tr := []
+	for i in range(Telemetry.TRACE_KEPT + 20):
+		tr = Telemetry.push_trace(tr, Telemetry.trace_sample(float(i) * 0.5, 16.7, 8.0, 1.0, {"nodes": 1000 + i}, {"zombies": i}, "running"))
+	check_eq(tr.size(), Telemetry.TRACE_KEPT, "the trace is a ring")
+	check_eq(int(tr[-1].zombies), Telemetry.TRACE_KEPT + 19, "newest last")
+	check(tr[0].has("proc") and tr[0].has("ms") and tr[0].has("nodes"), "a sample splits the frame and counts the scene")
+	var p := Telemetry.payload({"kind": "slow", "trace": tr})
+	var small := Telemetry.text(p, 1500)
+	var parsed: Dictionary = JSON.parse_string(small)
+	check(small.to_utf8_buffer().size() <= 1500 and (parsed.trace as Array).size() < tr.size(), "a tight limit cuts the trace from the front")
 
 
 func test_frame_buckets() -> void:

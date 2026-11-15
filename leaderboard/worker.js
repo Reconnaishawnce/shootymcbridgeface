@@ -226,14 +226,34 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// The performance trace as a table: one row per half second, the slow
+// frames (over 33 ms) marked, so a slowdown reads top to bottom.
+export function traceHtml(trace) {
+  if (!Array.isArray(trace) || trace.length === 0) return "";
+  const keys = [];
+  for (const row of trace) for (const k of Object.keys(row)) if (!keys.includes(k)) keys.push(k);
+  const head = keys.map((k) => `<th>${esc(k)}</th>`).join("");
+  const body = trace.map((row) => {
+    const slow = Number(row.ms) > 33;
+    return `<tr${slow ? ' class="slow"' : ""}>${keys.map((k) => `<td>${esc(row[k] === undefined ? "" : row[k])}</td>`).join("")}</tr>`;
+  }).join("");
+  return `<p>Trace (${trace.length} samples, oldest first; red rows are frames over 33 ms)</p><table><tr>${head}</tr>${body}</table>`;
+}
+
 function reportsHtml(rows) {
   const items = rows.map((r) => {
     const when = new Date(r.t * 1000).toISOString().replace("T", " ").slice(0, 16);
     let pretty = r.text;
-    try { pretty = JSON.stringify(JSON.parse(r.text), null, 2); } catch (e) { /* keep raw */ }
-    return `<details><summary><b>${esc(r.kind)}</b> &middot; v${esc(r.version)} &middot; ${esc(r.device)} &middot; ${esc(r.state)}/${esc(r.crumb)} &middot; ${when}${r.note ? " &middot; <i>" + esc(r.note) + "</i>" : ""}</summary><pre>${esc(pretty)}</pre></details>`;
+    let trace = "";
+    try {
+      const parsed = JSON.parse(r.text);
+      trace = traceHtml(parsed.trace);
+      delete parsed.trace;
+      pretty = JSON.stringify(parsed, null, 2);
+    } catch (e) { /* keep raw */ }
+    return `<details><summary><b>${esc(r.kind)}</b> &middot; v${esc(r.version)} &middot; ${esc(r.device)} &middot; ${esc(r.state)}/${esc(r.crumb)} &middot; ${when}${r.note ? " &middot; <i>" + esc(r.note) + "</i>" : ""}</summary>${trace}<pre>${esc(pretty)}</pre></details>`;
   });
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty reports</title><style>body{font:15px/1.4 system-ui;margin:12px;background:#111;color:#eee}summary{cursor:pointer;padding:6px 0}pre{white-space:pre-wrap;word-break:break-word;background:#1b1b22;padding:10px;border-radius:8px;font-size:12px}details{border-bottom:1px solid #333}</style><h2>Reports (${rows.length}, newest first)</h2>${items.join("") || "<p>None yet.</p>"}`;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty reports</title><style>body{font:15px/1.4 system-ui;margin:12px;background:#111;color:#eee}summary{cursor:pointer;padding:6px 0}pre{white-space:pre-wrap;word-break:break-word;background:#1b1b22;padding:10px;border-radius:8px;font-size:12px}details{border-bottom:1px solid #333}table{border-collapse:collapse;font-size:11px;margin:6px 0}td,th{padding:1px 6px;text-align:right;border-bottom:1px solid #222}tr.slow td{background:#4a1a1a}</style><h2>Reports (${rows.length}, newest first)</h2>${items.join("") || "<p>None yet.</p>"}`;
 }
 
 export async function reports(env, key, limit, html) {

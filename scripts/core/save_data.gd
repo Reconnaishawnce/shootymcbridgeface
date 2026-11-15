@@ -261,6 +261,15 @@ static func save_lessons_on(on: bool) -> void:
 	_write(SETTINGS, "lessons_on", on)
 
 
+## SHOW FPS: a frame counter in the corner during a run.
+static func load_show_fps() -> bool:
+	return bool(_read(SETTINGS, "show_fps", false))
+
+
+static func save_show_fps(on: bool) -> void:
+	_write(SETTINGS, "show_fps", on)
+
+
 ## HAPTICS: the phone buzzes with the game.
 static func load_haptics_on() -> bool:
 	return bool(_read(SETTINGS, "haptics_on", true))

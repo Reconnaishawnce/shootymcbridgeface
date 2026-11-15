@@ -1,5 +1,5 @@
 // Runs with plain node (18+): node leaderboard/test.mjs
-import { handle, hmacHex, canonical, dayNumber, weekNumber, cleanName, plausible } from "./worker.js";
+import { handle, hmacHex, canonical, dayNumber, weekNumber, cleanName, plausible, traceHtml } from "./worker.js";
 
 class FakeKV {
   constructor() { this.m = new Map(); }
@@ -99,6 +99,10 @@ check(page.headers.get("content-type").startsWith("text/html") && htmlText.inclu
 for (let i = 0; i < 12; i++) await post("/report", { text: payload, sig: rsig }, "8.8.8." + i);
 r = await post("/report", { text: payload, sig: rsig }, "8.8.8.99");
 check(r.status === 429, "an install is capped per day");
+
+const table = traceHtml([{ t: 1, ms: 16.7, zombies: 3 }, { t: 1.5, ms: 80.2, zombies: 90, st: "running" }]);
+check(table.includes("<th>st</th>") && table.includes('class="slow"') && table.split("<tr").length === 4, "the trace renders as a table with slow rows marked");
+check(traceHtml(undefined) === "" && traceHtml([]) === "", "no trace, no table");
 
 console.log(failures === 0 ? "\nleaderboard worker: all checks passed" : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

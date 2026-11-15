@@ -26,6 +26,13 @@ var _enabled := true
 ## the worst few frames with where the game was.
 var frame_hist: Array = [0, 0, 0, 0, 0]
 var worst_frames: Array = []
+## The performance trace (Telemetry.trace_sample every TRACE_EVERY) and
+## the game's gauges folded into each sample (set_gauge).
+var trace: Array = []
+var gauges: Dictionary = {}
+var _trace_at := 0.0
+var _trace_frames := 0
+var _trace_ms := 0.0
 ## A single frame of Telemetry.LONG_FRAME_SECONDS or more, in the
 ## foreground: a freeze the game should report.
 signal long_frame(seconds: float, crumb: String)
@@ -57,6 +64,19 @@ func _process(_delta: float) -> void:
 	if _frames > 2:
 		var ms := wall * 1000.0
 		frame_hist[Telemetry.hist_bucket(ms)] += 1
+		_trace_frames += 1
+		_trace_ms += ms
+		if now - _trace_at >= Telemetry.TRACE_EVERY:
+			var counts := {
+				"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+				"draw": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+				"prims": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+				"vram": int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0),
+			}
+			trace = Telemetry.push_trace(trace, Telemetry.trace_sample(now, _trace_ms / float(maxi(_trace_frames, 1)), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, counts, gauges, state_name))
+			_trace_at = now
+			_trace_frames = 0
+			_trace_ms = 0.0
 		if ms > 50.0:
 			worst_frames = Telemetry.note_worst(worst_frames, {"ms": snappedf(ms, 0.1), "t": snappedf(now, 0.01), "state": state_name, "crumb": crumb})
 	if Report.is_stall(wall) and _clean == false and _frames > 2:
@@ -77,6 +97,12 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_clean = false
 		_beat(true)
+
+
+## A number the game wants in every trace sample: zombies on screen,
+## bullets, the squad, the level.
+func set_gauge(key: String, value: Variant) -> void:
+	gauges[key] = value
 
 
 ## Game state changed (title, running, game over, ...).
@@ -156,6 +182,7 @@ func context(save: Dictionary, p_note: String = "") -> Dictionary:
 		"crumb": crumb,
 		"uptime": snappedf(Time.get_ticks_msec() * 0.001, 0.1),
 		"perf": perf(),
+		"trace": trace.duplicate(true),
 	}
 
 

@@ -9,11 +9,17 @@ extends RefCounted
 
 ## What a report is about.
 const KINDS := ["crash", "freeze", "slow", "manual"]
+## The performance trace: one sample every TRACE_EVERY seconds, the last
+## TRACE_KEPT of them, so a slowdown report shows the half minute before.
+const TRACE_EVERY := 0.5
+const TRACE_KEPT := 80
 ## The Worker refuses bigger bodies; events are dropped until it fits.
 const MAX_BYTES := 48000
 ## A single frame this long (wall clock) is a freeze worth a report.
-const LONG_FRAME_SECONDS := 2.0
-## Freeze reports per run, and reports of any kind per session.
+const LONG_FRAME_SECONDS := 1.0
+## A five-second average under this, in a run, is a slowdown worth one.
+const SLOW_FPS := 30.0
+## Freeze or slowdown reports per run, and reports of any kind per session.
 const PER_RUN_FREEZES := 1
 const PER_SESSION := 6
 ## Reports kept in the save when the network is not there.
@@ -28,7 +34,7 @@ const FIELDS := {
 	"memory_mb": "?", "fps": "?", "locale": "", "safe_graphics": false, "shadows": true,
 	"state": "", "crumb": "", "uptime": 0.0, "note": "",
 	"previous": {}, "stalls": [], "events": [], "previous_errors": [], "current_errors": [],
-	"save": {}, "perf": {},
+	"save": {}, "perf": {}, "trace": [],
 }
 
 
@@ -60,7 +66,10 @@ static func text(p: Dictionary, limit: int = MAX_BYTES) -> String:
 	while s.to_utf8_buffer().size() > limit and step < 12:
 		step += 1
 		var ev: Array = q.get("events", [])
-		if ev.size() > 8:
+		var tr: Array = q.get("trace", [])
+		if tr.size() > 10:
+			q.trace = tr.slice(tr.size() / 2)
+		elif ev.size() > 8:
 			q.events = ev.slice(ev.size() / 2)
 		elif not (q.get("previous_errors", []) as Array).is_empty() or not (q.get("current_errors", []) as Array).is_empty():
 			q.previous_errors = []
@@ -72,6 +81,7 @@ static func text(p: Dictionary, limit: int = MAX_BYTES) -> String:
 			q.previous = {}
 			q.save = {}
 			q.perf = {}
+			q.trace = []
 		s = JSON.stringify(q)
 	return s
 
@@ -91,16 +101,37 @@ static func url(base: String) -> String:
 
 ## Whether a report of [param kind] may go now. Manual reports always
 ## may (the player asked); the rest respect the toggle and the caps.
-static func allowed(on: bool, configured: bool, kind: String, sent_this_session: int, freezes_this_run: int) -> bool:
+## [param hitches_this_run] counts freeze and slowdown reports together.
+static func allowed(on: bool, configured: bool, kind: String, sent_this_session: int, hitches_this_run: int) -> bool:
 	if not configured:
 		return false
 	if kind == "manual":
 		return true
 	if not on or sent_this_session >= PER_SESSION:
 		return false
-	if kind == "freeze" and freezes_this_run >= PER_RUN_FREEZES:
+	if (kind == "freeze" or kind == "slow") and hitches_this_run >= PER_RUN_FREEZES:
 		return false
 	return true
+
+
+## One trace sample: the frame's cost split into script and render, the
+## scene's size, and the game's own gauges.
+static func trace_sample(t: float, frame_ms: float, process_ms: float, physics_ms: float, counts: Dictionary, gauges: Dictionary, state: String) -> Dictionary:
+	var row := {"t": snappedf(t, 0.1), "ms": snappedf(frame_ms, 0.1), "proc": snappedf(process_ms, 0.1), "phys": snappedf(physics_ms, 0.1), "st": state}
+	for k in counts:
+		row[k] = counts[k]
+	for k in gauges:
+		row[k] = gauges[k]
+	return row
+
+
+## Keeps the trace a ring of TRACE_KEPT.
+static func push_trace(trace: Array, row: Dictionary) -> Array:
+	var out := trace.duplicate()
+	out.append(row)
+	if out.size() > TRACE_KEPT:
+		out = out.slice(out.size() - TRACE_KEPT)
+	return out
 
 
 ## One previous session is reported once: its heartbeat's last time is

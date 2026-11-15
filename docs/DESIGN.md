@@ -325,8 +325,38 @@ and no canonical form has to agree between GDScript and JavaScript.
 Triggers: `Game._tele_report_crash` on the first title after a session
 that died in the foreground (once per previous session, by
 `crash_marker`); `Diag.long_frame` for a frame of `LONG_FRAME_SECONDS`
-in a run (`PER_RUN_FREEZES`); the fps watchdog switching safe graphics
-on; and the SETTINGS button, which uploads first and mails second.
+(one second) in a run; `Game._watch_fps` for a five-second average
+under `Telemetry.SLOW_FPS` in a run (freezes and slowdowns share the
+`PER_RUN_FREEZES` cap); the fps watchdog switching safe graphics on;
+the SETTINGS button; and the problem card, which uploads first and
+mails second.
+
+### Shake to report (0.53)
+
+The first weeks of phone testing produced freezes and slowdowns that
+players talked about and no report described: a two-second frame is
+rarer than a slow stretch, a freeze that kills the process leaves only
+the crash report, and nobody opens SETTINGS after a bad run. So the
+report is a gesture. `Shake` (pure) is fed `Input.get_accelerometer`
+every frame: a reading more than `JOLT` m/s² away from gravity is a
+jolt (debounced by `JOLT_GAP` so one swing is one jolt), `JOLTS` of
+them inside `WINDOW` is a shake, then `COOLDOWN`. A shake pauses the
+run and opens the problem card: IT FROZE, IT GOT SLOW, IT GLITCHED,
+SOMETHING ELSE, each a button that sends a manual report whose note
+starts with the pick in brackets. REPORT A PROBLEM in the pause menu
+and F9 on a desktop open the same card; the run resumes when it goes.
+
+What makes those reports useful is the trace. `Diag` keeps a ring of
+`Telemetry.TRACE_KEPT` samples taken every `TRACE_EVERY` seconds: the
+average wall-clock frame time since the last sample, the engine's
+process and physics time for the frame, node count, draw calls,
+primitives, video memory, the state, and whatever the game put in
+`Diag.set_gauge` (zombies alive, squad size, level, live effects, time
+scale). `Game._process` refreshes the gauges four times a second. The
+trace goes into every report as `trace`; `Telemetry.text` halves it
+(oldest first) before touching events, so a slowdown report shows the
+forty seconds before the shake even on a tight limit. The admin page
+shows it as rows. SHOW FPS in SETTINGS is the same reading on screen.
 `Telemetry.allowed` applies the SEND REPORTS toggle and the per-session
 cap; the player's own report always goes. A failed send that was not a
 rejection waits in the save (`PENDING_MAX`) and goes on the next title.

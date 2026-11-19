@@ -194,6 +194,8 @@ func _ready() -> void:
 		Engine.max_fps = 60
 	var args := OS.get_cmdline_user_args()
 	smoke = args.has("--smoke")
+	if smoke:
+		Diag.trace_every_frames = 30
 	_smoke_endless = args.has("--endless")
 	_smoke_daily = args.has("--daily")
 	_smoke_weekly = args.has("--weekly")

@@ -32,6 +32,9 @@ var trace: Array = []
 var gauges: Dictionary = {}
 var _trace_at := 0.0
 var _trace_frames := 0
+## The bot samples by frame instead of wall time: a fast runner plays
+## 900 fixed frames in a second, which is one wall-clock sample.
+var trace_every_frames := 0
 var _trace_ms := 0.0
 ## A single frame of Telemetry.LONG_FRAME_SECONDS or more, in the
 ## foreground: a freeze the game should report.
@@ -66,7 +69,8 @@ func _process(_delta: float) -> void:
 		frame_hist[Telemetry.hist_bucket(ms)] += 1
 		_trace_frames += 1
 		_trace_ms += ms
-		if now - _trace_at >= Telemetry.TRACE_EVERY:
+		var due := (_trace_frames >= trace_every_frames) if trace_every_frames > 0 else (now - _trace_at >= Telemetry.TRACE_EVERY)
+		if due:
 			var counts := {
 				"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 				"draw": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),

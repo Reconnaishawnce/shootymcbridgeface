@@ -15,6 +15,12 @@ signal buy_pressed(id: String)
 signal boost_pressed(id: String)
 ## A build card was picked from the draft.
 signal card_picked(id: String)
+## Chests: the card was asked for, the closed chest was tapped, the
+## reveal was tapped through, the card was left.
+signal chests_opened
+signal chest_tapped
+signal chest_next
+signal chest_closed
 signal squad_toggled
 signal mode_pressed
 signal menu_pressed
@@ -83,6 +89,8 @@ const FLOAT_START_Y := -20.0
 var _level: Label
 var _count: Label
 var _subline: Label
+## Who is next above you, and how far (Rivals.chip).
+var _rival: Label
 var _bounty_row: HBoxContainer
 var _bounty_label: Label
 var _bounty_tween: Tween
@@ -102,6 +110,18 @@ var _over_tick_at := 0.0
 var _crash_body: Label
 var _problem_card: Control
 var _draft_card: Control
+var _chest_card: Control
+var _chest_icon: ShopIcon
+var _chest_title: Label
+var _chest_label: Label
+var _chest_main: Label
+var _chest_bonus: Label
+var _chest_go: Button
+var _chest_state := ""
+var _chest_tier := "wood"
+var _chest_left := 0
+var _chest_home: Button
+var _over_chests: Button
 var _draft_rows: VBoxContainer
 var _problem_note: LineEdit
 var _problem_head: Label
@@ -372,6 +392,9 @@ func _init() -> void:
 	_bounty_label.pivot_offset = Vector2(0.0, 16.0)
 	_subline = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(root, _subline, 0.2, 0.8, 92.0)
+	_rival = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_rival.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
+	_place(root, _rival, 0.1, 0.9, 126.0)
 
 	_pause_button = _button("II", 34)
 	_pause_button.anchor_left = 1.0
@@ -391,7 +414,7 @@ func _init() -> void:
 	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_boss_box.visible = false
 	root.add_child(_boss_box)
-	for c in [_level, _count, _bounty_row, _subline, _pause_button, _boss_box]:
+	for c in [_level, _count, _bounty_row, _subline, _rival, _pause_button, _boss_box]:
 		_track_top(c)
 	var boss_bg := ColorRect.new()
 	boss_bg.color = BOSS_BAR_BG
@@ -573,6 +596,7 @@ func _init() -> void:
 	_build_problem(root)
 	_build_lesson(root)
 	_build_draft(root)
+	_build_chest(root)
 	# Last, so it sits over everything while the game warms up.
 	_loading = Control.new()
 	_loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -617,6 +641,115 @@ func _build_lesson(root: Control) -> void:
 	skip.text = "Lessons can be turned off in SETTINGS, and replayed with LEARN."
 	skip.modulate = Color(0.75, 0.75, 0.8)
 	box.add_child(skip)
+
+
+const CHEST_TINTS := {"wood": Color(0.95, 0.7, 0.45), "silver": Color(0.8, 0.88, 1.0), "gold": Color(1.0, 0.85, 0.3)}
+
+
+## The chest card: a chest, a tap, a rattle, and what was inside.
+func _build_chest(root: Control) -> void:
+	_chest_card = _card(root)
+	_chest_card.visible = false
+	_cards.append(_chest_card)
+	# Every tap on the screen is the chest's while the card is up.
+	var catch := Button.new()
+	catch.flat = true
+	catch.focus_mode = Control.FOCUS_NONE
+	catch.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		catch.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	catch.pressed.connect(_chest_tap)
+	_chest_card.add_child(catch)
+	_chest_card.move_child(catch, 1)
+	var panel: PanelContainer = _chest_card.get_meta("panel")
+	panel.add_theme_stylebox_override("panel", _flat(Color(0.05, 0.06, 0.1, 0.94), 22, Color(1.0, 0.85, 0.3, 0.5), 3))
+	var box: VBoxContainer = _chest_card.get_meta("box")
+	box.add_theme_constant_override("separation", 8)
+	_chest_title = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(_chest_title)
+	_chest_label = _label(21, HORIZONTAL_ALIGNMENT_CENTER)
+	_chest_label.modulate = Color(0.85, 0.85, 0.9)
+	box.add_child(_chest_label)
+	_chest_icon = ShopIcon.new()
+	_chest_icon.setup("chest:wood", Vector2(520.0, 300.0))
+	_chest_icon.pivot_offset = Vector2(260.0, 150.0)
+	box.add_child(_chest_icon)
+	_chest_main = _label(42, HORIZONTAL_ALIGNMENT_CENTER)
+	_chest_main.add_theme_color_override("font_color", COIN)
+	_chest_main.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_chest_main.custom_minimum_size = Vector2(520.0, 56.0)
+	box.add_child(_chest_main)
+	_chest_bonus = _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	_chest_bonus.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_chest_bonus.custom_minimum_size = Vector2(520.0, 36.0)
+	box.add_child(_chest_bonus)
+	_chest_go = _button("TAP TO OPEN", 36)
+	_chest_go.pressed.connect(_chest_tap)
+	box.add_child(_chest_go)
+	var later := _button("LATER", 24)
+	later.pressed.connect(func() -> void: chest_closed.emit())
+	box.add_child(later)
+
+
+## A closed chest. [param v]: {tier, title, label, waiting}.
+func show_chest(v: Dictionary) -> void:
+	_hide_cards()
+	_chest_tier = str(v.get("tier", "wood"))
+	_chest_left = int(v.get("waiting", 1))
+	_chest_state = "closed"
+	_chest_title.text = str(v.get("title", "CHEST"))
+	_chest_title.add_theme_color_override("font_color", CHEST_TINTS.get(_chest_tier, COIN))
+	_chest_label.set_meta("from", str(v.get("label", "")))
+	_chest_label.text = str(v.get("label", "")) + ("   ·   %d waiting" % _chest_left if _chest_left > 1 else "")
+	_chest_icon.kind = "chest:" + _chest_tier
+	_chest_icon.shake = 0.0
+	_chest_icon.scale = Vector2.ONE
+	_chest_main.text = ""
+	_chest_bonus.text = ""
+	_chest_go.text = "TAP TO OPEN"
+	_chest_card.move_to_front()
+	_chest_card.visible = true
+
+
+## One tap opens (after a rattle); the next tap moves on.
+func _chest_tap() -> void:
+	match _chest_state:
+		"closed":
+			_chest_state = "rattle"
+			_chest_go.text = "..."
+			var tw := create_tween()
+			tw.tween_property(_chest_icon, "shake", 1.0, 0.45)
+			tw.tween_callback(func() -> void: chest_tapped.emit())
+		"open":
+			chest_next.emit()
+
+
+## What was inside. [param shown]: {main, bonus, jackpot}; [param left]
+## chests still waiting.
+func reveal_chest(shown: Dictionary, left: int) -> void:
+	_chest_state = "open"
+	_chest_left = left
+	_chest_icon.shake = 0.0
+	_chest_label.text = str(_chest_label.get_meta("from", ""))
+	_chest_icon.kind = "chestopen:" + _chest_tier
+	_chest_icon.scale = Vector2(1.25, 1.25)
+	var tw := create_tween()
+	tw.tween_property(_chest_icon, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_chest_main.text = str(shown.get("main", ""))
+	var jackpot := bool(shown.get("jackpot", false))
+	_chest_bonus.text = str(shown.get("bonus", ""))
+	_chest_bonus.add_theme_color_override("font_color", Color(1.0, 0.5, 0.9) if jackpot else GAIN)
+	_chest_bonus.add_theme_font_size_override("font_size", 34 if jackpot else 26)
+	_chest_go.text = "NEXT CHEST  (%d)" % left if left > 0 else "DONE"
+	flash(0.5 if jackpot else 0.2)
+
+
+func hide_chest() -> void:
+	_chest_card.visible = false
+
+
+func chest_open() -> bool:
+	return _chest_card.visible
 
 
 const RARITY_COLORS := {"common": Color(0.6, 0.8, 1.0), "rare": Color(0.78, 0.5, 1.0), "epic": Color(1.0, 0.82, 0.25)}
@@ -999,6 +1132,14 @@ func _build_title(root: Control) -> void:
 	_stars_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	wallet.add_child(_stars_row)
 	_stars_title = _stars_row.get_meta("label")
+
+	# Top right: chests waiting to be opened, when there are any.
+	_chest_home = _chip("CHESTS", 24)
+	_chest_home.add_theme_color_override("font_color", COIN)
+	_chest_home.pressed.connect(func() -> void: chests_opened.emit())
+	_pin(t, _chest_home, 1.0, 0.0, Vector2(190.0, 54.0), Vector2(1.0, 0.0), Vector2(-22.0, 24.0))
+	_track_top(_chest_home)
+	_chest_home.visible = false
 
 	# The bottom bar, under the thumb: SHOP, LOCKER, MORE.
 	var bar := HBoxContainer.new()
@@ -1796,6 +1937,10 @@ func _build_over(root: Control) -> void:
 	_over_retry = _button("RETRY THIS LEVEL  ·  once a run", 28)
 	_over_retry.pressed.connect(func() -> void: retry_level_pressed.emit())
 	box.add_child(_over_retry)
+	_over_chests = _button("OPEN CHESTS", 32)
+	_over_chests.add_theme_color_override("font_color", COIN)
+	_over_chests.pressed.connect(func() -> void: chests_opened.emit())
+	box.add_child(_over_chests)
 	_over_prompt = _label(40, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(_over_prompt)
 	_over_lb = _button("LEADERBOARD", 28)
@@ -1854,6 +1999,12 @@ func update_stats(count: int, level: int, distance: float, score: int) -> void:
 	_count.text = "%d" % count
 	_level.text = "LV %d" % level
 	_subline.text = "%d m   ·   %d" % [int(distance), score]
+
+
+## The rival line under the score: "SAM  4210   ·   350 to go", or "".
+func set_rival(text: String) -> void:
+	if _rival.text != text:
+		_rival.text = text
 
 
 func set_sound(on: bool) -> void:
@@ -2087,6 +2238,9 @@ func show_title(t: Dictionary) -> void:
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS", "sniper": "SNIPERS"}.get(squad_type, "RIFLES")
 	_coins_title.text = str(coins)
 	_stars_title.text = "%d   ·   %s" % [stars, hero_name] if hero_name != "" else str(stars)
+	var waiting := int(t.get("chests", 0))
+	_chest_home.visible = waiting > 0
+	_chest_home.text = "%d %s" % [waiting, "CHEST" if waiting == 1 else "CHESTS"]
 	# A difficulty or squad tap redraws the home screen: the card it was
 	# tapped on comes back up.
 	if _modes_stay:
@@ -2371,7 +2525,7 @@ func show_game_over(r: Dictionary) -> void:
 	var extras := unlocked.size() + quests.size() + rewards.size() + road.size()
 	if extras <= 4:
 		for rw in road:
-			coins_line += "\nROAD %d: %s" % [int(rw.at), Road.reward_text(rw)]
+			coins_line += "\nROAD %d: %s" % [int(rw.at), Road.reward_text(rw) if str(rw.kind) == "unlock" else "a ROAD CHEST"]
 		for id in unlocked:
 			var a := Achievements.find(str(id))
 			if not a.is_empty():
@@ -2379,10 +2533,7 @@ func show_game_over(r: Dictionary) -> void:
 		for q in quests:
 			coins_line += "\nQUEST DONE: %s  +%d pts" % [q.title, int(q.points)]
 		for rw in rewards:
-			var text := Season.reward_text(rw)
-			if bool(rw.get("owned", false)):
-				text = "%s, owned: +%d stars" % [Wardrobe.title(str(rw.id)), maxi(1, Wardrobe.cost(str(rw.id)))]
-			coins_line += "\nSEASON TIER %d: %s" % [int(rw.tier), text]
+			coins_line += "\nSEASON TIER %d: a GOLD CHEST" % int(rw.tier)
 	else:
 		var bits := []
 		if unlocked.size() > 0:
@@ -2402,6 +2553,8 @@ func show_game_over(r: Dictionary) -> void:
 		head += "\n" + str(r.get("near_miss", ""))
 	if str(r.get("build", "")) != "":
 		where += "\nBUILD  " + str(r.get("build", ""))
+	if str(r.get("rivals", "")) != "":
+		head += "\n" + str(r.get("rivals", ""))
 	_over_template = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	if _over_count_tween != null:
 		_over_count_tween.kill()
@@ -2426,6 +2579,9 @@ func show_game_over(r: Dictionary) -> void:
 	var retry_level := int(r.get("retry_level", 0))
 	_over_retry.visible = retry_level > 0
 	_over_lb.visible = bool(r.get("leaderboard", false))
+	var waiting := int(r.get("chests", 0))
+	_over_chests.visible = waiting > 0
+	_over_chests.text = "OPEN %d %s" % [waiting, "CHEST" if waiting == 1 else "CHESTS"]
 	_over_retry.text = "RETRY LEVEL %d  ·  once a run" % retry_level
 	_over_prompt.text = "TAP TO START OVER" if retry_level > 0 else "TAP TO RETRY"
 	_pulse_prompt()

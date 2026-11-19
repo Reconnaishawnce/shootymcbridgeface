@@ -67,7 +67,7 @@ static func reward(k: int) -> Dictionary:
 		return {"kind": "item", "id": ITEM_POOL[(k / 5 - 1) % ITEM_POOL.size()], "at": at}
 	if k % 2 == 0:
 		return {"kind": "stars", "amount": 2 + k / 10, "at": at}
-	return {"kind": "coins", "amount": 80 + k * 15, "at": at}
+	return {"kind": "coins", "amount": 60 + k * 8, "at": at}
 
 
 static func reward_text(r: Dictionary) -> String:

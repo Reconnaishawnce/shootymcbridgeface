@@ -349,10 +349,12 @@ changes where they pay. Five phases, each a release:
    rain, the squad's lamp at night). See DESIGN, "Level themes". Left
    for later because they need new road geometry or a new objective:
    a collapsing lane, a convoy to escort.
-4. Chests, a lower coin curve, and rivals: quest, road and season
-   rewards become chests you tap open with a rare jackpot; late-game
-   coin income comes down now that the sinks exist; the run shows the
-   leaderboard name just above you and says when you pass it.
+4. Chests, a lower coin curve, and rivals (0.58, done): quest, road
+   and season rewards are chests you tap open with a rare jackpot;
+   the bounty-to-coins curve is flatter now that the sinks exist; the
+   run shows who is next above you (your own best everywhere, the
+   board's names in the daily and weekly) and says when you pass. See
+   DESIGN, "Chests", "The lower coin curve" and "Rivals".
 5. Sound, and bosses you dodge if the prototype is fun: a track per
    mode, combo kills that climb in pitch, and telegraphed boss attacks
    with safe lanes. The boss work ships only if it plays well.

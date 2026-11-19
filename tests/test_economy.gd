@@ -3,9 +3,9 @@ extends TestCase
 
 func test_conversion_and_caps() -> void:
 	check_eq(Economy.coins_for_bounty(300), 300, "small bounty converts one to one")
-	check_eq(Economy.coins_for_bounty(500), 500, "up to the knee")
+	check_eq(Economy.coins_for_bounty(Economy.GOLD_LINEAR), Economy.GOLD_LINEAR, "up to the knee")
 	var big := Economy.coins_for_bounty(84000)
-	check(big > 4000 and big < 7000, "a monster run pays well, not without limit (%d)" % big)
+	check(big > 900 and big < 1600, "a monster run pays well, not without limit (%d)" % big)
 	check(Economy.coins_for_bounty(1000) > Economy.coins_for_bounty(900), "always worth more")
 	check_eq(Economy.coins_for_bounty(-5), 0, "never negative")
 	check_eq(Economy.cap_squad(34616), Economy.SQUAD_CAP, "the bridge holds five hundred")

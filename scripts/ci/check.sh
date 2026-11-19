@@ -57,6 +57,16 @@ fail_on_script_errors "rush smoke"
 grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a boss"; exit 1; }
 grep -q "SMOKE_CARD " "$LOG" || { echo "::error::a boss fell and no build card was drafted"; exit 1; }
 
+echo "== rivals: the run passes the names above it, lowest first"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=900 --smoke-rivals 2>&1 | tee "$LOG"
+fail_on_script_errors "rivals smoke"
+grep "SMOKE_RIVALS" "$LOG" | grep -q '"passed":\["BOT B","YOUR BEST","BOT A"\]' || { echo "::error::the rivals were not passed in order"; exit 1; }
+
+echo "== chests: a finished run turns its quest rewards into chests"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=7000 --smoke-seed=2 --smoke-retry --smoke-wipe-at=4666 2>&1 | tee "$LOG"
+fail_on_script_errors "chests smoke"
+grep "SMOKE_CHESTS" "$LOG" | grep -q '"n":[1-9]' || { echo "::error::a run that finished quests earned no chests"; exit 1; }
+
 echo "== level themes: a storm level throws lightning, a long run changes places"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1500 --smoke-level=4 --smoke-upgrades 2>&1 | tee "$LOG"
 fail_on_script_errors "storm smoke"

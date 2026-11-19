@@ -163,7 +163,13 @@ static func sections() -> Array:
 			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
 			"Every quest done also pays %d coins per point, and a day with all three done pays %d more. Play on consecutive days for a STREAK: %d%% more coins at the end of every run for each day after the first, up to %d%%; miss a day and it starts over. " % [Quests.COINS_PER_POINT, Quests.ALL_DONE_BONUS, int(Streak.BONUS_PER_DAY * 100.0), int(Streak.BONUS_CAP * 100.0)] +
 			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +
-			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play."},
+			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play. All of these arrive as CHESTS."},
+		{"title": "CHESTS", "body":
+			"Quests, the season and the trophy road pay in CHESTS. A quest done is a QUEST CHEST, a road milestone is a ROAD CHEST, and a season tier or a day with all three quests done is a GOLD CHEST. The results card and the home screen show how many are waiting: tap, the chest rattles, and it opens.\n" +
+			"Every chest holds what it was earned for, and it may hold a BONUS on top: extra coins, extra stars, or once in a long while a JACKPOT. About %d in 100 quest chests have a bonus, %d in 100 road chests and %d in 100 gold chests, and a gold chest's jackpot is %d coins and %d stars. A locker item you already own pays its price in stars instead.\n" % [int(round(Chests.bonus_chance("wood") * 100.0)), int(round(Chests.bonus_chance("silver") * 100.0)), int(round(Chests.bonus_chance("gold") * 100.0)), int(Chests.JACKPOT["gold"][0]), int(Chests.JACKPOT["gold"][1])] +
+			"What is inside is decided when you earn the chest, not when you open it, and chests wait for you as long as you like."},
+		{"title": "RIVALS", "body":
+			"Under your score the game shows who is next above you and how far there is to go. In every mode that is YOUR BEST; beat it and the run says NEW BEST the moment it happens. In the DAILY and the WEEKLY it is also the names on the leaderboard: you see the next player up, and PASSED and their name when you go by. The results card lists everyone you passed."},
 		{"title": "LEADERBOARD", "body":
 			"The LEADERBOARD is under MORE. Daily and weekly scores only, because everyone plays the same road there, under a name you pick. " +
 			"Nothing else leaves the phone: a random id, your name, the score, the level, the kills and the run time. FORGET ME wipes it all. A local build without a server shows no board."},

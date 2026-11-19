@@ -3,6 +3,29 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.58 (chests, a lower coin curve, rivals: phase 4)
+
+- CHESTS. Quest, season and trophy road rewards now arrive as chests.
+  A quest done is a QUEST CHEST, a road milestone a ROAD CHEST, a
+  season tier or a day with all three quests done a GOLD CHEST. Tap,
+  it rattles, it opens. Every chest holds what it was earned for and
+  rolls for a bonus on top: coins, stars, or rarely a JACKPOT (up to
+  1500 coins and 8 stars from a gold chest). The roll is made when the
+  chest is earned and saved with it. Chests wait on the results card
+  and the home screen until you open them.
+- A LOWER COIN CURVE. Bounty converts one for one up to 300 (was 500)
+  and at the power 0.6 beyond (was 0.75), so a 1000-bounty run pays
+  about 350 coins where it paid about 600. Small runs are untouched.
+  Trophy road coin milestones pay 60 + 8 per milestone (was 80 + 15).
+  Stated multipliers (magnet, greed, hard, streak, DOUBLE PAY) still
+  apply exactly as written.
+- RIVALS. Under the score the run shows who is next above you and how
+  far. In every mode that is YOUR BEST, and passing it says NEW BEST on
+  the spot. In the daily and weekly it is also the names on the board:
+  PASSED and the name as you go by, and the results card lists them.
+- The bot has `--smoke-rivals`; `check.sh` proves rivals are passed in
+  order and that a finished run earns chests.
+
 ## 0.57 (level themes and the look that goes with them: phase 3)
 
 - LEVEL THEMES. Every level is now a place with its own rule and its

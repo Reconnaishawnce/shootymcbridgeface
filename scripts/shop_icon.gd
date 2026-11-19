@@ -16,6 +16,8 @@ const SKIN := Color(0.95, 0.75, 0.6)
 var kind := "start"
 ## Dimmed when the thing cannot be bought.
 var lit := true
+## 0 to 1: how hard the picture rattles (a chest about to open).
+var shake := 0.0
 var _t := 0.0
 var _pop := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -48,6 +50,13 @@ func _draw() -> void:
 	s *= 1.0 + 0.22 * sin(_pop * PI)
 	c.y += sin(_t * 2.0) * s * 0.04
 	var dim := 1.0 if lit else 0.45
+	if shake > 0.0:
+		c.x += sin(_t * 46.0) * s * 0.07 * shake
+		c.y += cos(_t * 39.0) * s * 0.03 * shake
+	if kind.begins_with("chest"):
+		# "chest:silver" closed, "chestopen:silver" open.
+		_chest(c, s, dim, kind.get_slice(":", 1), kind.begins_with("chestopen"))
+		return
 	match kind:
 		"start":
 			_soldiers(c, s, dim)
@@ -255,6 +264,46 @@ func _turret(c: Vector2, s: float, dim: float) -> void:
 	for i in range(4):
 		var a := ph * TAU * 0.5 + float(i) * TAU / 4.0
 		draw_line(c + Vector2(s * 0.75, s * 0.1), c + Vector2(s * 0.75, s * 0.1) + Vector2(cos(a), sin(a)) * s * (0.2 + 0.1 * sin(_t * 9.0)), _col(GOLD, dim), s * 0.06)
+
+
+# --- chests ----------------------------------------------------------------
+
+const CHEST_COLORS := {"wood": Color(0.6, 0.38, 0.2), "silver": Color(0.72, 0.76, 0.86), "gold": Color(1.0, 0.8, 0.25)}
+
+
+func _chest(c: Vector2, s: float, dim: float, tier: String, open: bool) -> void:
+	var body: Color = CHEST_COLORS.get(tier, CHEST_COLORS["wood"])
+	var trim := GOLD if tier != "gold" else Color(1.0, 0.97, 0.75)
+	if open:
+		# Light pours out: slow rays behind, then the glow in the mouth.
+		for i in range(10):
+			var a := _t * 0.6 + float(i) * TAU / 10.0
+			var d := Vector2(cos(a), sin(a))
+			var side := Vector2(-d.y, d.x)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -s * 0.2), c + Vector2(0.0, -s * 0.2) + d * s * 1.9 + side * s * 0.2, c + Vector2(0.0, -s * 0.2) + d * s * 1.9 - side * s * 0.2]), Color(1.0, 0.9, 0.45, 0.22 * dim))
+	# The box.
+	draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.05, s * 1.9, s * 0.95), _col(body, dim))
+	draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.05, s * 1.9, s * 0.95), _col(INK, dim), false, s * 0.07)
+	for x in [-0.6, 0.6]:
+		draw_rect(Rect2(c.x + s * x - s * 0.09, c.y - s * 0.05, s * 0.18, s * 0.95), _col(trim.darkened(0.15), dim))
+	if open:
+		# The lid stands up behind; coins and sparks hop out.
+		draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.95, s * 1.9, s * 0.42), _col(body.darkened(0.25), dim))
+		draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.95, s * 1.9, s * 0.42), _col(INK, dim), false, s * 0.07)
+		draw_rect(Rect2(c.x - s * 0.85, c.y - s * 0.5, s * 1.7, s * 0.46), _col(Color(1.0, 0.92, 0.5), dim))
+		for i in range(5):
+			var ph := fmod(_t * 0.9 + float(i) * 0.2, 1.0)
+			var x := c.x + (float(i) - 2.0) * s * 0.34
+			draw_circle(Vector2(x, c.y - s * 0.35 - sin(ph * PI) * s * 0.75), s * 0.13, _col(GOLD, dim))
+	else:
+		# A rounded lid, a band, a lock.
+		draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.62, s * 1.9, s * 0.6), _col(body.lightened(0.12), dim))
+		draw_circle(Vector2(c.x - s * 0.65, c.y - s * 0.62), s * 0.3, _col(body.lightened(0.12), dim))
+		draw_circle(Vector2(c.x + s * 0.65, c.y - s * 0.62), s * 0.3, _col(body.lightened(0.12), dim))
+		draw_rect(Rect2(c.x - s * 0.65, c.y - s * 0.92, s * 1.3, s * 0.32), _col(body.lightened(0.12), dim))
+		draw_rect(Rect2(c.x - s * 0.95, c.y - s * 0.1, s * 1.9, s * 0.12), _col(trim, dim))
+		draw_rect(Rect2(c.x - s * 0.17, c.y - s * 0.2, s * 0.34, s * 0.42), _col(trim, dim))
+		draw_circle(Vector2(c.x, c.y - s * 0.02), s * 0.07, _col(INK, dim))
 
 
 # --- build cards -----------------------------------------------------------

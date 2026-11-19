@@ -216,6 +216,15 @@ static func save_revives(d: Dictionary) -> void:
 	_write(STATS, "revives", d)
 
 
+## Chests earned and not yet opened (Chests), oldest first.
+static func load_chests() -> Array:
+	return Chests.clean(_read(META, "chests", []))
+
+
+static func save_chests(list: Array) -> void:
+	_write(META, "chests", list)
+
+
 static func load_trophies() -> int:
 	return int(_read(STATS, "trophies", 0))
 

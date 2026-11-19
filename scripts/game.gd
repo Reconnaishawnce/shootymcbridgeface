@@ -124,6 +124,15 @@ var _level_peak := 1
 var run_meta := Meta.new()
 ## Per-run boosts: armed in the shop, taken by the next run.
 var boosts := Boosts.new()
+## Chests earned and not yet opened (Chests), oldest first.
+var chests: Array = []
+## Who there is to beat this run (Rivals): your own best, and in the
+## daily and weekly the names on the board.
+var rivals := Rivals.new()
+var _rival_serial := 0
+var _smoke_rivals := false
+## The chest card was opened from the results card: DONE returns there.
+var _chest_from_over := false
 var run_boosts := Boosts.new()
 var daily_day := 0
 var daily_results: Dictionary = {}
@@ -237,6 +246,7 @@ func _ready() -> void:
 	# --smoke-upgrades: play with every shop upgrade maxed, to exercise them.
 	_smoke_upgrades = args.has("--smoke-upgrades")
 	_smoke_boosts = args.has("--smoke-boosts")
+	_smoke_rivals = args.has("--smoke-rivals")
 	_smoke_idle = args.has("--smoke-idle")
 	# --smoke-retry: after a wipe, tap through the results and play again,
 	# so the game-over screen and the restart run in CI too.
@@ -288,6 +298,7 @@ func _ready() -> void:
 	meta.levels = SaveData.load_upgrades()
 	meta.enlist = SaveData.load_enlist()
 	boosts.from_dict(SaveData.load_boosts())
+	chests = SaveData.load_chests()
 	if _smoke_upgrades:
 		for id in Meta.ORDER:
 			meta.levels[id] = Meta.max_level(id)
@@ -554,6 +565,10 @@ func _build_scene() -> void:
 	hud.buy_pressed.connect(buy_upgrade)
 	hud.boost_pressed.connect(buy_boost)
 	hud.card_picked.connect(_pick_card)
+	hud.chests_opened.connect(open_chests)
+	hud.chest_tapped.connect(_open_chest)
+	hud.chest_next.connect(_next_chest)
+	hud.chest_closed.connect(_close_chests)
 	hud.squad_toggled.connect(toggle_squad)
 	hud.mode_pressed.connect(cycle_mode)
 	hud.menu_pressed.connect(show_title)
@@ -1073,7 +1088,7 @@ func show_title() -> void:
 		"modifier": modifier, "mode_hint": hint,
 		"streak_line": Streak.line(streak, Daily.day_number(int(Time.get_unix_time_from_system()))),
 		"event_line": Events.banner(int(Time.get_unix_time_from_system())),
-		"boost_line": boosts.summary(),
+		"boost_line": boosts.summary(), "chests": chests.size(),
 		"rush_best": SaveData.load_best("rush"),
 	})
 
@@ -1351,6 +1366,138 @@ func buy_upgrade(id: String) -> void:
 	hud.shop_bought(id)
 
 
+# --- rivals ----------------------------------------------------------------
+
+## Your best in the mode about to be played.
+func _own_best() -> int:
+	match mode:
+		"daily":
+			return int(daily_results.get(daily_day, {}).get("score", 0))
+		"weekly":
+			return int(weekly_results.get(week_number, {}).get("score", 0))
+		"endless":
+			return best_endless
+		"rush":
+			return SaveData.load_best("rush")
+	return best
+
+
+## Sets up who there is to beat: your own best at once, and for the
+## daily and the weekly the board's names when the answer comes back.
+func _start_rivals() -> void:
+	rivals = Rivals.new()
+	_rival_serial += 1
+	hud.set_rival("")
+	if smoke:
+		if _smoke_rivals:
+			rivals.set_best(350)
+			rivals.set_board([{"rank": 1, "name": "BOT A", "score": 600}, {"rank": 2, "name": "BOT B", "score": 200}])
+		return
+	rivals.set_best(_own_best())
+	if not Leaderboard.MODES.has(mode) or not Leaderboard.configured():
+		return
+	var serial := _rival_serial
+	var req := HTTPRequest.new()
+	req.timeout = Leaderboard.TIMEOUT
+	add_child(req)
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		# A late answer for a run that is over is dropped.
+		if serial != _rival_serial or state != State.RUNNING:
+			return
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS else null
+		if parsed is Dictionary and code == 200 and bool(parsed.get("ok", false)):
+			var you = parsed.get("you", null)
+			rivals.set_board(parsed.get("rows", []), int(you.get("rank", 0)) if you is Dictionary else 0, score)
+			Diag.note("rivals", {"mode": mode, "targets": rivals.targets.size()}))
+	if req.request(Leaderboard.board_url(LeaderboardConfig.URL, mode, _lb_period(mode), str(lb.get("id", "")))) != OK:
+		req.queue_free()
+
+
+## As the score climbs: shout each rival passed and keep the chip fresh.
+func _tick_rivals() -> void:
+	for t in rivals.advance(score):
+		var text := Rivals.shout(t)
+		if smoke:
+			print("SMOKE_RIVAL ", JSON.stringify({"name": str(t.name), "score": int(t.score), "at": score, "shout": text, "frame": _frames}))
+			continue
+		Diag.note("rival", {"name": str(t.name), "self": bool(t.get("self", false))})
+		hud.show_float(text, true)
+		sfx.play("step", -2.0, 1.5)
+		_buzz("gate_good")
+	hud.set_rival(rivals.chip(score))
+
+
+# --- chests ----------------------------------------------------------------
+
+func _chest_view(c: Dictionary) -> Dictionary:
+	return {"tier": str(c.tier), "title": Chests.title(str(c.tier)), "label": str(c.label), "waiting": chests.size()}
+
+
+## Opens the chest card on the oldest chest waiting.
+func open_chests() -> void:
+	if chests.is_empty():
+		return
+	_chest_from_over = state == State.GAME_OVER
+	sfx.play("click")
+	Diag.note("chest_card", {"waiting": chests.size()})
+	hud.show_chest(_chest_view(chests[0]))
+
+
+## The player tapped the chest: pay it out and show what was inside.
+func _open_chest() -> void:
+	if chests.is_empty():
+		return
+	var c: Dictionary = chests[0]
+	var id := str(c.base.get("id", ""))
+	var owned := id != "" and wardrobe.is_owned(id)
+	var pay := Chests.totals(c, owned, Wardrobe.cost(id))
+	chests.remove_at(0)
+	SaveData.save_chests(chests)
+	if int(pay.coins) > 0:
+		coins = SaveData.add_coins(int(pay.coins))
+	if int(pay.stars) > 0:
+		wardrobe.stars += int(pay.stars)
+		stats.stars_earned = int(stats.get("stars_earned", 0)) + int(pay.stars)
+		SaveData.save_stats(stats)
+	if str(pay.item) != "" and Wardrobe.CATALOG.has(str(pay.item)):
+		wardrobe.owned[str(pay.item)] = true
+	if int(pay.stars) > 0 or str(pay.item) != "":
+		SaveData.save_wardrobe(wardrobe.to_dict())
+	var shown := Chests.reveal(c, Wardrobe.title(id) if id != "" else "", owned, Wardrobe.cost(id))
+	Diag.note("chest", {"tier": str(c.tier), "coins": int(pay.coins), "stars": int(pay.stars), "item": str(pay.item), "jackpot": bool(shown.jackpot)})
+	hud.reveal_chest(shown, chests.size())
+	if bool(shown.jackpot):
+		sfx.play("level_clear", 0.0, 1.0)
+		_buzz("boss_down")
+	elif str(shown.bonus) != "":
+		sfx.play("rally", -2.0, 1.2)
+		_buzz("rally")
+	else:
+		sfx.play("crate", -2.0, 1.1)
+		_buzz("gate_good")
+
+
+## After a reveal: the next chest, or back to where the card came from.
+func _next_chest() -> void:
+	if not chests.is_empty():
+		sfx.play("click")
+		hud.show_chest(_chest_view(chests[0]))
+		return
+	_close_chests()
+
+
+func _close_chests() -> void:
+	hud.hide_chest()
+	sfx.play("click")
+	if _chest_from_over and state == State.GAME_OVER:
+		_last_over["chests"] = chests.size()
+		_last_over["instant"] = true
+		hud.show_game_over(_last_over)
+	else:
+		show_title()
+
+
 func buy_boost(id: String) -> void:
 	var left := boosts.buy(id, coins)
 	if left == coins:
@@ -1463,6 +1610,7 @@ func start_run(p_mode: String = "levels") -> void:
 	# The bot runs plain unless told to be someone, so its numbers hold.
 	run_hero = (_smoke_hero if Heroes.known(_smoke_hero) else "") if smoke else Heroes.active(str(wardrobe.equipped.get("hero", "")), character_mode, mode)
 	_hero_fx = {}
+	_start_rivals()
 	_themes_seen = {}
 	world.theme_strikes = 0
 	squad.hero = run_hero
@@ -1537,6 +1685,9 @@ func end_run() -> void:
 	_game_over_at = Time.get_ticks_msec()
 	_game_over_frame = _frames
 	Diag.mark("end_run:records")
+	# One last look for a pass on the final stretch, then the line goes.
+	_tick_rivals()
+	hud.set_rival("")
 	var run_bounty := Meta.coins_for_run(bounty, bosses_killed, gates_passed)
 	var today := Daily.day_number(int(Time.get_unix_time_from_system()))
 	var streak_after := Streak.advance(streak, today) if not smoke else streak
@@ -1613,30 +1764,29 @@ func end_run() -> void:
 	var qa := Quests.advance(quest_state, day, run_stats)
 	quests_done = qa.completed
 	var quest_coins := 0
+	# Quest, season and road rewards arrive as chests to tap open. The
+	# bonus inside is rolled now and kept with the chest.
+	var new_chests: Array = []
+	var chest_rng := RandomNumberGenerator.new()
+	if smoke:
+		chest_rng.seed = run_seed
+	else:
+		chest_rng.randomize()
 	if not quests_done.is_empty():
 		var sa := Season.advance(season_state, Season.number(day), Quests.points_for(quests_done))
 		season_rewards = sa.rewards
 		quest_coins = Quests.coins_for_all(quests_done) + (Quests.ALL_DONE_BONUS if Quests.all_done(qa.state) else 0)
+		for q in quests_done:
+			new_chests.append(Chests.make("wood", "QUEST: %s" % str(q.title), {"kind": "coins", "amount": Quests.coins_for(q)}, chest_rng))
+		if Quests.all_done(qa.state):
+			new_chests.append(Chests.make("gold", "ALL THREE QUESTS", {"kind": "coins", "amount": Quests.ALL_DONE_BONUS}, chest_rng))
+		for rw in season_rewards:
+			new_chests.append(Chests.make("gold", "SEASON TIER %d" % int(rw.tier), rw, chest_rng))
 		if smoke:
 			print("SMOKE_QUESTS ", JSON.stringify({"done": quests_done.size(), "rewards": season_rewards.size(), "coins": quest_coins, "frame": _frames}))
 		else:
-			coins = SaveData.add_coins(quest_coins)
 			season_state = sa.state
 			SaveData.save_season(season_state)
-			for rw in season_rewards:
-				match str(rw.kind):
-					"coins":
-						coins = SaveData.add_coins(int(rw.amount))
-					"stars":
-						stars_earned += int(rw.amount)
-					"item":
-						if wardrobe.is_owned(str(rw.id)):
-							# Already in the locker: its price in stars instead.
-							rw.owned = true
-							stars_earned += maxi(1, Wardrobe.cost(str(rw.id)))
-						else:
-							wardrobe.owned[str(rw.id)] = true
-							SaveData.save_wardrobe(wardrobe.to_dict())
 	Diag.mark("end_run:road")
 	# The road: trophies for the run, milestones passed, rewards applied.
 	var trophies_earned := Road.trophies_for_run(world.level, grades, world.modifier, world.endless)
@@ -1650,22 +1800,28 @@ func end_run() -> void:
 			trophies = int(ra.trophies)
 			SaveData.save_trophies(trophies)
 			for rw in road_rewards:
-				match str(rw.kind):
-					"coins":
-						coins = SaveData.add_coins(int(rw.amount))
-					"stars":
-						stars_earned += int(rw.amount)
-					"unlock":
-						if str(rw.id) == "snipers" and meta.level("sniper") < 1:
-							meta.levels["sniper"] = 1
-							SaveData.save_upgrades(meta.levels)
-					"item":
-						if wardrobe.is_owned(str(rw.id)):
-							rw.owned = true
-							stars_earned += maxi(1, Wardrobe.cost(str(rw.id)))
-						else:
-							wardrobe.owned[str(rw.id)] = true
-							SaveData.save_wardrobe(wardrobe.to_dict())
+				# What a milestone opens is yours at once; the rest is a chest.
+				if str(rw.kind) == "unlock" and str(rw.id) == "snipers" and meta.level("sniper") < 1:
+					meta.levels["sniper"] = 1
+					SaveData.save_upgrades(meta.levels)
+		for rw in road_rewards:
+			if str(rw.kind) != "unlock":
+				new_chests.append(Chests.make("silver", "ROAD %d" % int(rw.at), rw, chest_rng))
+	if smoke:
+		# The bot opens its chests into thin air, so the code runs.
+		var bot := {"coins": 0, "stars": 0, "items": 0, "jackpots": 0}
+		for c in new_chests:
+			var t := Chests.totals(c)
+			bot.coins += int(t.coins)
+			bot.stars += int(t.stars)
+			bot.items += 1 if str(t.item) != "" else 0
+			bot.jackpots += 1 if Chests.is_jackpot(c) else 0
+		if not new_chests.is_empty():
+			print("SMOKE_CHESTS ", JSON.stringify({"n": new_chests.size(), "pays": bot, "first": Chests.reveal(new_chests[0], "ITEM").main}))
+	elif not new_chests.is_empty():
+		chests.append_array(new_chests)
+		SaveData.save_chests(chests)
+		Diag.note("chests", {"earned": new_chests.size(), "waiting": chests.size()})
 	# Stars from the season and the road count in the lifetime numbers too.
 	run_stats.stars_earned = stars_earned
 	Diag.mark("end_run:stats")
@@ -1689,13 +1845,14 @@ func end_run() -> void:
 	_last_over = {
 		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
 		"near_miss": NearMiss.line(score, shown_best, is_best), "build": cards.summary(),
+		"chests_new": new_chests.size(), "chests": chests.size(), "rivals": rivals.summary(),
 		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned, "bounty": run_bounty,
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
 		"grades": " ".join(grades), "modifier": world.modifier, "achievements": new_achievements,
 		"goal": Goals.next(_goal_context()), "quests_done": quests_done, "season_rewards": season_rewards,
 		"trophies_earned": trophies_earned, "road_rewards": road_rewards,
-		"quest_coins": quest_coins, "streak_days": streak_days, "streak_percent": Streak.bonus_percent(streak_days),
+		"quest_coins": 0, "streak_days": streak_days, "streak_percent": Streak.bonus_percent(streak_days),
 		"trophies_total": trophies, "all_quests_done": Quests.all_done(qa.state),
 		"tip": Tips.for_wipe({
 			"level": world.level, "in_boss": world.phase == World.Phase.BOSS,
@@ -1935,6 +2092,8 @@ func _tick_run(delta: float) -> void:
 	var ws := world.advance(delta, squad)
 	total_distance += ws * delta
 	score = int((total_distance + float(bonus)) * world.mod("score"))
+	if _frames % 6 == 0:
+		_tick_rivals()
 	if world.horde_z < World.HORDE_REST_Z - 0.5 and not _horde_warned:
 		_horde_warned = true
 		hud.show_banner("THE HORDE IS COMING\nKILL IT FAST", 1.6)
@@ -2072,6 +2231,8 @@ func _on_dash() -> void:
 
 
 func _try_retry() -> void:
+	if hud.chest_open():
+		return
 	if state == State.GAME_OVER and Time.get_ticks_msec() - _game_over_at >= int(RETRY_LOCKOUT * 1000.0):
 		Diag.note("retry")
 		start_run(mode)
@@ -2776,6 +2937,9 @@ func _back_out() -> bool:
 	if _draft_open:
 		# No way out of a draft but a pick.
 		return true
+	if hud.chest_open():
+		_close_chests()
+		return true
 	if _lesson_open:
 		_close_lesson()
 		return true
@@ -3396,6 +3560,8 @@ func _smoke_tick() -> void:
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
 		print("SMOKE_THEMES ", JSON.stringify({"seen": _themes_seen.keys(), "strikes": world.theme_strikes, "now": world.theme}))
+		if _smoke_rivals:
+			print("SMOKE_RIVALS ", JSON.stringify({"passed": rivals.passed, "left": rivals.targets.size(), "chip": rivals.chip(score)}))
 		if run_hero != "":
 			print("SMOKE_HERO ", JSON.stringify({"id": run_hero, "fx": _hero_fx, "uses": _ability_uses, "squad": squad.count, "peak": peak_squad}))
 		if cards.total() > 0:
@@ -3669,6 +3835,21 @@ func _shots_walkthrough() -> void:
 		hud.hide_draft()
 		hud.show_game_over({"instant": true, "score": 8650, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "near_miss": NearMiss.line(8650, 9000, false), "build": "BURNING ROUNDS  x2   ·   BLAST ROUNDS   ·   FIRESTORM!"})
 		await _capture("q21_results.png", 8)
+		hud.show_game_over({"instant": true, "score": 9400, "best": 9400, "is_best": true, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 351, "bounty": 1000, "mode": "daily", "grades": "A B", "rivals": "PASSED  LEE, SAM", "chests": 3, "quests_done": [{"title": "Kill 150 zombies", "points": 30}], "road_rewards": [{"kind": "coins", "amount": 164, "at": 1300}]})
+		await _capture("q24_results_chests.png", 8)
+		hud.show_chest({"tier": "silver", "title": Chests.title("silver"), "label": "ROAD 1300", "waiting": 3})
+		await _capture("q25_chest_closed.png", 8)
+		hud.reveal_chest(Chests.reveal({"tier": "silver", "base": {"kind": "coins", "amount": 164}, "bonus": {"kind": "stars", "amount": 3}}), 2)
+		await _capture("q26_chest_open.png", 30)
+		hud.show_chest({"tier": "gold", "title": Chests.title("gold"), "label": "SEASON TIER 5", "waiting": 1})
+		hud.reveal_chest(Chests.reveal({"tier": "gold", "base": {"kind": "item", "id": "crown"}, "bonus": {"kind": "jackpot", "coins": 1500, "stars": 8}}, "CROWN"), 0)
+		await _capture("q27_chest_jackpot.png", 30)
+		hud.hide_chest()
+		hud.show_running()
+		hud.update_stats(61, 3, 640.0, 3860)
+		hud.set_rival("SAM  4210   ·   350 to go")
+		await _capture("q28_rival.png", 8)
+		hud.set_rival("")
 		hud.show_running()
 		hud.set_show_fps(true)
 		hud.set_fps(58.0, 14.2, 4120)

@@ -978,6 +978,63 @@ screen is exactly where phones were struggling.
 the best it says SO CLOSE, otherwise the gap; nothing on a first run
 or a new best.
 
+## Chests (0.58)
+
+Quest coins, season tiers and road milestones used to land as lines of
+text on a results card nobody read. The same rewards in a box you tap
+are an event, and a box can hold a surprise.
+
+`Chests` (pure, tested): `make(tier, label, base, rng)` wraps a reward
+(`base`: coins, stars or an item) and rolls `roll_bonus` then and
+there. `BONUS` gives each tier its odds (wood about 30% any bonus,
+silver 43%, gold 62%) and `JACKPOT` its top prize. `totals` is what
+opening pays (an owned item pays its price in stars), `reveal` is the
+text, `clean` sanitises a save. The roll is stored with the chest, so
+quitting before the tap does not buy another throw.
+
+`Game._end_run` no longer pays these rewards directly: it appends
+chests (wood per quest, gold for all three and for season tiers,
+silver per road milestone; a road "unlock" still applies at once) and
+saves them. `open_chests` shows the oldest, `_open_chest` pays it and
+removes it before the reveal is drawn (a crash mid-animation loses
+nothing and pays nothing twice), `_next_chest` walks the queue. The
+card (`Hud._build_chest`) has a full-screen catch button so a stray
+tap cannot start a run underneath it, and the picture is `ShopIcon`
+drawing "chest:<tier>" closed or "chestopen:<tier>" with rays and
+hopping coins; `shake` rattles it for 0.45 s before the open.
+
+The bot opens its chests into thin air (`SMOKE_CHESTS`) so the code
+runs and nothing is saved.
+
+## The lower coin curve (0.58)
+
+The 0.54 tester maxed a 50,000-coin shop in two weeks. Two things
+changed: the sinks in 0.54, and now the income. `Economy.GOLD_LINEAR`
+went from 500 to 300 and `GOLD_EXPONENT` from 0.75 to 0.6. A first
+week player with bounties under 300 sees no change; a 1000 bounty pays
+351 where it paid 606, and a 5000 bounty 460 where it paid 1070. The
+multipliers a player bought or earned (magnet, greed, hard, streak,
+DOUBLE PAY) are left exactly as stated: folding them inside the curve
+would have cut harder but made "+20% coins" a lie. Road coin
+milestones were also trimmed (60 + 8k). Chest bonuses add a little
+back, by design: on average a chest's bonus is worth about 40 coins.
+
+## Rivals (0.58)
+
+A score means more next to somebody else's. `Rivals` (pure, tested)
+holds targets sorted by score: `set_best` puts your own best in the
+mode in as "YOUR BEST", `set_board` adds the board's rows (minus your
+own, minus anyone already behind you when a late answer arrives),
+`advance(score)` returns each target passed exactly once, `chip` is
+the HUD line and `summary` the results line.
+
+`Game._start_rivals` sets the best at once and, for the daily and the
+weekly, fetches the board; the answer is dropped if the run it was for
+is over. `_tick_rivals` runs every sixth frame after the score is
+computed: a pass is a float, a chirp and a buzz. Other modes have no
+board, so there the only rival is yourself, which still turns "new
+best" from a line on the results card into a moment in the run.
+
 ## Level themes (0.57)
 
 Cards made runs differ from each other; themes make the levels inside

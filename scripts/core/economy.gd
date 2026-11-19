@@ -10,9 +10,10 @@ extends RefCounted
 ## still a game. Pure.
 
 ## Bounty up to this converts one to one.
-const GOLD_LINEAR := 500
-## Beyond it, the extra converts at this power.
-const GOLD_EXPONENT := 0.75
+const GOLD_LINEAR := 300
+## Beyond it, the extra converts at this power. (0.54's tester maxed
+## the shop in two weeks on 500 and 0.75; this is the lower curve.)
+const GOLD_EXPONENT := 0.6
 ## The bridge holds this many soldiers.
 const SQUAD_CAP := 500
 ## How far a shot multiplier panel can be pushed, by squad size.

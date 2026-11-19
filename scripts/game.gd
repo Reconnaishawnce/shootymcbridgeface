@@ -65,6 +65,12 @@ var _draft_ids: Array = []
 ## Something that wanted the screen while the draft had it.
 var _after_draft: Callable = Callable()
 var _card_fx_last := 0.0
+## The hero whose power is live this run (Heroes.active), and how often
+## each part of it fired, for the bot.
+var run_hero := ""
+var _hero_fx: Dictionary = {}
+## --smoke-hero=id: the bot runs as this hero.
+var _smoke_hero := ""
 var combo := Combo.new()
 var powerups := Powerups.new()
 var waves_cleared := 0
@@ -239,6 +245,8 @@ func _ready() -> void:
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-hero="):
+			_smoke_hero = a.trim_prefix("--smoke-hero=")
 		elif a.begins_with("--smoke-cards="):
 			_smoke_cards = a.trim_prefix("--smoke-cards=")
 		elif a.begins_with("--smoke-wipe-at="):
@@ -1428,6 +1436,11 @@ func start_run(p_mode: String = "levels") -> void:
 					cards.take(id)
 	squad.cards = cards
 	world.cards = cards
+	# The bot runs plain unless told to be someone, so its numbers hold.
+	run_hero = (_smoke_hero if Heroes.known(_smoke_hero) else "") if smoke else Heroes.active(str(wardrobe.equipped.get("hero", "")), character_mode, mode)
+	_hero_fx = {}
+	squad.hero = run_hero
+	world.hero = run_hero
 	world.card_fx = {}
 	squad.squad_type = "rifle" if mode in ["daily", "weekly"] else squad_type
 	_drop_preview()
@@ -1465,9 +1478,12 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	hud.set_bounty(0)
 	world.supply_funds = 0
-	hud.set_perks("")
+	_refresh_pause_perks()
 	hud.show_hint(Progression.hint_for(1), 4.0)
-	if character_mode:
+	if run_hero != "":
+		# Who is leading and what that changes, every run.
+		hud.toast("%s: %s" % [wardrobe.hero_name(), Heroes.short(run_hero)])
+	elif character_mode:
 		hud.toast("%s: %s" % [wardrobe.hero_name(), Wardrobe.hero_line(wardrobe.equipped.get("hero", "max"))])
 	_touches.clear()
 	_cling_touch.clear()
@@ -1497,7 +1513,7 @@ func end_run() -> void:
 	var today := Daily.day_number(int(Time.get_unix_time_from_system()))
 	var streak_after := Streak.advance(streak, today) if not smoke else streak
 	var streak_days := Streak.days(streak_after, today)
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * run_boosts.coin_mult() * world.mod("coins") * squad.veterans.coin_mult() * Streak.bonus_mult(streak_days)))
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * run_boosts.coin_mult() * Heroes.coin_mult(run_hero) * world.mod("coins") * squad.veterans.coin_mult() * Streak.bonus_mult(streak_days)))
 	if not smoke:
 		streak = streak_after
 		SaveData.save_streak(streak)
@@ -1744,6 +1760,7 @@ func _process(delta: float) -> void:
 			Diag.set_gauge("squad", squad.count)
 			Diag.set_gauge("level", world.level)
 			Diag.set_gauge("cards", cards.total())
+			Diag.set_gauge("hero", run_hero)
 			Diag.set_gauge("fx", Fx.live_peak)
 			Diag.set_gauge("scale", snappedf(Engine.time_scale, 0.01))
 	if smoke:
@@ -1763,7 +1780,7 @@ func use_ability() -> void:
 	if state != State.RUNNING or get_tree().paused or _warming:
 		return
 	var level := meta.level("hero")
-	if not Abilities.ready(_run_time, _ability_last, level, cards.cooldown_mult()):
+	if not Abilities.ready(_run_time, _ability_last, level, _move_cooldown_mult()):
 		sfx.play("gate_bad", -10.0)
 		return
 	_ability_last = _run_time
@@ -1773,37 +1790,77 @@ func use_ability() -> void:
 	Diag.mark("ability:%s" % id)
 	if smoke:
 		print("SMOKE_ABILITY ", JSON.stringify({"id": id, "uses": _ability_uses, "level": world.level, "frame": _frames}))
+	# ADA: the move hits harder for everything the build holds.
+	var boost := Heroes.move_power(run_hero, perks.total() + cards.total())
+	if boost > 1.0:
+		_hero_note("power")
 	match id:
 		"volley":
-			squad.volley(Abilities.volley_shots(squad.count), Abilities.VOLLEY_DAMAGE_MULT * Abilities.power(level) * (1.0 + meta.hero_power_bonus()), Abilities.VOLLEY_PIERCE)
+			squad.volley(Abilities.volley_shots(squad.count), Abilities.VOLLEY_DAMAGE_MULT * Abilities.power(level) * (1.0 + meta.hero_power_bonus()) * boost, Abilities.VOLLEY_PIERCE)
 			sfx.play("rally", -2.0, 1.3)
 			_punch(4.0)
 		"shockwave":
-			var hits := world.shockwave(squad.position, Abilities.shockwave_radius(level), Abilities.shockwave_damage(squad.dps(), level), Abilities.SHOCKWAVE_PUSH)
+			var hits := world.shockwave(squad.position, Abilities.shockwave_radius(level), Abilities.shockwave_damage(squad.dps(), level) * boost, Abilities.SHOCKWAVE_PUSH)
 			squad.rally()
 			sfx.play("explosion", -4.0, 0.8)
 			_shake = minf(1.0, _shake + 0.5)
 			hud.show_float("SHOCKWAVE  x%d" % hits, true)
 			_punch(6.0)
 		"longshot":
-			var hits := world.longshot(squad.position.x, Abilities.LONGSHOT_HALF_WIDTH, Abilities.longshot_damage(squad.dps(), level), Abilities.LONGSHOT_RANGE)
+			var hits := world.longshot(squad.position.x, Abilities.LONGSHOT_HALF_WIDTH, Abilities.longshot_damage(squad.dps(), level) * boost, Abilities.LONGSHOT_RANGE)
 			sfx.play("rally", -2.0, 0.7)
 			_shake = minf(1.0, _shake + 0.3)
 			hud.flash(0.12)
 			hud.show_float("LONGSHOT  x%d" % hits, true)
 			_punch(5.0)
 		"heal":
-			var n := Abilities.heal_amount(squad.count, level)
+			var n := int(round(float(Abilities.heal_amount(squad.count, level)) * boost))
 			squad.add(n)
 			powerups.grant("shield", _run_time)
 			squad.rally()
 			sfx.play("gate_good", -2.0, 1.1)
 			hud.show_float("HEAL PULSE  +%d" % n, true)
 	hud.show_banner(Abilities.title(id), 0.6)
+	_hero_move_twist()
 	_buzz("ability")
 	squad.cheer()
 	if not smoke:
 		Fx.confetti(world, squad.position + Vector3(0.0, 1.6, -1.0), 12)
+
+
+# --- heroes ----------------------------------------------------------------
+
+func _hero_note(what: String) -> void:
+	_hero_fx[what] = int(_hero_fx.get(what, 0)) + 1
+
+
+## How long the hero move takes to come back: OVERCHARGE and PIP.
+func _move_cooldown_mult() -> float:
+	return cards.cooldown_mult() * Heroes.cooldown_mult(run_hero)
+
+
+## What the hero adds to the move that was just used.
+func _hero_move_twist() -> void:
+	if run_hero == "":
+		return
+	var who := Wardrobe.title(run_hero)
+	if Heroes.move_soldiers(run_hero) > 0:
+		squad.add(Heroes.move_soldiers(run_hero))
+		_hero_note("move_soldiers")
+		hud.show_float("%s  +%d" % [who, Heroes.move_soldiers(run_hero)], true)
+	if Heroes.ghost_seconds(run_hero) > 0.0:
+		squad.invulnerable_until = maxf(squad.invulnerable_until, _run_time + Heroes.ghost_seconds(run_hero))
+		_hero_note("ghost")
+		hud.show_float("%s  GHOST STEP" % who, true)
+	if Heroes.move_slows(run_hero):
+		var n := world.chill_all(Heroes.KOFI_SLOW, Heroes.KOFI_SLOW_SECONDS)
+		_hero_note("calm")
+		hud.show_float("%s  CALM  x%d" % [who, n], true)
+	if Heroes.move_shoves(run_hero):
+		world.shockwave(squad.position, Heroes.REX_SHOVE_RADIUS, squad.damage_per_shot(), Heroes.REX_SHOVE_PUSH)
+		_hero_note("shove")
+		_shake = minf(1.0, _shake + 0.3)
+		hud.show_float("%s  SHOVE" % who, true)
 
 
 func throw_bomb() -> void:
@@ -1838,7 +1895,7 @@ func _tick_run(delta: float) -> void:
 			if _cling_touch.is_empty() and not _touches.values().has("focus"):
 				squad.clear_focus()
 	_check_lessons()
-	hud.set_ability(Abilities.title(Abilities.for_type(squad.squad_type)), Abilities.charge(_run_time, _ability_last, meta.level("hero"), cards.cooldown_mult()), true)
+	hud.set_ability(Abilities.title(Abilities.for_type(squad.squad_type)), Abilities.charge(_run_time, _ability_last, meta.level("hero"), _move_cooldown_mult()), true)
 	# Hands off the road: panels stop climbing, and the first time it
 	# happens in a run the HUD says why.
 	# A finger held still is still a hand on the road.
@@ -2034,6 +2091,11 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 	gates_passed += 1
 	Diag.mark("gate:%d" % gates_passed)
 	_level_gates += 1
+	if Heroes.gate_seconds(run_hero) > 0.0:
+		_ability_last -= Heroes.gate_seconds(run_hero)
+		_hero_note("gate_seconds")
+	if Heroes.gate_soldiers(run_hero) > 0 and panel.kind == GateMath.Kind.ADD and panel.value > 0.0 and after > 0:
+		_hero_note("gate_soldiers")
 	if smoke:
 		print("SMOKE_GATE ", JSON.stringify({"level": world.level, "n": gates_passed, "dist": int(world.level_distance), "panel": GateMath.label(panel), "before": before, "after": after, "frame": _frames}))
 	var text := GateMath.label(panel)
@@ -2177,6 +2239,10 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 		print("SMOKE_GRADE ", JSON.stringify({"level": level, "grade": letter, "boss_seconds": snappedf(_run_time - _boss_start, 0.1)}))
 	hud.show_boss(false)
 	hud.show_banner("LEVEL %d CLEAR   GRADE %s\n+%d" % [level, letter, b], 1.8)
+	if Heroes.level_soldiers(run_hero) > 0 and squad_left > 0:
+		squad.add(Heroes.level_soldiers(run_hero))
+		_hero_note("level_soldiers")
+		hud.show_float("%s  +%d" % [Wardrobe.title(run_hero), Heroes.level_soldiers(run_hero)], true)
 	# A survivor steps up: a name, a beret, a trait the squad feels.
 	if squad_left > 0 and not squad.veterans.is_full():
 		var v := squad.veterans.promote(world.gen.rng)
@@ -2708,6 +2774,8 @@ func _lb_send_pending() -> void:
 ## The pause menu's line: perks held, then the veterans by name.
 func _refresh_pause_perks() -> void:
 	var parts := []
+	if run_hero != "":
+		parts.append("%s: %s. %s." % [Wardrobe.title(run_hero), Heroes.passive_text(run_hero), Heroes.twist_text(run_hero)])
 	if cards.total() > 0:
 		parts.append("CARDS: " + cards.summary())
 	var perk_text := Perks.summary(perks.stacks)
@@ -2988,6 +3056,13 @@ func _on_gate_perfect(_gate, _index: int) -> void:
 	_level_perfect += 1
 	bonus += Difficulty.PERFECT_BONUS
 	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
+	if Heroes.perfect_soldiers(run_hero) > 0 and squad.count > 0:
+		squad.add(Heroes.perfect_soldiers(run_hero))
+		_hero_note("perfect_soldiers")
+		hud.show_float("%s  +%d" % [Wardrobe.title(run_hero), Heroes.perfect_soldiers(run_hero)], true)
+	if Heroes.perfect_refills(run_hero):
+		_ability_last = -1000.0
+		_hero_note("refill")
 	sfx.play("level_clear", -8.0, 1.5)
 	_punch(2.0)
 	_buzz("perfect")
@@ -3177,6 +3252,8 @@ func _smoke_tick() -> void:
 			"retries": _smoke_retries,
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
+		if run_hero != "":
+			print("SMOKE_HERO ", JSON.stringify({"id": run_hero, "fx": _hero_fx, "uses": _ability_uses, "squad": squad.count, "peak": peak_squad}))
 		if cards.total() > 0:
 			print("SMOKE_CARDFX ", JSON.stringify({"cards": cards.stacks, "combos": cards.combos(), "fx": world.card_fx, "turrets": world.turrets.size()}))
 		# The report the phone would send after a crash, built headless.
@@ -3204,7 +3281,7 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
-	if near != null and near.position.z > -14.0 and Abilities.ready(_run_time, _ability_last, meta.level("hero"), cards.cooldown_mult()):
+	if near != null and near.position.z > -14.0 and Abilities.ready(_run_time, _ability_last, meta.level("hero"), _move_cooldown_mult()):
 		use_ability()
 	# A saw rolling at us outranks everything, the boss included: step
 	# round it, and dash if it is close.
@@ -3327,6 +3404,15 @@ func _shots_walkthrough() -> void:
 		show_title()
 		hud._show_more()
 		await _capture("q4_more.png", 5)
+		show_title()
+		hud._show_modes()
+		await _capture("q22_modes.png", 5)
+		show_title()
+		wardrobe.stars = 12
+		_locker_tab = "hero"
+		_show_locker()
+		await _capture("q23_heroes.png", 8)
+		close_locker()
 		show_title()
 		hud.show_lesson(Lessons.title("perk"), Lessons.perk_body(["rapid", "skin", "greed"]))
 		await _capture("q5_lesson.png", 5)

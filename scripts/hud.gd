@@ -117,7 +117,14 @@ var _coins_title: Label
 var _weekly_button: Button
 var _rush_button: Button
 var _event_line: Label
-var _plus_button: Button
+var _modes_button: Button
+var _modes_card: Control
+var _modes_stay := false
+var _endless_blurb: Label
+var _daily_blurb: Label
+var _weekly_blurb: Label
+var _rush_blurb: Label
+var _mode_blurb_label: Label
 var _more_button: Button
 var _more_card: Control
 var _road_button: Button
@@ -219,7 +226,6 @@ var _lb_card: Control
 var _cards: Array[Control] = []
 var _lb_box: VBoxContainer
 var _lb_button: Button
-var _lb_title_button: Button
 var _lb_teaser: Label
 var _over_lb: Button
 var _pit_tiles: Dictionary = {}
@@ -969,52 +975,15 @@ func _build_title(root: Control) -> void:
 	var play := _button("PLAY", 52)
 	play.pressed.connect(func() -> void: play_pressed.emit("levels"))
 	_pin(t, play, 0.5, 0.47, Vector2(440.0, 104.0))
-	var modes := HBoxContainer.new()
-	modes.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	modes.alignment = BoxContainer.ALIGNMENT_CENTER
-	modes.add_theme_constant_override("separation", 14)
-	_pin(t, modes, 0.5, 0.56, Vector2(680.0, 70.0))
-	_endless_button = _button("ENDLESS", 26)
-	_endless_button.custom_minimum_size = Vector2(160.0, 66.0)
-	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
-	modes.add_child(_endless_button)
-	_daily_button = _button("DAILY", 26)
-	_daily_button.custom_minimum_size = Vector2(160.0, 66.0)
-	_daily_button.pressed.connect(func() -> void: daily_opened.emit())
-	modes.add_child(_daily_button)
-	_weekly_button = _button("WEEKLY", 26)
-	_weekly_button.custom_minimum_size = Vector2(160.0, 66.0)
-	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
-	modes.add_child(_weekly_button)
-	_rush_button = _button("BOSS RUSH", 24)
-	_rush_button.custom_minimum_size = Vector2(160.0, 66.0)
-	_rush_button.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
-	_rush_button.pressed.connect(func() -> void: play_pressed.emit("rush"))
-	modes.add_child(_rush_button)
+	# One button for every other way to play.
+	_modes_button = _button("MODES", 30)
+	_modes_button.pressed.connect(_show_modes)
+	_pin(t, _modes_button, 0.5, 0.56, Vector2(440.0, 66.0))
 	# The weekend event, under the best lines.
 	_event_line = _label(21, HORIZONTAL_ALIGNMENT_CENTER)
 	_event_line.add_theme_color_override("font_color", Color(1.0, 0.75, 0.3))
 	_event_line.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_pin(t, _event_line, 0.5, 0.39, Vector2(640.0, 56.0))
-	# Under the modes: the leaderboard, up front like any game, and the
-	# learning round beside it; then one line on who leads today.
-	var second := HBoxContainer.new()
-	second.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	second.alignment = BoxContainer.ALIGNMENT_CENTER
-	second.add_theme_constant_override("separation", 12)
-	_pin(t, second, 0.5, 0.635, Vector2(520.0, 50.0))
-	_lb_title_button = _chip("LEADERBOARD", 24)
-	_lb_title_button.custom_minimum_size = Vector2(230.0, 50.0)
-	_lb_title_button.add_theme_color_override("font_color", COIN)
-	_lb_title_button.pressed.connect(func() -> void: leaderboard_opened.emit())
-	second.add_child(_lb_title_button)
-	_learn_button = _chip("LEARN THE ROAD", 22)
-	_learn_button.custom_minimum_size = Vector2(200.0, 50.0)
-	_learn_button.pressed.connect(func() -> void: learn_pressed.emit())
-	second.add_child(_learn_button)
-	_lb_teaser = _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	_lb_teaser.add_theme_color_override("font_color", Color(1.0, 0.95, 0.75))
-	_pin(t, _lb_teaser, 0.5, 0.675, Vector2(640.0, 34.0))
 
 	# Top left: the wallet, and a + that opens the shop.
 	var wallet := VBoxContainer.new()
@@ -1030,51 +999,27 @@ func _build_title(root: Control) -> void:
 	_stars_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	wallet.add_child(_stars_row)
 	_stars_title = _stars_row.get_meta("label")
-	_plus_button = _chip("+", 26)
-	_plus_button.pressed.connect(func() -> void: shop_opened.emit())
-	_pin(t, _plus_button, 0.0, 0.0, Vector2(52.0, 46.0), Vector2(0.0, 0.0), Vector2(180.0, 26.0))
-	_track_top(_plus_button)
 
-	# Top right: shop and locker.
-	var shops := VBoxContainer.new()
-	shops.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shops.add_theme_constant_override("separation", 8)
-	shops.alignment = BoxContainer.ALIGNMENT_BEGIN
-	_pin(t, shops, 1.0, 0.0, Vector2(150.0, 130.0), Vector2(1.0, 0.0), Vector2(-22.0, 22.0))
-	_track_top(shops)
-	_shop_button = _chip("SHOP", 26)
+	# The bottom bar, under the thumb: SHOP, LOCKER, MORE.
+	var bar := HBoxContainer.new()
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	bar.add_theme_constant_override("separation", 12)
+	_pin(t, bar, 0.5, 1.0, Vector2(680.0, 78.0), Vector2(0.5, 1.0), Vector2(0.0, -28.0))
+	_shop_button = _button("SHOP", 30)
+	_shop_button.custom_minimum_size = Vector2(216.0, 78.0)
+	_shop_button.add_theme_color_override("font_color", COIN)
 	_shop_button.pressed.connect(func() -> void: shop_opened.emit())
-	shops.add_child(_shop_button)
-	_locker_button = _chip("LOCKER", 26)
+	bar.add_child(_shop_button)
+	_locker_button = _button("LOCKER", 30)
+	_locker_button.custom_minimum_size = Vector2(216.0, 78.0)
+	_locker_button.add_theme_color_override("font_color", STAR)
 	_locker_button.pressed.connect(func() -> void: locker_opened.emit())
-	shops.add_child(_locker_button)
-
-	# Bottom left: the mode chip, and the squad chip once there is a choice.
-	var left := VBoxContainer.new()
-	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left.add_theme_constant_override("separation", 8)
-	left.alignment = BoxContainer.ALIGNMENT_END
-	_pin(t, left, 0.0, 1.0, Vector2(260.0, 120.0), Vector2(0.0, 1.0), Vector2(22.0, -24.0))
-	_squad_button = _chip("SQUAD: RIFLES", 22)
-	_squad_button.pressed.connect(func() -> void: squad_toggled.emit())
-	left.add_child(_squad_button)
-	_mode_button = _chip("NORMAL", 26)
-	_mode_button.pressed.connect(func() -> void: mode_pressed.emit())
-	left.add_child(_mode_button)
-
-	# Bottom right: help and settings.
-	var right := HBoxContainer.new()
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.add_theme_constant_override("separation", 8)
-	right.alignment = BoxContainer.ALIGNMENT_END
-	_pin(t, right, 1.0, 1.0, Vector2(260.0, 60.0), Vector2(1.0, 1.0), Vector2(-22.0, -24.0))
-	var help := _chip("?", 28)
-	help.custom_minimum_size.x = 56.0
-	help.pressed.connect(func() -> void: help_opened.emit())
-	right.add_child(help)
-	var settings := _chip("SETTINGS", 24)
-	settings.pressed.connect(func() -> void: settings_opened.emit())
-	right.add_child(settings)
+	bar.add_child(_locker_button)
+	_more_button = _button("MORE", 30)
+	_more_button.custom_minimum_size = Vector2(216.0, 78.0)
+	_more_button.pressed.connect(_show_more)
+	bar.add_child(_more_button)
 
 	# Bottom centre: where you stand on the road, the next thing to do, MORE.
 	_road_line = _label(24, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1106,34 +1051,106 @@ func _build_title(root: Control) -> void:
 	_goal.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_goal.modulate = Color(0.92, 0.92, 0.96)
 	_pin(t, _goal, 0.5, 1.0, Vector2(520.0, 70.0), Vector2(0.5, 1.0), Vector2(0.0, -150.0))
-	_more_button = _chip("MORE", 24)
-	_more_button.pressed.connect(_show_more)
-	_pin(t, _more_button, 0.5, 1.0, Vector2(130.0, 48.0), Vector2(0.5, 1.0), Vector2(0.0, -34.0))
 
-	# The drawer behind MORE.
+	# The drawer behind MORE: everything that is not playing or buying.
 	_more_card = _card(root)
 	_more_card.visible = false
 	var box: VBoxContainer = _more_card.get_meta("box")
-	_records_button = _button("RECORDS", 34)
-	_records_button.pressed.connect(func() -> void: records_opened.emit())
-	box.add_child(_records_button)
-	_quests_button = _button("QUESTS", 34)
-	_quests_button.pressed.connect(func() -> void: quests_opened.emit())
-	box.add_child(_quests_button)
-	_road_button = _button("TROPHY ROAD", 34)
-	_road_button.pressed.connect(func() -> void: road_opened.emit())
-	_road_button.visible = false
-	box.add_child(_road_button)
-	_lb_button = _button("LEADERBOARD", 34)
+	box.add_theme_constant_override("separation", 10)
+	var more_head := _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	more_head.text = "MORE"
+	box.add_child(more_head)
+	_lb_button = _button("LEADERBOARD", 32)
+	_lb_button.custom_minimum_size.x = 440.0
+	_lb_button.add_theme_color_override("font_color", COIN)
 	_lb_button.pressed.connect(func() -> void: leaderboard_opened.emit())
 	_lb_button.visible = false
 	box.add_child(_lb_button)
-	var more_help := _button("HOW TO PLAY", 34)
+	_lb_teaser = _label(19, HORIZONTAL_ALIGNMENT_CENTER)
+	_lb_teaser.add_theme_color_override("font_color", Color(1.0, 0.95, 0.75))
+	_lb_teaser.visible = false
+	box.add_child(_lb_teaser)
+	_quests_button = _button("QUESTS", 32)
+	_quests_button.pressed.connect(func() -> void: quests_opened.emit())
+	box.add_child(_quests_button)
+	_road_button = _button("TROPHY ROAD", 32)
+	_road_button.pressed.connect(func() -> void: road_opened.emit())
+	_road_button.visible = false
+	box.add_child(_road_button)
+	_records_button = _button("RECORDS", 32)
+	_records_button.pressed.connect(func() -> void: records_opened.emit())
+	box.add_child(_records_button)
+	_learn_button = _button("LEARN THE ROAD", 32)
+	_learn_button.pressed.connect(func() -> void: learn_pressed.emit())
+	box.add_child(_learn_button)
+	var more_help := _button("HOW TO PLAY", 32)
 	more_help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(more_help)
-	var back := _button("BACK", 34)
+	var settings := _button("SETTINGS", 32)
+	settings.pressed.connect(func() -> void: settings_opened.emit())
+	box.add_child(settings)
+	var back := _button("BACK", 32)
 	back.pressed.connect(func() -> void: shop_closed.emit())
 	box.add_child(back)
+
+	# MODES: the other ways to play, the difficulty and the squad.
+	_modes_card = _card(root)
+	_modes_card.visible = false
+	_cards.append(_modes_card)
+	var mbox: VBoxContainer = _modes_card.get_meta("box")
+	mbox.add_theme_constant_override("separation", 6)
+	var modes_head := _label(40, HORIZONTAL_ALIGNMENT_CENTER)
+	modes_head.text = "MODES"
+	mbox.add_child(modes_head)
+	_endless_button = _button("ENDLESS", 32)
+	_endless_button.custom_minimum_size.x = 480.0
+	_endless_button.pressed.connect(func() -> void: play_pressed.emit("endless"))
+	mbox.add_child(_endless_button)
+	_endless_blurb = _mode_blurb(mbox, "No levels and no end. How far can you get?")
+	_daily_button = _button("DAILY", 32)
+	_daily_button.pressed.connect(func() -> void: daily_opened.emit())
+	mbox.add_child(_daily_button)
+	_daily_blurb = _mode_blurb(mbox, "One road a day, the same for everyone. No upgrades.")
+	_weekly_button = _button("WEEKLY", 32)
+	_weekly_button.pressed.connect(func() -> void: play_pressed.emit("weekly"))
+	mbox.add_child(_weekly_button)
+	_weekly_blurb = _mode_blurb(mbox, "A week-long road with its own rules.")
+	_rush_button = _button("BOSS RUSH", 32)
+	_rush_button.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
+	_rush_button.pressed.connect(func() -> void: play_pressed.emit("rush"))
+	mbox.add_child(_rush_button)
+	_rush_blurb = _mode_blurb(mbox, "One gate, then a boss. Again and again.")
+	# Difficulty and squad: tap to cycle, and the card stays open.
+	_mode_button = _button("NORMAL", 28)
+	_mode_button.pressed.connect(func() -> void:
+		_modes_stay = true
+		mode_pressed.emit())
+	mbox.add_child(_mode_button)
+	_mode_blurb_label = _mode_blurb(mbox, "")
+	_squad_button = _button("SQUAD: RIFLES", 28)
+	_squad_button.pressed.connect(func() -> void:
+		_modes_stay = true
+		squad_toggled.emit())
+	mbox.add_child(_squad_button)
+	var modes_back := _button("BACK", 32)
+	modes_back.pressed.connect(func() -> void: shop_closed.emit())
+	mbox.add_child(modes_back)
+
+
+## A grey line under a mode button saying what it is.
+func _mode_blurb(parent: Control, text: String) -> Label:
+	var l := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
+	l.text = text
+	l.modulate = Color(0.8, 0.8, 0.86)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD
+	l.custom_minimum_size.x = 480.0
+	parent.add_child(l)
+	return l
+
+
+func _show_modes() -> void:
+	_hide_cards()
+	_modes_card.visible = true
 
 
 ## The rally offer: a small card over the frozen road with a countdown.
@@ -1186,7 +1203,7 @@ func hide_revive() -> void:
 
 func set_lb_teaser(text: String) -> void:
 	_lb_teaser.text = text
-	_lb_teaser.visible = text != ""
+	_lb_teaser.visible = text != "" and _lb_button.visible
 
 
 ## The leaderboard page. [param st] keys: configured, joined, name,
@@ -1536,8 +1553,10 @@ func _build_locker(root: Control) -> void:
 	_locker_grid.add_theme_constant_override("h_separation", 6)
 	_locker_grid.add_theme_constant_override("v_separation", 8)
 	box.add_child(_locker_grid)
-	_locker_line = _label(22, HORIZONTAL_ALIGNMENT_CENTER)
+	_locker_line = _label(19, HORIZONTAL_ALIGNMENT_CENTER)
 	_locker_line.modulate = Color(0.9, 0.9, 0.95)
+	_locker_line.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_locker_line.custom_minimum_size.x = 580.0
 	box.add_child(_locker_line)
 	var back := _button("BACK", 34)
 	back.pressed.connect(func() -> void: locker_closed.emit())
@@ -2014,7 +2033,6 @@ func show_title(t: Dictionary) -> void:
 	var buttons: Dictionary = t.get("buttons", {})
 	_hide_cards()
 	_shop_button.visible = bool(buttons.get("shop", true))
-	_plus_button.visible = _shop_button.visible
 	_daily_button.visible = bool(buttons.get("daily", true))
 	_weekly_button.visible = bool(buttons.get("weekly", _daily_button.visible))
 	_rush_button.visible = bool(buttons.get("rush", false))
@@ -2026,9 +2044,15 @@ func show_title(t: Dictionary) -> void:
 	_quests_button.visible = bool(buttons.get("quests", true))
 	_road_button.visible = bool(buttons.get("road", false))
 	_lb_button.visible = bool(buttons.get("leaderboard", false))
-	_lb_title_button.visible = bool(buttons.get("leaderboard", false))
-	_lb_teaser.visible = _lb_title_button.visible and _lb_teaser.text != ""
-	_more_button.visible = _records_button.visible or _quests_button.visible or _road_button.visible or _lb_button.visible
+	_lb_teaser.visible = _lb_button.visible and _lb_teaser.text != ""
+	_endless_blurb.visible = _endless_button.visible
+	_daily_blurb.visible = _daily_button.visible
+	_weekly_blurb.visible = _weekly_button.visible
+	_rush_blurb.visible = _rush_button.visible
+	_mode_blurb_label.visible = _mode_button.visible
+	_mode_blurb_label.text = "DIFFICULTY (tap to change): %s" % Modifiers.blurb(modifier) if modifier != "normal" else "DIFFICULTY (tap to change)"
+	_modes_button.visible = _endless_button.visible or _daily_button.visible or _weekly_button.visible or _rush_button.visible or _mode_button.visible
+	_modes_button.text = "MODES" if modifier == "normal" else "MODES  ·  %s" % Modifiers.title(modifier)
 	if not bool(buttons.get("hints", true)):
 		mode_hint = ""
 	_goal.text = str(t.get("goal", ""))
@@ -2063,6 +2087,11 @@ func show_title(t: Dictionary) -> void:
 	_squad_button.text = "SQUAD: %s" % {"rifle": "RIFLES", "shotgun": "SHOTGUNS", "medic": "MEDICS", "sniper": "SNIPERS"}.get(squad_type, "RIFLES")
 	_coins_title.text = str(coins)
 	_stars_title.text = "%d   ·   %s" % [stars, hero_name] if hero_name != "" else str(stars)
+	# A difficulty or squad tap redraws the home screen: the card it was
+	# tapped on comes back up.
+	if _modes_stay:
+		_modes_stay = false
+		_show_modes()
 
 
 ## Today's quests and the season track.
@@ -2187,9 +2216,11 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 	for child in _locker_grid.get_children():
 		_locker_grid.remove_child(child)
 		child.queue_free()
+	# Heroes get wider buttons: there is a power to read under the name.
+	_locker_grid.columns = 2 if tab == "hero" else 3
 	for id in Wardrobe.items_in(tab):
 		var b := _button("", 19)
-		b.custom_minimum_size = Vector2(190.0, 72.0)
+		b.custom_minimum_size = Vector2(288.0, 76.0) if tab == "hero" else Vector2(190.0, 72.0)
 		var state := ""
 		if w.is_equipped(id):
 			state = "WEARING"
@@ -2199,12 +2230,15 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 			state = "%d STARS" % Wardrobe.cost(id) if Wardrobe.cost(id) != 1 else "1 STAR"
 			b.disabled = not w.can_buy(id)
 		b.text = "%s\n%s" % [Wardrobe.title(id), state]
+		if tab == "hero":
+			b.text = "%s  ·  %s\n%s" % [Wardrobe.title(id), state, Heroes.short(id)]
 		b.toggle_mode = true
 		b.button_pressed = w.is_equipped(id)
 		b.pressed.connect(func() -> void: item_pressed.emit(id))
 		_locker_grid.add_child(b)
 	if tab == "hero":
-		_locker_line.text = "%s: %s" % [w.hero_name(), Wardrobe.hero_line(w.equipped.get("hero", "max"))]
+		var hero := str(w.equipped.get("hero", "max"))
+		_locker_line.text = "%s: %s\n%s: %s.\n%s: %s." % [w.hero_name(), Wardrobe.hero_line(hero), Heroes.passive_title(hero), Heroes.passive_text(hero), Heroes.twist_title(hero), Heroes.twist_text(hero)]
 	elif tab == "crew":
 		_locker_line.text = "How everyone behind %s dresses." % w.hero_name()
 	elif tab == "road":

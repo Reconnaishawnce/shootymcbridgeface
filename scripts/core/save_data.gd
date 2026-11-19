@@ -101,7 +101,8 @@ static func save_squad_type(type: String) -> void:
 
 
 static func load_character_mode() -> bool:
-	return bool(_read(SETTINGS, "character_mode", false))
+	# On unless the player turned it off: heroes are a way to play now.
+	return bool(_read(SETTINGS, "character_mode", true))
 
 
 static func save_character_mode(on: bool) -> void:

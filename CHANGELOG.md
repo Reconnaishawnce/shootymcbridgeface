@@ -3,6 +3,33 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.56 (heroes that play differently, a cleaner home: phase 2)
+
+- HEROES. Each of the eight heroes now changes the run: one thing that
+  is always on, and one thing the hero move does on top of its usual
+  job. MAX brings soldiers back (3 a level, 2 a move). ZURI gets one
+  more at every adding gate and gates wind her move 2 seconds. PIP hits
+  30% harder with 12 or fewer and his move recharges 25% faster. LUNA
+  dashes 40% sooner and her move makes the squad untouchable for 1.5
+  seconds. KOFI halves how often clingers bite and his move slows every
+  zombie. ADA earns 10% more coins and her move hits 6% harder per perk
+  and card. REX takes a quarter less from heavy bites and his move
+  shoves the front rows back. MEI gets 2 soldiers for a perfect gate
+  and a perfect gate refills her move.
+- The locker's HEROES tab shows each power on the button and the full
+  text for the one you wear; the pause menu and the start of each run
+  say who is leading. Powers work in normal, endless and rush runs; the
+  daily and weekly stay plain for everyone.
+- CHARACTERS is on by default now (a save that turned it off keeps it
+  off): heroes are a way to play, not a costume.
+- HOME SCREEN. Down from a dozen buttons to PLAY, MODES and a bottom
+  bar of SHOP, LOCKER and MORE. MODES holds endless, daily, weekly and
+  boss rush with a line on each, plus difficulty and squad type. MORE
+  holds the leaderboard, quests, trophy road, records, the learning
+  round, how to play and settings.
+- The bot runs plain unless given `--smoke-hero=<id>`; `check.sh` runs
+  six heroes and proves each power fires.
+
 ## 0.55 (build cards: phase 1 of the "make it awesome" arc)
 
 - BUILD CARDS. Every time a boss falls the road pauses and deals three

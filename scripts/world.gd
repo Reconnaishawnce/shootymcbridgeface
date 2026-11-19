@@ -139,6 +139,8 @@ var squad: Squad
 var perks: Perks
 ## Build cards (Cards): what bullets and bites do this run.
 var cards: Cards
+## The hero whose power is live this run (Heroes), or "".
+var hero := ""
 ## How often each card effect fired, for the bot and the reports.
 var card_fx: Dictionary = {}
 var meta: Meta
@@ -533,7 +535,7 @@ func mod(key: String) -> float:
 
 ## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
-	var armor := meta.bite_mult() if meta != null else 1.0
+	var armor := (meta.bite_mult() if meta != null else 1.0) * Heroes.bite_mult(hero)
 	if squad != null:
 		armor *= squad.veterans.bite_mult()
 	var base := maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
@@ -1026,7 +1028,7 @@ func _move_gates(delta: float, p_squad: Squad) -> void:
 					bet_placed.emit()
 				if after > 0:
 					if meta != null and panel.kind == GateMath.Kind.ADD and panel.value > 0.0:
-						after += meta.gate_bonus()
+						after += meta.gate_bonus() + Heroes.gate_soldiers(hero)
 					if perks != null and perks.recruit_per_gate() > 0:
 						after += perks.recruit_per_gate()
 						perk_felt.emit("recruit", perks.recruit_per_gate())
@@ -1151,7 +1153,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			if can_cling:
 				# Clings to a flank and rides along, eating, until shot off.
 				z.mark_latched()
-				z.latch_timer = Difficulty.LATCH_INTERVAL
+				z.latch_timer = Difficulty.LATCH_INTERVAL * Heroes.latch_interval_mult(hero)
 				z.hp = maxf(z.hp, z.max_hp) * Difficulty.LATCH_HP_MULT
 				z.max_hp = z.hp
 				_latched.append(z)
@@ -1196,7 +1198,7 @@ func _tick_latched(delta: float, z: Zombie, p_squad: Squad) -> void:
 		z.look_at(face, Vector3.UP)
 	z.latch_timer -= delta
 	if z.latch_timer <= 0.0:
-		z.latch_timer = Difficulty.LATCH_INTERVAL
+		z.latch_timer = Difficulty.LATCH_INTERVAL * Heroes.latch_interval_mult(hero)
 		if p_squad.is_shielded():
 			return
 		var bite := Difficulty.latch_bite(p_squad.count)
@@ -1519,6 +1521,16 @@ func _nearest_zombie(at: Vector3, max_range: float, skip: Array) -> Zombie:
 			best_d = d
 			best = z
 	return best
+
+
+## Slows every zombie on the road: KOFI's hero move.
+func chill_all(mult: float, seconds: float) -> int:
+	var n := 0
+	for z in zombies:
+		if z.alive:
+			z.chill(mult, seconds)
+			n += 1
+	return n
 
 
 ## A card's explosion: BLAST ROUNDS or a LAST STAND. Hurts every zombie

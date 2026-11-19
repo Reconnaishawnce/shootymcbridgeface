@@ -338,10 +338,11 @@ changes where they pay. Five phases, each a release:
 1. Build cards (0.55, done). A draft of three after every boss, ten
    cards in three rarities, four combos, and a near-miss line on the
    results card. See DESIGN, "Build cards".
-2. Heroes that play differently, and a cleaner home screen. Each of the
-   eight heroes gets a passive and a twist on the hero move, so stars
-   buy ways to play; the home screen goes down to PLAY, MODES, SHOP,
-   LOCKER and a MORE drawer.
+2. Heroes that play differently, and a cleaner home screen (0.56,
+   done). Each of the eight heroes has a passive and a twist on the
+   hero move, so stars buy ways to play; the home screen is PLAY,
+   MODES, and a bottom bar of SHOP, LOCKER and MORE. See DESIGN,
+   "Heroes" and "The home screen".
 3. Levels with an identity, and the graphics pass that goes with them:
    a signature rule and a look per level (night bridge with headlights,
    a collapsing lane, a convoy to escort, the horde at your back), plus

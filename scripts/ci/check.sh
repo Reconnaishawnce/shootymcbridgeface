@@ -57,6 +57,14 @@ fail_on_script_errors "rush smoke"
 grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a boss"; exit 1; }
 grep -q "SMOKE_CARD " "$LOG" || { echo "::error::a boss fell and no build card was drafted"; exit 1; }
 
+echo "== heroes: each one's power reaches the run"
+for pair in max:move_soldiers zuri:gate_soldiers luna:ghost kofi:calm rex:shove mei:refill; do
+  hero="${pair%%:*}"; fx="${pair##*:}"
+  "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1200 --smoke-hero="$hero" 2>&1 | tee "$LOG"
+  fail_on_script_errors "$hero smoke"
+  grep "SMOKE_HERO" "$LOG" | grep -q "\"$fx\":[1-9]" || { echo "::error::$hero's power ($fx) never fired"; exit 1; }
+done
+
 echo "== build cards: every card held, every effect fires"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1500 --smoke-cards=all 2>&1 | tee "$LOG"
 fail_on_script_errors "cards smoke"

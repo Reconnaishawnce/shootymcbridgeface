@@ -47,6 +47,9 @@ func test_help_text() -> void:
 	for id in Cards.COMBO_ORDER:
 		check(all.contains(Cards.combo_title(id)), "help mentions combo %s" % id)
 	check(all.contains("BUILD CARDS") and all.contains("EPIC"), "help explains the draft")
+	for id in Heroes.ORDER:
+		check(all.contains(Heroes.passive_text(id)) and all.contains(Heroes.twist_text(id)), "help says what %s does" % id)
+	check(all.contains("MODES holds") and all.contains("Along the bottom: SHOP"), "help maps the home screen")
 	check(all.contains("level %d" % Progression.DASH_LEVEL), "dash level comes from the constant")
 	check(all.contains("%d gates and a boss" % Difficulty.GATES_PER_LEVEL), "gates per level from the constant")
 

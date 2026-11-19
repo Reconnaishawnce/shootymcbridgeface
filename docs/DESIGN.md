@@ -978,6 +978,59 @@ screen is exactly where phones were struggling.
 the best it says SO CLOSE, otherwise the gap; nothing on a first run
 or a new best.
 
+## Heroes (0.56)
+
+Eight heroes were eight faces. Now each is a way to play, which is
+what makes stars worth chasing and gives the cards something to pair
+with. `Heroes` (pure, tested) is the whole design: per hero one
+passive and one twist on the hero move, as text that reads the
+constants and as getters that return the neutral value for anyone
+else (`damage_mult("", n)` is 1.0), so call sites need no branches.
+
+| Hero | Always on | The move also |
+| --- | --- | --- |
+| MAX | 3 soldiers on a level clear | brings 2 back |
+| ZURI | +1 at adding gates | each gate winds it 2 s |
+| PIP | +30% damage at 12 or fewer | recharges 25% faster |
+| LUNA | dash 40% sooner | 1.5 s untouchable |
+| KOFI | clingers bite half as often | slows every zombie |
+| ADA | +10% coins | +6% per perk and card |
+| REX | heavy bites -25% | shoves the front rows |
+| MEI | perfect gate +2 | perfect gate refills it |
+
+Where they live: `World.hero` and `Squad.hero` carry the id;
+`World._bite`, the gate gain, the latch timer, `Squad._damage_mult`
+and `Squad.dash` read it; `Game` does the rest (`_on_boss_killed`,
+`_on_gate_passed`, `_on_gate_perfect`, the coin line,
+`_move_cooldown_mult`, and `_hero_move_twist` after `use_ability`).
+`Heroes.active` decides whether a power is live: characters on, and a
+mode in `MODES` (the daily and weekly are one road for everyone). The
+bot runs plain unless `--smoke-hero` names someone, so the soak's
+numbers and the idle test keep their meaning.
+
+Character mode is on by default from this build; a save that turned
+it off stays off, and then there is no hero and no power. The locker's
+hero tab is two columns so each button can carry `Heroes.short`, and
+the line under the grid is the worn hero's full text. Tapping an
+unowned hero still buys it, so the short line is what you buy on.
+
+MEI's refill is the strongest of these in a bot's hands (seven moves
+where the others get two); she is the dearest hero and a human's
+perfect rate is lower, but the balance pass should look at her first.
+
+## The home screen (0.56)
+
+The home screen had grown to a dozen buttons and five lines of text.
+It is now: the wallet top left, the title, one line of bests, PLAY,
+MODES, the road bar and next goal, and a bottom bar of SHOP, LOCKER
+and MORE under the thumb. MODES is a card with endless, daily, weekly
+and boss rush (a grey line on each), then the difficulty and squad
+chips, which cycle in place: they set `_modes_stay` so the redraw that
+follows reopens the card. MORE is everything that is neither playing
+nor buying. The unlock rules in `Goals.title_buttons` are unchanged;
+the MODES button shows when any of its contents do, and names the
+difficulty when it is not normal.
+
 ## The run meta (0.48)
 
 Four things that give a finished run a reason to come back tomorrow.

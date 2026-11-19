@@ -45,6 +45,8 @@ var active := false
 var world: World
 var perks: Perks
 var cards: Cards
+## The hero whose power is live this run (Heroes), or "".
+var hero := ""
 var meta: Meta
 ## HOT ROUNDS: a per-run damage boost, 1.0 when none.
 var boost_damage := 1.0
@@ -357,7 +359,7 @@ func can_dash() -> bool:
 func dash(direction: float) -> bool:
 	if not can_dash():
 		return false
-	dash_ready_at = now + Progression.DASH_COOLDOWN
+	dash_ready_at = now + Progression.DASH_COOLDOWN * Heroes.dash_cooldown_mult(hero)
 	invulnerable_until = now + Progression.DASH_IFRAMES
 	var b := _bounds()
 	target_x = clampf(target_x + signf(direction) * Progression.DASH_DISTANCE, b.x, b.y)
@@ -434,7 +436,7 @@ func _fire_mult() -> float:
 
 
 func _damage_mult() -> float:
-	var m := (meta.damage_mult() if meta != null else 1.0) * boost_damage
+	var m := (meta.damage_mult() if meta != null else 1.0) * boost_damage * Heroes.damage_mult(hero, count)
 	if is_shotgun():
 		m *= SHOTGUN_DAMAGE_MULT
 	elif is_medic():

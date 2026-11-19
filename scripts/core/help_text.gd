@@ -22,7 +22,9 @@ static func sections() -> Array:
 			"Freezes of a second or more and slow stretches under %d frames a second send a report on their own when SEND REPORTS is on in SETTINGS. SHOW FPS puts a frame counter in the corner if you want to watch it yourself." % int(Telemetry.SLOW_FPS)},
 		{"title": "LEARN AS YOU GO", "body":
 			"The first time something new appears on the road (a hidden panel, a sum, a deal, a perk gate, the fork, a saw, each boss...) the road pauses and one short card says how it works. Tap GOT IT and play on. " +
-			"LEARN on the home screen starts a learning round where every card shows again. LESSONS in SETTINGS turns them off. This page is the long version."},
+			"LEARN THE ROAD under MORE starts a learning round where every card shows again. LESSONS in SETTINGS turns them off. This page is the long version."},
+		{"title": "THE HOME SCREEN", "body":
+			"PLAY starts a normal run. MODES holds every other way to play (endless, the daily, the weekly, the boss rush), the difficulty and your squad type. Along the bottom: SHOP for coins, LOCKER for stars, and MORE for the leaderboard, quests, the trophy road, records, the learning round, this page and SETTINGS."},
 		{"title": "CONTROLS", "body":
 			"Low on the screen, near the squad: drag left or right to steer, drag up or down to spread out or bunch up, and flick hard sideways to dash (from level %d). " % Progression.DASH_LEVEL +
 			"Higher up, on the road: hold a finger there and every gun aims at that spot with a red laser. Lift to go back to firing straight ahead. " +
@@ -123,8 +125,12 @@ static func sections() -> Array:
 		{"title": "STARS AND THE LOCKER", "body":
 			"Stars are the other currency. A run pays one star per boss, one per four perfect gates, and one for getting through at least three gates. " +
 			"The daily pays one extra, the weekly two, and hard and nightmare pay bonus stars. Achievements pay stars too. " +
-			"Turn CHARACTERS on in Settings and the LOCKER opens: %d heroes, outfits, %d hats, weapon skins, backs and crew styles, all bought with stars. " % [heroes, hats] +
+			"The LOCKER holds %d heroes, outfits, %d hats, weapon skins, backs and crew styles, all bought with stars. (CHARACTERS in SETTINGS turns the whole thing off and puts the squad back in plain kit.) " % [heroes, hats] +
 			"Your hero leads the squad with a name tag, and always escapes. The ROAD tab sells paint for the bridge deck, and GOLD SQUAD dresses the whole crew in gold."},
+		{"title": "HEROES", "body":
+			"A hero is not only a face. Each one changes how the run plays: one thing that is always on, and one thing your hero move does on top of its usual job. Pick the hero that suits how you play, or the one that goes with the cards you like.\n" +
+			_hero_lines() +
+			"Hero powers work in normal runs, endless and the boss rush. The daily and the weekly are the same road for everyone, so everyone runs them plain. With CHARACTERS off there is no hero and no power."},
 		{"title": "MODES", "body":
 			"NORMAL is the road as it comes. HARD opens at %d trophies: bigger waves, meaner bosses, 1.5x score and coins. " % int(Road.UNLOCKS["hard"]) +
 			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +
@@ -160,6 +166,13 @@ static func sections() -> Array:
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]
+
+
+static func _hero_lines() -> String:
+	var out := ""
+	for id in Heroes.ORDER:
+		out += "%s: %s. %s.\n" % [Wardrobe.title(id), Heroes.passive_text(id), Heroes.twist_text(id)]
+	return out
 
 
 static func _card_lines() -> String:

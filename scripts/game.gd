@@ -58,6 +58,13 @@ var hud: Hud
 var sfx: Sfx
 var meta := Meta.new()
 var perks := Perks.new()
+## Build cards: drafted after bosses, held for the run.
+var cards := Cards.new()
+var _draft_open := false
+var _draft_ids: Array = []
+## Something that wanted the screen while the draft had it.
+var _after_draft: Callable = Callable()
+var _card_fx_last := 0.0
 var combo := Combo.new()
 var powerups := Powerups.new()
 var waves_cleared := 0
@@ -110,6 +117,8 @@ var trophies := 0
 var revives: Dictionary = {}
 var _revive_used := false
 var _revive_open := false
+## A draft is on its way (the timer is running).
+var _draft_due := false
 var achievements_done: Array = []
 var _bets_won := 0
 var _bets_lost := 0
@@ -145,6 +154,8 @@ var _smoke_daily := false
 var _smoke_weekly := false
 var _smoke_upgrades := false
 var _smoke_boosts := false
+## --smoke-cards=all (or ids): the bot starts with these build cards.
+var _smoke_cards := ""
 ## --smoke-idle: the bot does nothing at all, to measure what a squad
 ## left alone gets away with.
 var _smoke_idle := false
@@ -228,6 +239,8 @@ func _ready() -> void:
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-cards="):
+			_smoke_cards = a.trim_prefix("--smoke-cards=")
 		elif a.begins_with("--smoke-wipe-at="):
 			_smoke_wipe_at = int(a.get_slice("=", 1))
 		elif a.begins_with("--shots="):
@@ -457,6 +470,7 @@ func _build_scene() -> void:
 		if what == "saw":
 			hud.show_float("SAW!", false))
 	world.perk_felt.connect(_on_perk_felt)
+	world.card_felt.connect(_on_card_felt)
 	world.pit_stop_reached.connect(_on_pit_stop)
 	world.pit_lane_opened.connect(func() -> void:
 		if not smoke:
@@ -510,6 +524,7 @@ func _build_scene() -> void:
 	hud.shop_closed.connect(show_title)
 	hud.buy_pressed.connect(buy_upgrade)
 	hud.boost_pressed.connect(buy_boost)
+	hud.card_picked.connect(_pick_card)
 	hud.squad_toggled.connect(toggle_squad)
 	hud.mode_pressed.connect(cycle_mode)
 	hud.menu_pressed.connect(show_title)
@@ -1400,12 +1415,26 @@ func start_run(p_mode: String = "levels") -> void:
 	Engine.time_scale = 1.0
 	_slowmo_until = 0.0
 	squad.perks = perks
+	cards = Cards.new()
+	_draft_open = false
+	_draft_due = false
+	_draft_ids = []
+	_after_draft = Callable()
+	hud.hide_draft()
+	if smoke and _smoke_cards != "":
+		for id in (Cards.ORDER if _smoke_cards == "all" else Array(_smoke_cards.split(","))):
+			if Cards.CATALOG.has(id):
+				for n in range(Cards.max_stack(id) if _smoke_cards == "all" else 1):
+					cards.take(id)
+	squad.cards = cards
+	world.cards = cards
+	world.card_fx = {}
 	squad.squad_type = "rifle" if mode in ["daily", "weekly"] else squad_type
 	_drop_preview()
 	squad.visible = true
 	_apply_looks()
 	world.perks = perks
-	world.perk_count = 0
+	world.perk_count = cards.total()
 	world.endless = mode == "endless"
 	world.modifier = "normal" if mode == "daily" else (Daily.WEEKLY_MODIFIER if mode == "weekly" else modifier)
 	grades = []
@@ -1422,6 +1451,9 @@ func start_run(p_mode: String = "levels") -> void:
 	# Reset before RUNNING: a road snapping back to two lanes must not
 	# banner, chime or glide the camera like a mid-run widening.
 	world.reset(run_seed)
+	# The bot's granted SENTRY cards stand their turrets up too.
+	for i in range(cards.stack("sentry")):
+		world.add_turret()
 	state = State.RUNNING
 	Diag.set_state("running")
 	Diag.note("start_run", {"mode": mode, "modifier": modifier, "seed": run_seed, "squad_type": squad_type})
@@ -1612,6 +1644,7 @@ func end_run() -> void:
 	hud.update_stats(squad.count, world.level, total_distance, score)
 	_last_over = {
 		"score": score, "best": shown_best, "is_best": is_best, "level": world.level,
+		"near_miss": NearMiss.line(score, shown_best, is_best), "build": cards.summary(),
 		"distance": int(total_distance), "kills": kills, "peak": peak_squad, "coins_earned": earned, "bounty": run_bounty,
 		"mode": mode, "stars_earned": stars_earned, "hero_name": wardrobe.hero_name() if character_mode else "",
 		"locker_nudge": character_mode and wardrobe.can_afford_something(),
@@ -1710,6 +1743,7 @@ func _process(delta: float) -> void:
 			Diag.set_gauge("zombies", world.zombies.size())
 			Diag.set_gauge("squad", squad.count)
 			Diag.set_gauge("level", world.level)
+			Diag.set_gauge("cards", cards.total())
 			Diag.set_gauge("fx", Fx.live_peak)
 			Diag.set_gauge("scale", snappedf(Engine.time_scale, 0.01))
 	if smoke:
@@ -1729,7 +1763,7 @@ func use_ability() -> void:
 	if state != State.RUNNING or get_tree().paused or _warming:
 		return
 	var level := meta.level("hero")
-	if not Abilities.ready(_run_time, _ability_last, level):
+	if not Abilities.ready(_run_time, _ability_last, level, cards.cooldown_mult()):
 		sfx.play("gate_bad", -10.0)
 		return
 	_ability_last = _run_time
@@ -1804,7 +1838,7 @@ func _tick_run(delta: float) -> void:
 			if _cling_touch.is_empty() and not _touches.values().has("focus"):
 				squad.clear_focus()
 	_check_lessons()
-	hud.set_ability(Abilities.title(Abilities.for_type(squad.squad_type)), Abilities.charge(_run_time, _ability_last, meta.level("hero")), true)
+	hud.set_ability(Abilities.title(Abilities.for_type(squad.squad_type)), Abilities.charge(_run_time, _ability_last, meta.level("hero"), cards.cooldown_mult()), true)
 	# Hands off the road: panels stop climbing, and the first time it
 	# happens in a run the HUD says why.
 	# A finger held still is still a hand on the road.
@@ -2052,6 +2086,10 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 	world.supply_funds = bounty
 	# Greed shows on the counter as it happens, not only at the end.
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
+	if cards.note_kill() and squad.count > 0:
+		squad.add(1)
+		world.card_fx["medic"] = int(world.card_fx.get("medic", 0)) + 1
+		hud.show_float("+1 MEDIC", true)
 	var chain := combo.kill(_run_time)
 	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
@@ -2080,6 +2118,10 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	hud.show_float("-%d" % bite, false)
 	if smoke:
 		print("SMOKE_BITE ", JSON.stringify({"level": world.level, "bite": bite, "left": squad.count, "frame": _frames}))
+	# LAST STAND: the soldiers who went take the front row with them.
+	if cards.stack("martyr") > 0:
+		world.card_fx["martyr"] = int(world.card_fx.get("martyr", 0)) + 1
+		world.card_blast(squad.position + Vector3(0.0, 0.0, -1.4), cards.martyr_radius(), squad.damage_per_shot() * Cards.MARTYR_DAMAGE_MULT * float(mini(bite, 3)), "martyr")
 	if heavy:
 		_bites_heavy += 1
 	# A heavy bite can take a veteran with it. The loss is named.
@@ -2144,11 +2186,17 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 			_refresh_pause_perks()
 			if smoke:
 				print("SMOKE_VETERAN ", JSON.stringify({"name": v.name, "trait": v.trait, "level": level, "frame": _frames}))
-			get_tree().create_timer(2.0).timeout.connect(func() -> void:
+			var announce := func() -> void:
 				if state == State.RUNNING:
 					hud.show_banner("%s STEPS UP\n%s: %s" % [v.name, Veterans.title(v.trait), Veterans.description(v.trait)], 2.4)
 					sfx.play("rally", -2.0, 1.2)
-					_teach("veterans"))
+					_teach("veterans")
+			get_tree().create_timer(2.0).timeout.connect(func() -> void:
+				# The draft has the screen: the veteran steps up after the pick.
+				if _draft_open or _draft_due:
+					_after_draft = announce
+				else:
+					announce.call())
 	if character_mode:
 		hud.show_float(Wardrobe.cheer_line(wardrobe.hero_name(), letter, level + bosses_killed), true)
 	squad.cheer()
@@ -2164,6 +2212,119 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	if world.boss != null:
 		Burst.spawn(world, world.boss.position + Vector3(0.0, 2.0, 0.0), Boss.CORE_COLOR, 40, 0.22, 7.0, 0.9)
 		Burst.spawn(world, world.boss.position + Vector3(0.0, 1.5, 0.0), Boss.SKIN, 30, 0.2, 6.0, 0.9)
+	_queue_draft()
+
+
+# --- build cards -----------------------------------------------------------
+
+## Cards that cannot be offered right now: no third turret.
+func _cards_blocked() -> Array:
+	return ["sentry"] if world.turrets.size() >= Difficulty.MAX_TURRETS else []
+
+
+## A boss fell: if it pays a draft, the cards come once the confetti has
+## landed. The bot takes the first card on the spot.
+func _queue_draft() -> void:
+	if not Cards.drafts_after_boss(mode, bosses_killed):
+		return
+	if smoke:
+		var hand := cards.offer(world.gen.rng, _cards_blocked())
+		if not hand.is_empty():
+			_take_card(str(hand[0]))
+		return
+	_draft_due = true
+	get_tree().create_timer(1.5, true, false, true).timeout.connect(_open_draft.bind(0))
+
+
+## Opens the draft when nothing else has the screen; tries again if a
+## lesson, the pit or a pause is in the way.
+func _open_draft(tries: int) -> void:
+	if state != State.RUNNING:
+		_draft_due = false
+		return
+	if get_tree().paused or _lesson_open or _pit_open or _revive_open or _second_wind_pending:
+		if tries < 40:
+			get_tree().create_timer(0.5, true, false, true).timeout.connect(_open_draft.bind(tries + 1))
+		else:
+			_draft_due = false
+		return
+	_draft_due = false
+	_draft_ids = cards.offer(world.gen.rng, _cards_blocked())
+	if _draft_ids.is_empty():
+		return
+	_draft_open = true
+	Engine.time_scale = 1.0
+	_slowmo_until = 0.0
+	get_tree().paused = true
+	Diag.set_state("draft")
+	Diag.note("draft", {"offer": _draft_ids, "level": world.level})
+	var rows := []
+	for id in _draft_ids:
+		rows.append({"id": id, "name": Cards.title(id), "desc": Cards.description(id, cards.stack(id) + 1), "rarity": Cards.rarity(id), "icon": Cards.icon(id), "have": cards.stack(id), "max": Cards.max_stack(id), "combo": cards.combo_hint(id)})
+	hud.show_draft(rows)
+	sfx.play("powerup", -4.0, 1.1)
+	_buzz("gate_good")
+
+
+func _pick_card(id: String) -> void:
+	if not _draft_open or not _draft_ids.has(id):
+		return
+	_draft_open = false
+	_draft_ids = []
+	hud.hide_draft()
+	get_tree().paused = false
+	Diag.set_state("running")
+	_take_card(id)
+	if _after_draft.is_valid():
+		var later := _after_draft
+		_after_draft = Callable()
+		get_tree().create_timer(2.2).timeout.connect(later)
+
+
+## The card joins the build: the banner names it, or the combo it made.
+func _take_card(id: String) -> void:
+	var before := cards.combos()
+	cards.take(id)
+	world.perk_count = perks.total() + cards.total()
+	var made := ""
+	for combo in cards.combos():
+		if not before.has(combo):
+			made = str(combo)
+	Diag.note("card", {"id": id, "stack": cards.stack(id), "combo": made, "level": world.level})
+	if smoke:
+		print("SMOKE_CARD ", JSON.stringify({"id": id, "stack": cards.stack(id), "combo": made, "total": cards.total(), "level": world.level, "frame": _frames}))
+	if id == "sentry" and world.add_turret():
+		Diag.note("turret", {"from": "card", "count": world.turrets.size(), "level": world.level})
+	if made != "":
+		hud.show_banner("COMBO: %s\n%s" % [Cards.combo_title(made), Cards.combo_description(made)], 2.4)
+		sfx.play("level_clear", -4.0, 1.3)
+		hud.flash(0.25)
+		_buzz("boss_down")
+	else:
+		hud.show_banner("%s%s\n%s" % [Cards.title(id), "  x%d" % cards.stack(id) if cards.stack(id) > 1 else "", Cards.description(id, cards.stack(id))], 2.0)
+		sfx.play("gate_good", -2.0, 1.2)
+		_buzz("gate_good")
+	_refresh_pause_perks()
+
+
+## A card went off on the road: a tracer for a bounce, a burst for a
+## blast. Sound and shake are rationed so a crowd does not drown in them.
+func _on_card_felt(id: String, from: Vector3, to: Vector3) -> void:
+	if smoke:
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	match id:
+		"ricochet":
+			Fx.tracer(world, from + Vector3(0.0, 0.9, 0.0), to + Vector3(0.0, 0.9, 0.0), Color(1.0, 0.95, 0.5))
+		"blast", "martyr":
+			var radius := to.x
+			var colour := Color(1.0, 0.6, 0.2) if id == "blast" else Color(0.5, 0.75, 1.0)
+			Fx.ring(world, from + Vector3(0.0, 0.08, 0.0), radius, colour)
+			Fx.sparks(world, from + Vector3(0.0, 0.5, 0.0), 8)
+			if now - _card_fx_last > 0.15:
+				_card_fx_last = now
+				sfx.play("explosion", -12.0 if id == "blast" else -7.0, 1.5)
+				_shake = minf(1.0, _shake + 0.15)
 
 
 ## Fog: a thick grey haze that eats the far road; off again after.
@@ -2213,7 +2374,7 @@ func _on_level_started(level: int) -> void:
 
 func _on_perk_chosen(id: String) -> void:
 	perks.take(id)
-	world.perk_count = perks.total()
+	world.perk_count = perks.total() + cards.total()
 	hud.show_banner(Perks.title(id) + ("  x%d" % perks.stack(id) if perks.stack(id) > 1 else ""), 1.0)
 	_refresh_pause_perks()
 	sfx.play("gate_good")
@@ -2405,6 +2566,9 @@ func _back_out() -> bool:
 	if hud.leaderboard_open():
 		_lb_close()
 		return true
+	if _draft_open:
+		# No way out of a draft but a pick.
+		return true
 	if _lesson_open:
 		_close_lesson()
 		return true
@@ -2544,9 +2708,11 @@ func _lb_send_pending() -> void:
 ## The pause menu's line: perks held, then the veterans by name.
 func _refresh_pause_perks() -> void:
 	var parts := []
+	if cards.total() > 0:
+		parts.append("CARDS: " + cards.summary())
 	var perk_text := Perks.summary(perks.stacks)
 	if perk_text != "":
-		parts.append(perk_text)
+		parts.append("PERKS: " + perk_text)
 	var vets := squad.veterans.summary()
 	if vets != "":
 		parts.append("VETERANS: " + vets)
@@ -3011,6 +3177,8 @@ func _smoke_tick() -> void:
 			"retries": _smoke_retries,
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
+		if cards.total() > 0:
+			print("SMOKE_CARDFX ", JSON.stringify({"cards": cards.stacks, "combos": cards.combos(), "fx": world.card_fx, "turrets": world.turrets.size()}))
 		# The report the phone would send after a crash, built headless.
 		var bundle := Diag.bundle(_save_summary(), "crash", "smoke")
 		bundle.install = "0123456789abcdef"
@@ -3036,7 +3204,7 @@ func _bot_steer() -> void:
 			break
 	if powerups.bombs > 0 and (heavy_near or (world.phase == World.Phase.BOSS and world.boss != null and world.boss.alive and world.boss.position.z > -16.0)):
 		throw_bomb()
-	if near != null and near.position.z > -14.0 and Abilities.ready(_run_time, _ability_last, meta.level("hero")):
+	if near != null and near.position.z > -14.0 and Abilities.ready(_run_time, _ability_last, meta.level("hero"), cards.cooldown_mult()):
 		use_ability()
 	# A saw rolling at us outranks everything, the boss included: step
 	# round it, and dash if it is close.
@@ -3253,6 +3421,17 @@ func _shots_walkthrough() -> void:
 		hud.set_bombs(2)
 		hud.set_ability("VOLLEY", 0.65, true)
 		await _capture("q16_crowd.png", 8)
+		var shown := Cards.new()
+		shown.take("burn")
+		var hand := []
+		for id in ["blast", "frost", "sentry"]:
+			hand.append({"id": id, "name": Cards.title(id), "desc": Cards.description(id, shown.stack(id) + 1), "rarity": Cards.rarity(id), "icon": Cards.icon(id), "have": shown.stack(id), "max": Cards.max_stack(id), "combo": shown.combo_hint(id)})
+		hud.show_draft(hand)
+		await _capture("q20_draft.png", 30)
+		hud.hide_draft()
+		hud.show_game_over({"instant": true, "score": 8650, "best": 9000, "level": 3, "distance": 640, "kills": 212, "peak": 61, "coins_earned": 540, "bounty": 760, "mode": "levels", "grades": "A B", "near_miss": NearMiss.line(8650, 9000, false), "build": "BURNING ROUNDS  x2   ·   BLAST ROUNDS   ·   FIRESTORM!"})
+		await _capture("q21_results.png", 8)
+		hud.show_running()
 		hud.set_show_fps(true)
 		hud.set_fps(58.0, 14.2, 4120)
 		hud.show_paused(true)

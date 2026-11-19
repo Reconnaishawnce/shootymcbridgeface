@@ -77,6 +77,18 @@ func _draw() -> void:
 			_turret(c, s, dim)
 		"hero":
 			_hero(c, s, dim)
+		"ricochet":
+			_ricochet(c, s, dim)
+		"burn":
+			_flame(c, s, dim)
+		"frost":
+			_frost(c, s, dim)
+		"charge":
+			_charge(c, s, dim)
+		"martyr":
+			_burst(c, s, dim)
+		"crit":
+			_crosshair(c, s, dim)
 		_:
 			draw_circle(c, s * 0.5, GOLD * dim)
 
@@ -243,6 +255,72 @@ func _turret(c: Vector2, s: float, dim: float) -> void:
 	for i in range(4):
 		var a := ph * TAU * 0.5 + float(i) * TAU / 4.0
 		draw_line(c + Vector2(s * 0.75, s * 0.1), c + Vector2(s * 0.75, s * 0.1) + Vector2(cos(a), sin(a)) * s * (0.2 + 0.1 * sin(_t * 9.0)), _col(GOLD, dim), s * 0.06)
+
+
+# --- build cards -----------------------------------------------------------
+
+func _ricochet(c: Vector2, s: float, dim: float) -> void:
+	# A tracer that zigzags off two heads.
+	var pts := [c + Vector2(-s * 1.0, s * 0.6), c + Vector2(-s * 0.2, -s * 0.45), c + Vector2(s * 0.35, s * 0.4), c + Vector2(s * 1.0, -s * 0.55)]
+	for i in range(pts.size() - 1):
+		draw_line(pts[i], pts[i + 1], _col(GOLD, dim), s * 0.11)
+	for i in [1, 2]:
+		draw_circle(pts[i], s * (0.24 + 0.05 * sin(_t * 7.0 + float(i))), _col(Color(0.45, 0.75, 0.4), dim))
+		draw_circle(pts[i] + Vector2(-s * 0.08, -s * 0.04), s * 0.05, _col(RED, dim))
+		draw_circle(pts[i] + Vector2(s * 0.08, -s * 0.04), s * 0.05, _col(RED, dim))
+	var ph := fmod(_t * 1.6, 1.0) * 3.0
+	var seg := mini(2, int(ph))
+	draw_circle(pts[seg].lerp(pts[seg + 1], ph - float(seg)), s * 0.12, _col(WHITE, dim))
+
+
+func _flame(c: Vector2, s: float, dim: float) -> void:
+	var w := 0.12 * sin(_t * 8.0)
+	var outer := PackedVector2Array([c + Vector2(0.0, -s * (1.0 + w)), c + Vector2(s * 0.55, -s * 0.15), c + Vector2(s * 0.6, s * 0.45), c + Vector2(s * 0.25, s * 0.9), c + Vector2(-s * 0.25, s * 0.9), c + Vector2(-s * 0.6, s * 0.45), c + Vector2(-s * 0.45, -s * 0.25), c + Vector2(-s * 0.15, -s * 0.1)])
+	draw_colored_polygon(outer, _col(Color(1.0, 0.45, 0.1), dim))
+	var inner := PackedVector2Array([c + Vector2(s * 0.05, -s * (0.35 - w)), c + Vector2(s * 0.3, s * 0.3), c + Vector2(s * 0.15, s * 0.8), c + Vector2(-s * 0.15, s * 0.8), c + Vector2(-s * 0.3, s * 0.35)])
+	draw_colored_polygon(inner, _col(GOLD, dim))
+
+
+func _frost(c: Vector2, s: float, dim: float) -> void:
+	# A six-armed snowflake that turns slowly.
+	var ice := Color(0.6, 0.88, 1.0)
+	for i in range(6):
+		var a := _t * 0.5 + float(i) * TAU / 6.0
+		var d := Vector2(cos(a), sin(a))
+		draw_line(c, c + d * s * 0.95, _col(ice, dim), s * 0.1)
+		var mid := c + d * s * 0.6
+		var side := Vector2(-d.y, d.x)
+		draw_line(mid, mid + (d + side).normalized() * s * 0.28, _col(ice, dim), s * 0.07)
+		draw_line(mid, mid + (d - side).normalized() * s * 0.28, _col(ice, dim), s * 0.07)
+	draw_circle(c, s * 0.16, _col(WHITE, dim))
+
+
+func _charge(c: Vector2, s: float, dim: float) -> void:
+	# A dial filling up around a bolt.
+	draw_arc(c, s * 0.85, 0.0, TAU, 32, _col(STEEL.darkened(0.4), dim), s * 0.14)
+	draw_arc(c, s * 0.85, -PI * 0.5, -PI * 0.5 + TAU * fmod(_t * 0.6, 1.0), 32, _col(GOLD, dim), s * 0.14)
+	var bolt := PackedVector2Array([c + Vector2(s * 0.2, -s * 0.6), c + Vector2(-s * 0.3, s * 0.05), c + Vector2(-s * 0.02, s * 0.05), c + Vector2(-s * 0.2, s * 0.6), c + Vector2(s * 0.3, -s * 0.1), c + Vector2(s * 0.03, -s * 0.1)])
+	draw_colored_polygon(bolt, _col(GOLD, dim))
+
+
+func _burst(c: Vector2, s: float, dim: float) -> void:
+	# A soldier's helmet in the middle of a starburst.
+	var pts := PackedVector2Array()
+	for i in range(16):
+		var a := float(i) * TAU / 16.0 + _t * 0.4
+		var r := s * (1.0 if i % 2 == 0 else 0.55) * (1.0 + 0.06 * sin(_t * 9.0))
+		pts.append(c + Vector2(cos(a), sin(a)) * r)
+	draw_colored_polygon(pts, _col(Color(1.0, 0.5, 0.15), dim))
+	draw_circle(c, s * 0.34, _col(BLUE, dim))
+	draw_rect(Rect2(c.x - s * 0.36, c.y - s * 0.02, s * 0.72, s * 0.14), _col(BLUE.darkened(0.3), dim))
+
+
+func _crosshair(c: Vector2, s: float, dim: float) -> void:
+	draw_arc(c, s * 0.75, 0.0, TAU, 32, _col(RED, dim), s * 0.1)
+	for i in range(4):
+		var d := Vector2(cos(float(i) * PI * 0.5), sin(float(i) * PI * 0.5))
+		draw_line(c + d * s * 0.45, c + d * s * 1.05, _col(RED, dim), s * 0.1)
+	draw_circle(c, s * (0.14 + 0.05 * sin(_t * 6.0)), _col(WHITE, dim))
 
 
 func _rifle(c: Vector2, s: float, dim: float) -> void:

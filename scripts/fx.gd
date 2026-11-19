@@ -16,6 +16,49 @@ static var live := 0
 static var live_peak := 0
 
 
+## Marks: single meshes that flash and go (a bounce's tracer, a blast's
+## ring). Capped on their own so a crowd of card effects stays cheap.
+const MAX_MARKS := 24
+static var marks := 0
+
+
+static func _fade(m: Node3D, to_scale: Vector3, life: float) -> void:
+	marks += 1
+	var tw := m.create_tween()
+	tw.tween_property(m, "scale", to_scale, life)
+	tw.tween_callback(func() -> void:
+		marks = maxi(0, marks - 1)
+		m.queue_free())
+
+
+## A bright line from [param from] to [param to] (in the parent's space)
+## that thins out and is gone: where a ricochet went.
+static func tracer(parent: Node, from: Vector3, to: Vector3, color: Color) -> void:
+	var d := from.distance_to(to)
+	if marks >= MAX_MARKS or d < 0.2:
+		return
+	var m := Mats.box(Vector3(0.09, 0.09, 1.0), color, true)
+	m.material_override = Mats.glow(color, 2.6)
+	parent.add_child(m)
+	m.position = (from + to) * 0.5
+	m.basis = Basis.looking_at((to - from).normalized(), Vector3.UP)
+	m.scale = Vector3(1.0, 1.0, d)
+	_fade(m, Vector3(0.05, 0.05, d), 0.16)
+
+
+## A ring on the ground that opens to [param radius]: how far a blast
+## reached.
+static func ring(parent: Node, at: Vector3, radius: float, color: Color) -> void:
+	if marks >= MAX_MARKS:
+		return
+	var m := Mats.torus(0.82, 1.0, color, true)
+	m.material_override = Mats.glow(color, 2.2)
+	parent.add_child(m)
+	m.position = at
+	m.scale = Vector3.ONE * radius * 0.25
+	_fade(m, Vector3(radius, 0.4, radius), 0.22)
+
+
 static func _mesh(size: float, color: Color, glow: bool = false) -> Mesh:
 	var m := SphereMesh.new()
 	m.radius = size

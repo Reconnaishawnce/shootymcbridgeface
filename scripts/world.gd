@@ -59,6 +59,9 @@ signal pit_lane_opened
 ## A perk just did something you could have missed: thick skin softened
 ## a bite by [param amount], the recruiter added [param amount].
 signal perk_felt(id: String, amount: int)
+## A build card did something worth showing: a bounce (from, to), a
+## blast or a last stand (at, radius in to.x).
+signal card_felt(id: String, from: Vector3, to: Vector3)
 ## A supply panel paid off, or could not be paid.
 signal supply_bought(id: String, amount: int, cost: int)
 signal supply_refused(cost: int)
@@ -134,6 +137,10 @@ var gen: Difficulty
 ## Set by the game so hit resolution can read the squad's damage output.
 var squad: Squad
 var perks: Perks
+## Build cards (Cards): what bullets and bites do this run.
+var cards: Cards
+## How often each card effect fired, for the bot and the reports.
+var card_fx: Dictionary = {}
 var meta: Meta
 var powerups: Powerups
 ## Run seconds, passed in by the game each frame.
@@ -603,11 +610,15 @@ func try_hit(b: Bullet) -> bool:
 	var z_lo := minf(b.prev_z, b.position.z) - 0.35
 	var z_hi := maxf(b.prev_z, b.position.z) + 0.35
 	for z in zombies.duplicate():
-		if z.latched or z.position.z < z_lo or z.position.z > z_hi:
+		# A bounce or a blast earlier in this same sweep may have killed it.
+		if not z.alive or z.latched or z.position.z < z_lo or z.position.z > z_hi:
 			continue
 		if absf(z.position.x - b.position.x) > z.radius * b.radius_mult:
 			continue
-		if z.take_damage(b.damage):
+		var dead: bool = z.take_damage(b.damage * (cards.shatter_mult() if cards != null and z.slow_left > 0.0 else 1.0))
+		if not dead and cards != null:
+			dead = _card_hit(z, b.damage)
+		if dead:
 			zombies.erase(z)
 			zombie_killed.emit(z)
 			_note_wave_death(z)
@@ -615,6 +626,8 @@ func try_hit(b: Bullet) -> bool:
 			z.die()
 			if b.source != null and is_instance_valid(b.source):
 				b.source.note_kill()
+			if cards != null:
+				_card_bullet_kill(z.position, b.damage, z)
 			if b.hits_left > 1:
 				# Piercing: keep flying, but never count the same kill twice.
 				b.hits_left -= 1
@@ -1108,13 +1121,19 @@ func nearest_upcoming_perk_gate() -> PerkGate:
 
 func _move_zombies(delta: float, p_squad: Squad) -> void:
 	for z in zombies.duplicate():
+		if not z.alive:
+			continue
+		if (z.burn_left > 0.0 or z.slow_left > 0.0) and z.tick_status(delta):
+			_fx("burn_kills")
+			_kill(z)
+			continue
 		if z.is_thief():
 			_move_thief(delta, z)
 			continue
 		if z.latched:
 			_tick_latched(delta, z, p_squad)
 			continue
-		var pace := _pace()
+		var pace: float = _pace() * z.pace_mult()
 		z.position.z += (world_speed + z.speed * pace) * delta
 		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-road_half + 0.4, z.lane_min), minf(road_half - 0.4, z.lane_max))
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
@@ -1429,6 +1448,102 @@ func shell_should_burst(sh: Shell) -> bool:
 	if boss != null and boss.alive and absf(boss.position.z - sh.position.z) < 1.5 and absf(boss.position.x - sh.position.x) < Boss.BODY_RADIUS:
 		return true
 	return false
+
+
+# --- build cards -----------------------------------------------------------
+
+func _fx(id: String) -> void:
+	card_fx[id] = int(card_fx.get(id, 0)) + 1
+
+
+## Everything a death needs, for the card effects' own kills.
+func _kill(z: Zombie) -> void:
+	var was_latched := z.latched
+	_latched.erase(z)
+	zombies.erase(z)
+	zombie_killed.emit(z)
+	_note_wave_death(z)
+	if not was_latched:
+		_split(z)
+	z.die()
+
+
+## A bullet hit [param z] and it lived: burn it, slow it, and with the
+## EXECUTIONER finish it under a quarter health. True when that kills.
+func _card_hit(z: Zombie, damage: float) -> bool:
+	if cards.burn_fraction() > 0.0:
+		if z.burn_left <= 0.0:
+			_fx("burn")
+		z.ignite(damage * cards.burn_fraction(), Cards.BURN_SECONDS)
+	if cards.stack("frost") > 0:
+		if z.slow_left <= 0.0:
+			_fx("slow")
+		z.chill(cards.slow_mult(), Cards.SLOW_SECONDS)
+	if cards.executes() and z.hp <= z.max_hp * Cards.EXECUTE_FRACTION:
+		_fx("execute")
+		return true
+	return false
+
+
+## A bullet killed something at [param at]: the shot bounces on, and
+## every so many kills one goes off.
+func _card_bullet_kill(at: Vector3, damage: float, dead: Zombie) -> void:
+	var from := at
+	var seen: Array = [dead]
+	for hop in range(cards.ricochets()):
+		var next := _nearest_zombie(from, Cards.RICOCHET_RANGE, seen)
+		if next == null:
+			break
+		seen.append(next)
+		_fx("ricochet")
+		var to := next.position
+		card_felt.emit("ricochet", from, to)
+		if cards.has_combo("wildfire"):
+			next.ignite(damage * cards.burn_fraction(), Cards.BURN_SECONDS)
+		if next.take_damage(damage * Cards.RICOCHET_MULT):
+			_kill(next)
+		from = to
+	if cards.note_bullet_kill():
+		_fx("blast")
+		card_blast(at, cards.blast_radius(), damage * Cards.BLAST_DAMAGE_MULT, "blast")
+
+
+func _nearest_zombie(at: Vector3, max_range: float, skip: Array) -> Zombie:
+	var best: Zombie = null
+	var best_d := max_range
+	for z in zombies:
+		if not z.alive or z.latched or skip.has(z):
+			continue
+		var d := Vector2(z.position.x - at.x, z.position.z - at.z).length()
+		if d < best_d:
+			best_d = d
+			best = z
+	return best
+
+
+## A card's explosion: BLAST ROUNDS or a LAST STAND. Hurts every zombie
+## in the circle, sets them alight with FIRESTORM, and never chains into
+## another blast. Returns the kills.
+func card_blast(at: Vector3, radius: float, damage: float, id: String) -> int:
+	if frozen or cards == null:
+		return 0
+	var kills := 0
+	var burn := cards.has_combo("firestorm")
+	for z in zombies.duplicate():
+		if not z.alive or Vector2(z.position.x - at.x, z.position.z - at.z).length() > radius + z.radius * 0.5:
+			continue
+		if burn:
+			z.ignite(damage / Cards.BLAST_DAMAGE_MULT * maxf(cards.burn_fraction(), Cards.BURN_FRACTION), Cards.BURN_SECONDS)
+		if z.take_damage(damage):
+			_kill(z)
+			kills += 1
+	if boss != null and boss.alive and Vector2(boss.position.x - at.x, boss.position.z - at.z).length() <= radius + Boss.BODY_RADIUS:
+		var dead := boss.take_damage(damage * 0.5, false)
+		boss_hit.emit(boss, false)
+		if dead:
+			_on_boss_dead()
+	card_felt.emit(id, at, Vector3(radius, float(kills), 0.0))
+	return kills
 
 
 ## A burst of [param damage] on everything within [param radius] of

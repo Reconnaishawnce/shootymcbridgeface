@@ -13,6 +13,8 @@ signal shop_opened
 signal shop_closed
 signal buy_pressed(id: String)
 signal boost_pressed(id: String)
+## A build card was picked from the draft.
+signal card_picked(id: String)
 signal squad_toggled
 signal mode_pressed
 signal menu_pressed
@@ -99,6 +101,8 @@ var _over_count_tween: Tween
 var _over_tick_at := 0.0
 var _crash_body: Label
 var _problem_card: Control
+var _draft_card: Control
+var _draft_rows: VBoxContainer
 var _problem_note: LineEdit
 var _problem_head: Label
 var _settings_fps: Button
@@ -562,6 +566,7 @@ func _init() -> void:
 	_build_crash(root)
 	_build_problem(root)
 	_build_lesson(root)
+	_build_draft(root)
 	# Last, so it sits over everything while the game warms up.
 	_loading = Control.new()
 	_loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -606,6 +611,110 @@ func _build_lesson(root: Control) -> void:
 	skip.text = "Lessons can be turned off in SETTINGS, and replayed with LEARN."
 	skip.modulate = Color(0.75, 0.75, 0.8)
 	box.add_child(skip)
+
+
+const RARITY_COLORS := {"common": Color(0.6, 0.8, 1.0), "rare": Color(0.78, 0.5, 1.0), "epic": Color(1.0, 0.82, 0.25)}
+
+
+## The draft: three build cards after a boss. The road is paused under
+## it and there is no way out but a pick.
+func _build_draft(root: Control) -> void:
+	_draft_card = _card(root)
+	_draft_card.visible = false
+	var panel: PanelContainer = _draft_card.get_meta("panel")
+	panel.add_theme_stylebox_override("panel", _flat(Color(0.05, 0.06, 0.1, 0.94), 22, Color(1.0, 0.85, 0.3, 0.5), 3))
+	var box: VBoxContainer = _draft_card.get_meta("box")
+	box.add_theme_constant_override("separation", 12)
+	var head := _label(44, HORIZONTAL_ALIGNMENT_CENTER)
+	head.text = "PICK A CARD"
+	head.add_theme_color_override("font_color", COIN)
+	box.add_child(head)
+	var sub := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
+	sub.text = "Yours until the run ends. Some pairs make a COMBO."
+	sub.modulate = Color(0.85, 0.85, 0.9)
+	box.add_child(sub)
+	_draft_rows = VBoxContainer.new()
+	_draft_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_draft_rows.add_theme_constant_override("separation", 14)
+	box.add_child(_draft_rows)
+
+
+## [param rows]: one per card, {id, name, desc, rarity, icon, have, max,
+## combo}. Each is one big button.
+func show_draft(rows: Array) -> void:
+	for child in _draft_rows.get_children():
+		_draft_rows.remove_child(child)
+		child.queue_free()
+	var n := 0
+	for row in rows:
+		var id := str(row.id)
+		var tint: Color = RARITY_COLORS.get(str(row.rarity), Color.WHITE)
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(600.0, 176.0)
+		b.add_theme_stylebox_override("normal", _flat(Color(tint.r * 0.16, tint.g * 0.16, tint.b * 0.2, 0.96), 18, tint, 4))
+		b.add_theme_stylebox_override("hover", _flat(Color(tint.r * 0.24, tint.g * 0.24, tint.b * 0.28, 0.96), 18, tint, 4))
+		b.add_theme_stylebox_override("pressed", _flat(Color(tint.r * 0.34, tint.g * 0.34, tint.b * 0.38, 0.96), 18, Color.WHITE, 5))
+		b.pressed.connect(func() -> void: card_picked.emit(id))
+		var h := HBoxContainer.new()
+		h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		h.offset_left = 14.0
+		h.offset_right = -14.0
+		h.add_theme_constant_override("separation", 12)
+		b.add_child(h)
+		var icon := ShopIcon.new()
+		icon.setup(str(row.icon), Vector2(132.0, 132.0))
+		icon.lit = true
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(icon)
+		var v := VBoxContainer.new()
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		v.alignment = BoxContainer.ALIGNMENT_CENTER
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		v.add_theme_constant_override("separation", 0)
+		h.add_child(v)
+		var tag := _label(17, HORIZONTAL_ALIGNMENT_LEFT)
+		var have := int(row.get("have", 0))
+		tag.text = str(row.rarity).to_upper() + ("   ·   you have %d of %d" % [have, int(row.max)] if have > 0 else "")
+		tag.add_theme_color_override("font_color", tint)
+		v.add_child(tag)
+		var name := _label(32, HORIZONTAL_ALIGNMENT_LEFT)
+		name.text = str(row.name)
+		v.add_child(name)
+		var desc := _label(20, HORIZONTAL_ALIGNMENT_LEFT)
+		desc.text = str(row.desc)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+		desc.custom_minimum_size.x = 410.0
+		desc.modulate = Color(0.9, 0.9, 0.95)
+		v.add_child(desc)
+		if str(row.get("combo", "")) != "":
+			var combo := _label(18, HORIZONTAL_ALIGNMENT_LEFT)
+			combo.text = str(row.combo)
+			combo.autowrap_mode = TextServer.AUTOWRAP_WORD
+			combo.custom_minimum_size.x = 410.0
+			combo.add_theme_color_override("font_color", COIN)
+			v.add_child(combo)
+		_draft_rows.add_child(b)
+		# The cards deal in one after another.
+		b.modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_interval(0.08 * float(n))
+		tw.tween_property(b, "modulate:a", 1.0, 0.18)
+		n += 1
+	_draft_card.move_to_front()
+	_draft_card.visible = true
+	_pause_button.visible = false
+
+
+func hide_draft() -> void:
+	if _draft_card.visible:
+		_pause_button.visible = true
+	_draft_card.visible = false
+
+
+func draft_open() -> bool:
+	return _draft_card.visible
 
 
 func show_lesson(title: String, body: String) -> void:
@@ -1854,7 +1963,7 @@ func set_powers(text: String) -> void:
 
 ## The perks held this run, shown in the pause menu, not on the road.
 func set_perks(text: String) -> void:
-	_pause_perks.text = "PERKS: " + text if text != "" else ""
+	_pause_perks.text = text
 	_pause_perks.visible = text != ""
 
 
@@ -2254,6 +2363,11 @@ func show_game_over(r: Dictionary) -> void:
 	var goal := str(r.get("goal", ""))
 	if goal != "":
 		coins_line += "\n\nNEXT: " + goal
+	# How close that was, and what the run was built from.
+	if str(r.get("near_miss", "")) != "":
+		head += "\n" + str(r.get("near_miss", ""))
+	if str(r.get("build", "")) != "":
+		where += "\nBUILD  " + str(r.get("build", ""))
 	_over_template = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
 	if _over_count_tween != null:
 		_over_count_tween.kill()

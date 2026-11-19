@@ -52,6 +52,13 @@ static func sections() -> Array:
 			"The heavier side pays better panels. Read both and pick. " +
 			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
 				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
+		{"title": "BUILD CARDS", "body":
+			"Every time a boss falls the road stops and deals you three BUILD CARDS. Pick one. It is yours until the run ends, and it changes what your bullets and your squad do, so no two runs play the same. In the BOSS RUSH it is every other boss.\n" +
+			"Cards come in three kinds: COMMON (blue), RARE (purple) and EPIC (gold, and not often). Most can be taken more than once and get stronger each time.\n" +
+			_card_lines() +
+			"Some pairs make a COMBO, which is a third power on top of the two cards. The card tells you when it would make one, and a card that would finish a combo turns up more often:\n" +
+			_combo_lines() +
+			"The pause menu lists your cards, and the results card shows the build you finished with. Bosses are a little tougher for every card you hold."},
 		{"title": "PERKS", "body":
 			"Every perk panel says what it does and how many of it you already hold, the banner on the way through says it again, and the strip under your stats lists everything you carry. " +
 			"When a perk does its job you see it: THICK SKIN tells you how many soldiers it just saved, RECRUITER shows its extra soldier at the gate, GREED shows on the bounty counter as it grows.\n" +
@@ -153,6 +160,24 @@ static func sections() -> Array:
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]
+
+
+static func _card_lines() -> String:
+	var out := ""
+	for id in Cards.ORDER:
+		var text := Cards.description(id, 1)
+		if Cards.max_stack(id) > 1:
+			text += " (up to %d)" % Cards.max_stack(id)
+		out += "%s (%s): %s.\n" % [Cards.title(id), Cards.rarity(id), text]
+	return out
+
+
+static func _combo_lines() -> String:
+	var out := ""
+	for id in Cards.COMBO_ORDER:
+		var needs: Array = Cards.COMBOS[id]["needs"]
+		out += "%s = %s + %s: %s.\n" % [Cards.combo_title(id), Cards.title(str(needs[0])), Cards.title(str(needs[1])), Cards.combo_description(id)]
+	return out
 
 
 static func _perk_lines() -> String:

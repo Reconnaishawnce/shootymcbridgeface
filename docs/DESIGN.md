@@ -929,6 +929,55 @@ run starts with `Difficulty.RUSH_START_SQUAD` extra soldiers and keeps
 its own best under the "rush" key. The bot takes `--rush` and prints
 `SMOKE_RUSH` per boss; CI requires one.
 
+## Build cards (0.55)
+
+Perks were the only build a run had, and perks are numbers: more fire
+rate, more coins. Every run converged on the same squad. Cards are the
+answer to "every run plays the same": a card changes what a bullet or
+a bite does, cards pair into combos, and the hand is dealt, so a run
+is shaped by what turned up.
+
+`Cards` (pure, tested) holds the catalog (ten cards, `RARITY_WEIGHT`
+60/30/10), the bag of stacks, the four `COMBOS`, the dealing
+(`offer(rng, blocked)`: weighted, distinct, and `COMBO_PULL` leans it
+toward the other half of a combo you have started), the text
+(`description(id, n)` reads the constants, `combo_hint`), and three
+counters the game ticks: `note_shot` (DEAD EYE), `note_bullet_kill`
+(BLAST ROUNDS) and `note_kill` (FIELD MEDIC). Counters, not dice, so a
+card is predictable and a seed replays.
+
+When: `Cards.drafts_after_boss` (every boss; every other in the rush).
+`Game._queue_draft` waits 1.5 s for the confetti, `_open_draft` waits
+again if a lesson, the pit, a rally offer or a pause has the screen,
+then pauses the tree (state "draft") and shows `Hud.show_draft`: three
+full-width buttons bordered in the rarity's colour, with an animated
+icon, the stack you hold, what the next stack does and the combo line.
+There is no way out but a pick; back does nothing. The veteran's
+banner, which used to land at the same moment, waits in `_after_draft`.
+
+Where the effects live: `World.try_hit` is the one place a bullet
+lands. A hit that does not kill runs `_card_hit` (ignite, chill,
+execute under `EXECUTE_FRACTION`); a kill runs `_card_bullet_kill`
+(the bounce chain through `_nearest_zombie`, then the blast counter).
+`card_blast` is the cards' own explosion, used by BLAST ROUNDS and by
+LAST STAND from `Game._on_squad_bitten`; it never feeds the blast
+counter, so explosions cannot chain forever. Fire and frost are
+fields on `Zombie` (`ignite`, `chill`, `tick_status`, `pace_mult`)
+ticked at the top of `_move_zombies`; fire drains health without the
+hit flinch. `World._kill` is the full death sequence for those kills.
+DEAD EYE is decided in `Squad._spawn_bullet`; OVERCHARGE is a
+multiplier on `Abilities.ready/charge`; SENTRY GUN is `add_turret`.
+
+Balance: every card counts as a perk for `Difficulty.boss_hp`, so a
+stacked build meets a tougher boss. Cost: the status marker is one
+lazily built cone per zombie, tracers and rings are single meshes
+under `Fx.MAX_MARKS`, and the sounds are rationed, because the busy
+screen is exactly where phones were struggling.
+
+`NearMiss.line` is the results card's "how close": within `CLOSE` of
+the best it says SO CLOSE, otherwise the gap; nothing on a first run
+or a new best.
+
 ## The run meta (0.48)
 
 Four things that give a finished run a reason to come back tomorrow.

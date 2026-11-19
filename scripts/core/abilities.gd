@@ -63,13 +63,14 @@ static func power(level: int) -> float:
 
 
 ## Whether the move may fire: it has been cooldown(level) since the last.
-static func ready(now: float, last_used: float, level: int) -> bool:
-	return now - last_used >= cooldown(level)
+## [param mult] is the OVERCHARGE card: a shorter wait.
+static func ready(now: float, last_used: float, level: int, mult: float = 1.0) -> bool:
+	return now - last_used >= cooldown(level) * mult
 
 
 ## 0 at the moment of use, 1 when ready again.
-static func charge(now: float, last_used: float, level: int) -> float:
-	return clampf((now - last_used) / cooldown(level), 0.0, 1.0)
+static func charge(now: float, last_used: float, level: int, mult: float = 1.0) -> float:
+	return clampf((now - last_used) / (cooldown(level) * mult), 0.0, 1.0)
 
 
 static func volley_shots(count: int) -> int:

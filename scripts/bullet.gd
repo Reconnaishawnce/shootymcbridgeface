@@ -6,6 +6,8 @@ extends Node3D
 const SPEED := 42.0
 const LIFETIME := 1.8
 const COLOR := Color(1.0, 0.9, 0.35)
+## A DEAD EYE shot: red, fat, triple.
+const CRIT_COLOR := Color(1.0, 0.3, 0.25)
 
 var damage := 1.0
 var vx := 0.0

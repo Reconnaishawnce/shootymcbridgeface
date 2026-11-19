@@ -44,6 +44,7 @@ var target_x := 0.0
 var active := false
 var world: World
 var perks: Perks
+var cards: Cards
 var meta: Meta
 ## HOT ROUNDS: a per-run damage boost, 1.0 when none.
 var boost_damage := 1.0
@@ -708,8 +709,12 @@ func volley(shots: int, damage_mult: float, pierce: int) -> void:
 
 
 func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> void:
-	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0))
-	b.damage = damage
+	# DEAD EYE: every so many bullets one is red, fat and hits for triple.
+	var crit := cards != null and cards.note_shot()
+	var b := Bullet.new(size * (perks.bullet_radius_mult() if perks != null else 1.0) * (1.6 if crit else 1.0), Bullet.CRIT_COLOR if crit else Bullet.COLOR)
+	b.damage = damage * (Cards.CRIT_MULT if crit else 1.0)
+	if crit and world != null:
+		world.card_fx["crit"] = int(world.card_fx.get("crit", 0)) + 1
 	if straight and not focus_on:
 		# Out of the middle, dead ahead, harder, and through one more.
 		origin = Vector3(global_position.x, origin.y, origin.z)

@@ -55,6 +55,16 @@ echo "== boss rush (one gate, then the boss) and a saw storm event"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2400 --rush --smoke-upgrades 2>&1 | tee "$LOG"
 fail_on_script_errors "rush smoke"
 grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a boss"; exit 1; }
+grep -q "SMOKE_CARD " "$LOG" || { echo "::error::a boss fell and no build card was drafted"; exit 1; }
+
+echo "== build cards: every card held, every effect fires"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1500 --smoke-cards=all 2>&1 | tee "$LOG"
+fail_on_script_errors "cards smoke"
+for fx in ricochet burn slow blast crit execute medic; do
+  grep "SMOKE_CARDFX" "$LOG" | grep -q "\"$fx\":[1-9]" || { echo "::error::the $fx card effect never fired"; exit 1; }
+done
+grep "SMOKE_CARDFX" "$LOG" | grep -q '"firestorm","shatter","wildfire","chain"' || { echo "::error::the combos did not all form"; exit 1; }
+grep "SMOKE_CARDFX" "$LOG" | grep -q '"turrets":2' || { echo "::error::the sentry cards put no turrets on the curb"; exit 1; }
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=3000 --smoke-event=saw_storm --smoke-seed=3 2>&1 | tee "$LOG"
 fail_on_script_errors "saw storm smoke"
 grep -q "SMOKE_SAW" "$LOG" || { echo "::error::the saw storm rolled no saw past the squad"; exit 1; }

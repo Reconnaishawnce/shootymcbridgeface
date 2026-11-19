@@ -3,6 +3,28 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.55 (build cards: phase 1 of the "make it awesome" arc)
+
+- BUILD CARDS. Every time a boss falls the road pauses and deals three
+  cards; you pick one and keep it for the run. Ten cards in three
+  rarities change what bullets and bites do: RICOCHET, BURNING ROUNDS,
+  COLD ROUNDS, FIELD MEDIC, OVERCHARGE (common), BLAST ROUNDS, LAST
+  STAND, DEAD EYE (rare), SENTRY GUN and EXECUTIONER (epic). Most stack.
+- COMBOS. Four pairs make a third power: FIRESTORM (burn + blast),
+  SHATTER (cold + dead eye), WILDFIRE (ricochet + burn) and CHAIN
+  REACTION (blast + last stand). A card says when it would make one,
+  and the other half of a combo you have started turns up more often.
+- You see it work: burning zombies carry a flame, slowed ones a shard
+  of ice, bounces draw a tracer, blasts open a ring on the road, dead
+  eye shots are fat and red. Effects are capped so a crowd stays cheap.
+- The pause menu lists the cards, the results card shows the build, and
+  bosses gain a little health for every card held.
+- The results card says how close you came: "SO CLOSE: 50 short of your
+  best" within a tenth, otherwise the gap. (Retry was already one tap
+  anywhere on that card after 0.6 seconds.)
+- The smoke bot drafts the first card offered; `--smoke-cards=all`
+  holds everything, and `check.sh` proves every effect fires.
+
 ## 0.54 (something to spend it on)
 
 - A tester maxed the shop and the locker and had nothing left to buy.

@@ -329,6 +329,34 @@ shipped and measured on its own.
    arrive (the warm-up and watchdog target the likeliest cause of the
    slow starts; the reports will say whether they were right).
 
+## The "fun but not excellent" arc (0.55 onward)
+
+The owner's brief, late November 2026: the game is fun, not excellent;
+every run plays the same. Make it addictive and interesting, with big
+changes where they pay. Five phases, each a release:
+
+1. Build cards (0.55, done). A draft of three after every boss, ten
+   cards in three rarities, four combos, and a near-miss line on the
+   results card. See DESIGN, "Build cards".
+2. Heroes that play differently, and a cleaner home screen. Each of the
+   eight heroes gets a passive and a twist on the hero move, so stars
+   buy ways to play; the home screen goes down to PLAY, MODES, SHOP,
+   LOCKER and a MORE drawer.
+3. Levels with an identity, and the graphics pass that goes with them:
+   a signature rule and a look per level (night bridge with headlights,
+   a collapsing lane, a convoy to escort, the horde at your back), plus
+   lighting, materials and effects across the board.
+4. Chests, a lower coin curve, and rivals: quest, road and season
+   rewards become chests you tap open with a rare jackpot; late-game
+   coin income comes down now that the sinks exist; the run shows the
+   leaderboard name just above you and says when you pass it.
+5. Sound, and bosses you dodge if the prototype is fun: a track per
+   mode, combo kills that climb in pitch, and telegraphed boss attacks
+   with safe lanes. The boss work ships only if it plays well.
+
+Performance runs alongside: the 0.53 traces decide whether the crowd
+moves to batched instances.
+
 ## The graphics arc: from stick figures to a stylized, polished look
 
 An Epic-style look needs modelled, textured, rigged characters and a

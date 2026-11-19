@@ -58,6 +58,13 @@ var _cling_ring: MeshInstance3D
 var _legs: Array[Node3D] = []
 var _arms: Array[Node3D] = []
 var _hit_t := 0.0
+## Build cards: on fire (damage a second, seconds left) and slowed.
+var burn_dps := 0.0
+var burn_left := 0.0
+var slow_left := 0.0
+var slow_mult := 1.0
+var _status: MeshInstance3D
+var _status_kind := ""
 var _head: MeshInstance3D
 var _base_scale := 1.0
 var _phase := randf() * TAU
@@ -309,6 +316,35 @@ func mark_latched() -> void:
 		add_child(_cling_ring)
 
 
+## Sets it alight: the strongest fire wins, the clock restarts.
+func ignite(dps: float, seconds: float) -> void:
+	burn_dps = maxf(burn_dps, dps)
+	burn_left = seconds
+
+
+func chill(mult: float, seconds: float) -> void:
+	slow_mult = minf(slow_mult, mult) if slow_left > 0.0 else mult
+	slow_left = seconds
+
+
+## How fast it walks right now: slowed zombies drag.
+func pace_mult() -> float:
+	return slow_mult if slow_left > 0.0 else 1.0
+
+
+## Burns and thaws. True when the fire killed it. No flinch: fire is a
+## steady drain, not a hit.
+func tick_status(delta: float) -> bool:
+	if slow_left > 0.0:
+		slow_left -= delta
+	if burn_left <= 0.0 or not alive:
+		return false
+	burn_left -= delta
+	hp -= burn_dps * delta
+	_refresh_bar()
+	return hp <= 0.0
+
+
 func take_damage(amount: float) -> bool:
 	if not alive:
 		return false
@@ -355,9 +391,30 @@ func _refresh_bar() -> void:
 		_bar_bg.visible = _bar.visible
 
 
+## A small flame or a shard of ice over the head while it burns or drags.
+func _show_status() -> void:
+	var want := "burn" if burn_left > 0.0 else ("slow" if slow_left > 0.0 else "")
+	if want == _status_kind:
+		return
+	_status_kind = want
+	if want == "":
+		if _status != null:
+			_status.visible = false
+		return
+	if _status == null:
+		_status = Mats.cone(0.16, 0.42, Color(1.0, 0.55, 0.1), true)
+		_status.position = Vector3(0.0, 1.72, 0.1)
+		_body.add_child(_status)
+	_status.material_override = Mats.glow(Color(1.0, 0.55, 0.1) if want == "burn" else Color(0.55, 0.85, 1.0), 2.4)
+	_status.visible = true
+
+
 func _process(delta: float) -> void:
 	if not alive:
 		return
+	_show_status()
+	if _status != null and _status.visible:
+		_status.scale = Vector3.ONE * (1.0 + 0.25 * sin(Time.get_ticks_msec() * 0.02 + _phase))
 	# A stumbling lurch so a wave reads as a crowd, not a grid.
 	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() or latched else 7.0) + _phase
 	_body.rotation.z = sin(t * 0.8) * 0.1

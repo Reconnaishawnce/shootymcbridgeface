@@ -978,6 +978,48 @@ screen is exactly where phones were struggling.
 the best it says SO CLOSE, otherwise the gap; nothing on a first run
 or a new best.
 
+## Music and the combo's scale (0.59)
+
+The old music was three unrelated loops (100, 118 and 140 beats a
+minute) of a bass pulse under a drone. Crossfading them was a cut
+between tempos, and the bass sat at 55 Hz as a pure sine, which a
+phone speaker does not reproduce at all.
+
+`Tunes` (pure, tested) is the composition as data: `BARS` is the
+progression (Am, F, C, G) with each bar's bass note, pad triad and the
+four notes a melody may use over it; `MELODIES` gives each lead eight
+steps a bar as indices into those notes, so a melody cannot leave the
+chord. Every loop is `BEAT * BEATS` samples long, which is what keeps
+them in step: the players are started together and loop together.
+
+- `bed(style)`: the pad swells in and out at each bar line (no click
+  on the change), the bass is plucked with two overtones (so 110 Hz
+  reads on a phone as its harmonics), and the drums thicken with the
+  style: calm has a kick a bar, tense adds a backbeat and off-beat
+  hats, boss is four on the floor with sixteenth hats and a bass that
+  jumps the octave.
+- `lead(id)`: plucked notes on the eighth-note grid. `lead_for_mode`
+  picks one: the road, endless (a wheel of arpeggios), the contest
+  (daily and weekly), the rush (hammered eighths).
+- `combo_pitch(chain)`: from the third kill, a step up a minor
+  pentatonic scale every two kills, capped two octaves up.
+
+`Sfx` turns them into streams and keeps the crossfade it had:
+`set_music` picks the bed, `set_lead` the melody, and `_aim_layers`
+makes silence take both. `play_combo` plays the "ping" at the chain's
+pitch, rationed like the hit sound; `play_warn` is two rising beeps on
+`World.strike_called`.
+
+Nobody can hear a unit test, so the tests hold what can be held: every
+loop the same length, no clipping, no silence, a clean loop point,
+every melody note a chord tone, the modes not sharing a tune, the
+combo scale strictly rising. A rendered preview was checked by its
+spectrum: each bar's strongest partials are its chord. Whether it is
+a good tune is for ears.
+
+Cost: eight loops are built under the loading screen instead of four,
+one a frame, about twice the old music build time.
+
 ## Chests (0.58)
 
 Quest coins, season tiers and road milestones used to land as lines of

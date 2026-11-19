@@ -18,7 +18,13 @@ const MUSIC_RATE := 8000
 const MUSIC_DB := -15.0
 ## The room layers crossfade against each other; SHIMMER rides on top of
 ## whichever is playing and follows the combo.
-const MUSIC_STYLES := ["calm", "tense", "boss", "shimmer"]
+## The beds that carry the room, the combo's shimmer, and one melody
+## per kind of run (Tunes). All but the shimmer share a tempo and a
+## length, so they stay in step under any crossfade.
+const MUSIC_STYLES := ["calm", "tense", "boss", "shimmer", "lead_levels", "lead_endless", "lead_contest", "lead_rush"]
+const LEAD_DB := -16.0
+const COMBO_INTERVAL := 0.06
+const WARN_INTERVAL := 0.3
 const SHIMMER := "shimmer"
 const SHIMMER_DB := -13.0
 
@@ -30,6 +36,9 @@ var _hit_cooldown := 0.0
 var _music: Dictionary = {}
 var _music_target: Dictionary = {}
 var _music_style := ""
+var _lead := ""
+var _combo_cooldown := 0.0
+var _warn_cooldown := 0.0
 var _music_ready := false
 
 
@@ -54,6 +63,8 @@ func _ready() -> void:
 		"explosion": make_explosion(),
 		"block": make_block(),
 		"crate": make_crate(),
+		"ping": make_ping(),
+		"warn": make_warn(),
 	}
 	for i in range(POOL):
 		var p := AudioStreamPlayer.new()
@@ -101,6 +112,8 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	_shot_cooldown -= delta
 	_hit_cooldown -= delta
+	_combo_cooldown -= delta
+	_warn_cooldown -= delta
 	# Crossfade the music layers toward their targets.
 	for style in _music:
 		var mp: AudioStreamPlayer = _music[style]
@@ -115,10 +128,26 @@ func set_music(style: String) -> void:
 	if style == _music_style:
 		return
 	_music_style = style
+	_aim_layers()
+
+
+## Which melody rides on the bed: a Tunes lead id, or "" for none.
+func set_lead(lead: String) -> void:
+	if lead == _lead:
+		return
+	_lead = lead
+	_aim_layers()
+
+
+## One bed at a time, and its melody with it; silence takes both.
+func _aim_layers() -> void:
 	for key in _music_target:
 		if key == SHIMMER:
 			continue
-		_music_target[key] = db_to_linear(MUSIC_DB) if key == style else 0.0
+		if Tunes.LEADS.has(key):
+			_music_target[key] = db_to_linear(LEAD_DB) if (key == _lead and _music_style != "") else 0.0
+		else:
+			_music_target[key] = db_to_linear(MUSIC_DB) if key == _music_style else 0.0
 
 
 ## The combo layer: 0 is silent, 1 is full. Bright and beatless, so it
@@ -164,6 +193,23 @@ func play_hit() -> void:
 		return
 	_hit_cooldown = HIT_INTERVAL
 	play("hit", -10.0, randf_range(0.85, 1.15))
+
+
+## The combo's note: every kill in a chain pings, and the ping climbs a
+## scale as the chain grows (Tunes.combo_pitch).
+func play_combo(chain: int) -> void:
+	if chain < Tunes.COMBO_FROM or _combo_cooldown > 0.0:
+		return
+	_combo_cooldown = COMBO_INTERVAL
+	play("ping", -15.0, Tunes.combo_pitch(chain))
+
+
+## A boss attack is on its way: two quick rising beeps, rationed.
+func play_warn() -> void:
+	if _warn_cooldown > 0.0:
+		return
+	_warn_cooldown = WARN_INTERVAL
+	play("warn", -9.0)
 
 
 # --- synthesis (static and pure, so it is unit-testable) -------------------
@@ -299,15 +345,24 @@ static func make_block() -> AudioStreamWAV:
 	return to_stream(mix(tone(0.12, 1200.0, 600.0, 20.0, Wave.SQUARE, 0.2), tone(0.12, 0.0, 0.0, 30.0, Wave.NOISE, 0.3)))
 
 
+## The combo's note: a short bell at E4, pitched up by the chain.
+static func make_ping() -> AudioStreamWAV:
+	return to_stream(mix(tone(0.11, 329.63, 329.63, 26.0, Wave.SINE, 0.5), tone(0.07, 659.25, 659.25, 40.0, Wave.SINE, 0.2)))
+
+
+## The warning for a boss attack: two rising beeps.
+static func make_warn() -> AudioStreamWAV:
+	return to_stream(concat(tone(0.07, 700.0, 880.0, 14.0, Wave.SINE, 0.5), tone(0.1, 880.0, 1175.0, 16.0, Wave.SINE, 0.5)))
+
+
 static func make_crate() -> AudioStreamWAV:
 	return to_stream(concat(tone(0.05, 700.0, 700.0, 20.0, Wave.SQUARE, 0.3), tone(0.12, 1050.0, 1050.0, 14.0, Wave.SINE, 0.4)))
 
 
 # --- music -----------------------------------------------------------------
 
-## A short looping bed synthesised from a kick, a bass pulse, hats and a pad.
-## Three styles share the key so crossfading between them feels like one
-## track getting more urgent.
+## The loops are composed in Tunes: three beds and four melodies over
+## one progression at one tempo. Here they only become streams.
 ## The shimmer: four high notes under a fast tremolo and a slow swell,
 ## no beat, looping. Louder with the combo.
 static func make_shimmer() -> AudioStreamWAV:
@@ -346,76 +401,8 @@ static func make_shimmer() -> AudioStreamWAV:
 static func make_music(style: String) -> AudioStreamWAV:
 	if style == SHIMMER:
 		return make_shimmer()
-	var bpm := 100.0
-	var kicks := [0]
-	var hats := []
-	var bass_amp := 0.22
-	var pad := [110.0, 130.8, 164.8]
-	var pad_amp := 0.07
-	match style:
-		"tense":
-			bpm = 118.0
-			kicks = [0, 2]
-			hats = [1, 3]
-			bass_amp = 0.3
-			pad = [110.0, 130.8, 164.8, 196.0]
-			pad_amp = 0.06
-		"boss":
-			bpm = 140.0
-			kicks = [0, 1, 2, 3]
-			hats = [0.5, 1.5, 2.5, 3.5]
-			bass_amp = 0.36
-			pad = [110.0, 130.8, 155.6, 164.8]
-			pad_amp = 0.08
-	var beat := 60.0 / bpm
-	var beats := 8
-	var rate := float(MUSIC_RATE)
-	# Own generator: this runs on a worker thread, and the global one is
-	# shared with the main thread.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = style.hash()
-	var n := int(beat * float(beats) * rate)
-	var out := PackedFloat32Array()
-	out.resize(n)
-	# Pad and bass are continuous oscillators; kicks and hats are short
-	# one-shots mixed in afterwards, so the per-sample loop stays cheap.
-	var pad_step := PackedFloat32Array()
-	for f in pad:
-		pad_step.append(TAU * float(f) / rate)
-	var pad_phase := PackedFloat32Array()
-	pad_phase.resize(pad.size())
-	var bass_phase := 0.0
-	var beat_samples := int(beat * rate)
-	for i in range(n):
-		var in_beat := float(i % beat_samples) / rate
-		var bar_beat := (i / beat_samples) % 4
-		var bass_f := 110.0 if (style == "boss" and bar_beat == 2) else 55.0
-		bass_phase += TAU * bass_f / rate
-		var v := sin(bass_phase) * bass_amp * exp(-3.0 * in_beat)
-		var trem := 0.7 + 0.3 * sin(float(i) / rate * 0.8)
-		for j in range(pad_phase.size()):
-			pad_phase[j] += pad_step[j]
-			v += sin(pad_phase[j]) * pad_amp * trem
-		out[i] = v
-	# One-shots: a kick is a quick pitch drop, a hat a tick of noise.
-	var kick_len := int(0.25 * rate)
-	var hat_len := int(0.05 * rate)
-	for bar in range(beats / 4):
-		for k in kicks:
-			var start := int((float(bar * 4) + float(k)) * beat * rate)
-			for j in range(kick_len):
-				var since := float(j) / rate
-				var idx := start + j
-				if idx < n:
-					out[idx] += sin(TAU * (120.0 - 300.0 * since) * since) * 0.5 * exp(-18.0 * since)
-		for h in hats:
-			var start_h := int((float(bar * 4) + float(h)) * beat * rate)
-			for j in range(hat_len):
-				var idx := start_h + j
-				if idx < n:
-					out[idx] += rng.randf_range(-1.0, 1.0) * 0.12 * exp(-80.0 * float(j) / rate)
-	for i in range(n):
-		out[i] = clampf(out[i], -1.0, 1.0)
+	var out := Tunes.lead(style) if Tunes.LEADS.has(style) else Tunes.bed(style)
+	var n := out.size()
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = MUSIC_RATE

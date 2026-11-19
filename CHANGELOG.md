@@ -3,6 +3,29 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.59 (sound: phase 5)
+
+- MUSIC. The three loops were a bass pulse and a drone at three
+  different tempos. They are now one song: a four-chord progression
+  (Am, F, C, G) at one tempo, as three beds (calm, tense, boss) that
+  stay in step when they crossfade, with real bass lines, a snare and
+  hats. Bass notes carry overtones so a phone speaker can play them.
+- A TUNE PER MODE. A melody rides on whichever bed is playing: one for
+  normal runs and the home screen, one for endless, one for the daily
+  and weekly, one for the boss rush.
+- THE COMBO SINGS. From the third kill of a chain every kill plays a
+  note that climbs a minor pentatonic scale, one step every two kills,
+  two octaves at the top.
+- ATTACK WARNING. Two rising beeps when a boss calls lightning rings
+  or a line, and for a storm front's lines.
+- Loading builds eight loops instead of four, one a frame as before:
+  about twice the music build time (0.2 s here, more on a phone).
+- BOSSES YOU DODGE was the other half of this phase, to ship only if it
+  played well. It did not need building: every boss already attacks
+  with a telegraph and a way out (rings that fill like a clock, lines
+  with a gap, aimed spit). Those attacks got the warning sound instead
+  of a new mechanic nobody has played.
+
 ## 0.58 (chests, a lower coin curve, rivals: phase 4)
 
 - CHESTS. Quest, season and trophy road rewards now arrive as chests.

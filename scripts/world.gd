@@ -64,6 +64,8 @@ signal perk_felt(id: String, amount: int)
 signal card_felt(id: String, from: Vector3, to: Vector3)
 ## A STORM FRONT's lightning line was called down on the gates.
 signal theme_struck
+## A lightning ring or line was called down: the warning starts now.
+signal strike_called
 ## A supply panel paid off, or could not be paid.
 signal supply_bought(id: String, amount: int, cost: int)
 signal supply_refused(cost: int)
@@ -1301,6 +1303,7 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			st.setup(clampf(p_squad.position.x + p_squad.velocity_x * 0.5 + offset, -road_half, road_half))
 			add_child(st)
 			_strikes.append(st)
+			strike_called.emit()
 	# Adds: the boss calls runners down the road.
 	_adds_timer -= delta * _pace()
 	if _adds_timer <= 0.0:
@@ -1633,6 +1636,7 @@ func _storm_line(delay: float) -> void:
 		st.delay(delay)
 		add_child(st)
 		_strikes.append(st)
+	strike_called.emit()
 
 
 ## The nearest x to [param x] that no warning ring threatens within

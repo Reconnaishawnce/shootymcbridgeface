@@ -17,6 +17,10 @@ static func sections() -> Array:
 			"More soldiers means more bullets. Lose them all and the run is over."},
 		{"title": "FEEL", "body":
 			"The phone buzzes with the game (HAPTICS in SETTINGS turns it off): a tap for a bite, a thump for a brute, a long one when the boss goes down. Heavy kills land with a blink of stopped time, the boss falls in slow motion under confetti, the music brightens as your combo climbs, and the score on the results card counts up before it settles."},
+		{"title": "SOUND", "body":
+			"The music is one song that changes with the room: calm on the road, tense when things get hard, and a driving beat for the boss. Every kind of run has its own tune over it: one for a normal run, one for ENDLESS, one for the DAILY and the WEEKLY, one for the BOSS RUSH.\n" +
+			"A combo sings. From the third kill of a chain every kill plays a note, and the note climbs a step every %d kills, two octaves up at the top. Drop the chain and it starts from the bottom again.\n" % Tunes.COMBO_KILLS_PER_STEP +
+			"Two rising beeps mean a boss attack or a lightning line has just been called: look for the red rings and move. SOUND and MUSIC can each be turned off in SETTINGS or the pause menu."},
 		{"title": "IF IT FREEZES OR SLOWS DOWN", "body":
 			"SHAKE the phone hard and a card asks what happened: IT FROZE, IT GOT SLOW, IT GLITCHED or SOMETHING ELSE. Tap one and a report goes to the developer with the last half minute of frame times and what was on screen, never your name. The run pauses while the card is up. REPORT A PROBLEM in the pause menu does the same without the shake. " +
 			"Freezes of a second or more and slow stretches under %d frames a second send a report on their own when SEND REPORTS is on in SETTINGS. SHOW FPS puts a frame counter in the corner if you want to watch it yourself." % int(Telemetry.SLOW_FPS)},

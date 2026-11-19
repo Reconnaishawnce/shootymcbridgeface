@@ -511,6 +511,7 @@ func _build_scene() -> void:
 	world.perk_felt.connect(_on_perk_felt)
 	world.card_felt.connect(_on_card_felt)
 	world.theme_struck.connect(_on_theme_struck)
+	world.strike_called.connect(func() -> void: sfx.play_warn())
 	world.pit_stop_reached.connect(_on_pit_stop)
 	world.pit_lane_opened.connect(func() -> void:
 		if not smoke:
@@ -1059,6 +1060,8 @@ func show_title() -> void:
 		_tele_report_crash()
 		_tele_flush()
 	sfx.set_music("calm")
+	# The home screen plays the road's own tune.
+	sfx.set_lead("lead_levels")
 	sfx.set_shimmer(0.0)
 	# A daily or weekly forces rifles; the title squad shows the real pick.
 	if squad.squad_type != squad_type:
@@ -1666,6 +1669,8 @@ func start_run(p_mode: String = "levels") -> void:
 	squad.clear_focus()
 	sfx.play("spawn")
 	sfx.set_music("tense" if mode == "endless" else "calm")
+	# Every kind of run has its own tune over the same beds.
+	sfx.set_lead(Tunes.lead_for_mode(mode))
 
 
 func end_run() -> void:
@@ -2344,6 +2349,8 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 	var chain := combo.kill(_run_time)
 	bonus += int(10.0 * combo.multiplier())
 	sfx.play_hit()
+	# The chain sings: each kill a note higher up the scale.
+	sfx.play_combo(chain)
 	if chain > 0 and chain % Combo.STEP == 0:
 		sfx.play("step", -6.0, 1.0 + 0.08 * float(chain / Combo.STEP))
 		hud.show_float("%d COMBO" % chain, true)

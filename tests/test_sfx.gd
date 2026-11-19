@@ -40,3 +40,7 @@ func test_music_loops() -> void:
 		check(m.get_length() > 2.0 and m.get_length() < 8.0, "%s loop is a few seconds" % style)
 		check_eq(m.loop_mode, AudioStreamWAV.LOOP_FORWARD, "%s loops" % style)
 		check_eq(m.loop_end, m.data.size() / 2, "%s loops its whole length" % style)
+	var beds := Sfx.make_music("calm").data.size()
+	for style in ["tense", "boss", "lead_levels", "lead_endless", "lead_contest", "lead_rush"]:
+		check_eq(Sfx.make_music(style).data.size(), beds, "%s is exactly as long as the calm bed, so they stay in step" % style)
+	check(Sfx.make_ping().get_length() < 0.2 and Sfx.make_warn().get_length() < 0.3, "the ping and the warning are short")

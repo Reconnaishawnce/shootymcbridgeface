@@ -355,9 +355,12 @@ changes where they pay. Five phases, each a release:
    run shows who is next above you (your own best everywhere, the
    board's names in the daily and weekly) and says when you pass. See
    DESIGN, "Chests", "The lower coin curve" and "Rivals".
-5. Sound, and bosses you dodge if the prototype is fun: a track per
-   mode, combo kills that climb in pitch, and telegraphed boss attacks
-   with safe lanes. The boss work ships only if it plays well.
+5. Sound (0.59, done): one song as three synced beds, a melody per
+   kind of run, combo kills that climb a scale, and a warning for boss
+   attacks. See DESIGN, "Music and the combo's scale". Bosses you
+   dodge was dropped as a build item: the bosses already telegraph
+   every attack and leave a way out, and a new attack pattern needs a
+   person holding a phone to judge, which this pass did not have.
 
 Performance runs alongside: the 0.53 traces decide whether the crowd
 moves to batched instances.

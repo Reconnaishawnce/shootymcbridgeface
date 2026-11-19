@@ -140,6 +140,24 @@ static func save_upgrades(levels: Dictionary) -> void:
 	_write(META, "upgrades", levels)
 
 
+static func load_enlist() -> Dictionary:
+	var v = _read(META, "enlist", {})
+	return v if v is Dictionary else {}
+
+
+static func save_enlist(tiers: Dictionary) -> void:
+	_write(META, "enlist", tiers)
+
+
+static func load_boosts() -> Dictionary:
+	var v = _read(META, "boosts", {})
+	return v if v is Dictionary else {}
+
+
+static func save_boosts(armed: Dictionary) -> void:
+	_write(META, "boosts", armed)
+
+
 static func load_daily() -> Dictionary:
 	var v = _read(STATS, "daily", {})
 	return v if v is Dictionary else {}

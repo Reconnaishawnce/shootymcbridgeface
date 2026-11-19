@@ -1911,6 +1911,12 @@ var _scenery: Array[Node3D] = []
 const SCENERY_SPAN := 240.0
 
 
+## Road paint from the locker: recolours the deck.
+func set_deck(colour: Color) -> void:
+	if _road != null:
+		_road.material_override = Mats.grainy(colour, 1.1, 0.18, 1)
+
+
 func _build_dressing() -> void:
 	_build_horde()
 	_road = Mats.gbox(Vector3(7.2, 0.2, 260.0), ROAD, 1.1, 0.18, 1)

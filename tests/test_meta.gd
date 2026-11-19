@@ -41,6 +41,29 @@ func test_effects() -> void:
 	check(Meta.effect_text("start", 2).begins_with("5"), "effect text reads the real number")
 
 
+func test_enlist() -> void:
+	var m := Meta.new()
+	check(not m.can_enlist("power", 100000), "nothing to enlist before max")
+	m.levels = {"power": Meta.max_level("power"), "start": Meta.max_level("start"), "wind": 1}
+	check(not m.can_enlist("wind", 100000), "one-shot upgrades do not enlist")
+	check_eq(m.enlist_cost("power"), 1250, "the first tier costs 2.5 base")
+	check(Meta.enlist_cost_at("power", 10) > Meta.enlist_cost_at("power", 9), "and climbs")
+	check_eq(m.enlist_tier("power", 1249), 1249, "too poor")
+	var before := m.damage_mult()
+	check_eq(m.enlist_tier("power", 1250), 0, "a tier costs what it says")
+	check_near(m.damage_mult() - before, 0.01, 0.0001, "a tier is one percent")
+	check(m.enlist_cost("power") > 1250, "the next costs more")
+	for i in range(4):
+		m.enlist_tier("start", 1000000)
+	check_eq(m.start_squad(), 1 + 2 * Meta.max_level("start") + 1, "four start tiers are one soldier")
+	check(Meta.enlist_text("start", 3).contains("3/4"), "the tile shows the fraction")
+	for id in Meta.ENLIST:
+		check(Meta.enlist_text(id, 2) != "", "enlist text for %s" % id)
+	m.enlist = {"armor": 1000}
+	m.levels = {"armor": Meta.max_level("armor")}
+	check(m.bite_mult() >= 0.25, "armor tiers never make bites free")
+
+
 func test_squad_cycling() -> void:
 	var m := Meta.new()
 	check_eq(m.next_squad("rifle"), "rifle", "nothing unlocked wraps to rifle")

@@ -34,6 +34,12 @@ grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"traced":true' || { echo "::error::the 
 
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"volley"' || { echo "::error::the rifle squad never fired its volley"; exit 1; }
 
+echo "== the sinks: every boost armed and a tier of every upgrade enlisted"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=900 --smoke-boosts 2>&1 | tee "$LOG"
+fail_on_script_errors "boosts smoke"
+grep "SMOKE_BOOSTS" "$LOG" | grep -q '"bombs":2' && grep "SMOKE_BOOSTS" "$LOG" | grep -q '"damage":1.25' && grep "SMOKE_BOOSTS" "$LOG" | grep -q '"winds":1' && grep "SMOKE_BOOSTS" "$LOG" | grep -q '"coin_mult":2' && grep "SMOKE_BOOSTS" "$LOG" | grep -q '"left_armed":false' || { echo "::error::the per-run boosts did not reach the run or were not spent"; exit 1; }
+grep "SMOKE_BOOSTS" "$LOG" | grep -q '"power":1' || { echo "::error::the enlist tier did not stick"; exit 1; }
+
 echo "== the other squads' moves (shotgun shockwave, medic heal pulse)"
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=900 --smoke-squad=shotgun 2>&1 | tee "$LOG"
 fail_on_script_errors "shotgun smoke"

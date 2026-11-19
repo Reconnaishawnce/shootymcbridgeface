@@ -3,6 +3,26 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.54 (something to spend it on)
+
+- A tester maxed the shop and the locker and had nothing left to buy.
+  Three sinks:
+  - FOR THE NEXT RUN at the top of the shop: BOMB DROP (two extra
+    bombs), HOT ROUNDS (+25% damage), DOUBLE PAY (twice the coins) and
+    SPARE WIND (one more comeback), bought with coins and spent on the
+    next normal, endless or rush run. The home screen says what is
+    armed; the daily and weekly leave them for later.
+  - ENLIST: a maxed upgrade keeps growing one tier at a time with no
+    cap. A tier is one percent (damage, coins, hero move), half a
+    percent off bites, a metre of reveal, or a quarter of a soldier
+    (a fifth per gate), and costs 2.5 times the base price growing 12%
+    a tier. Armor can never take bites below a quarter.
+  - Stars: a ROAD tab in the locker with six deck paints (blue free,
+    red, green, purple, black and gold up to 15 stars) that recolour
+    the bridge everywhere, and GOLD SQUAD, a crew style in gold.
+- The smoke bot has `--smoke-boosts`, and `check.sh` proves the boosts
+  reach the run, are spent, and that an enlist tier sticks.
+
 ## 0.53 (shake to report)
 
 - Shake the phone hard (four jolts inside a second) and a card asks

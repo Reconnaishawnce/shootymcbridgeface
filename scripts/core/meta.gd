@@ -21,12 +21,21 @@ const CATALOG := {
 const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "hero", "slayer", "magnet", "scout", "shotgun", "medic", "sniper"]
 const SQUAD_TYPES := ["rifle", "shotgun", "medic", "sniper"]
 const COST_GROWTH := 1.6
+## ENLIST: past max, an upgrade keeps growing a tier at a time, one
+## percent (or a fraction of a soldier) each, with no end but the cost.
+const ENLIST := ["start", "power", "gate", "armor", "slayer", "magnet", "scout", "hero"]
+const ENLIST_COST_MULT := 2.5
+const ENLIST_GROWTH := 1.12
+## Fractions of a soldier per tier for the whole-number upgrades.
+const ENLIST_START_PER := 4
+const ENLIST_GATE_PER := 5
 ## Soldiers a second wind brings back.
 const SECOND_WIND_SOLDIERS := 8
 ## Clearing this level unlocks Endless mode.
 const ENDLESS_UNLOCK_LEVEL := 3
 
 var levels: Dictionary = {}
+var enlist: Dictionary = {}
 
 
 func level(id: String) -> int:
@@ -71,6 +80,63 @@ static func max_level(id: String) -> int:
 	return int(CATALOG[id]["max"])
 
 
+# --- enlist ----------------------------------------------------------------
+
+func tiers(id: String) -> int:
+	return int(enlist.get(id, 0))
+
+
+static func enlistable(id: String) -> bool:
+	return ENLIST.has(id)
+
+
+static func enlist_cost_at(id: String, tier: int) -> int:
+	return int(round(float(CATALOG[id]["base"]) * ENLIST_COST_MULT * pow(ENLIST_GROWTH, tier)))
+
+
+func enlist_cost(id: String) -> int:
+	return enlist_cost_at(id, tiers(id))
+
+
+func can_enlist(id: String, coins: int) -> bool:
+	return enlistable(id) and is_maxed(id) and coins >= enlist_cost(id)
+
+
+## Buys one tier. Returns the coins left, or [param coins] unchanged.
+func enlist_tier(id: String, coins: int) -> int:
+	if not can_enlist(id, coins):
+		return coins
+	var c := enlist_cost(id)
+	enlist[id] = tiers(id) + 1
+	return coins - c
+
+
+## What the tiers add, for the shop tile: "+3% damage", "+1 soldier".
+static func enlist_text(id: String, tier: int) -> String:
+	match id:
+		"start":
+			return "+%d soldier%s (%d/%d)" % [tier / ENLIST_START_PER, "" if tier / ENLIST_START_PER == 1 else "s", tier % ENLIST_START_PER, ENLIST_START_PER]
+		"gate":
+			return "+%d per gate (%d/%d)" % [tier / ENLIST_GATE_PER, tier % ENLIST_GATE_PER, ENLIST_GATE_PER]
+		"power":
+			return "+%d%% damage" % tier
+		"armor":
+			return "-%.1f%% on bites" % (0.5 * tier)
+		"slayer":
+			return "core +%.2f" % (0.01 * tier)
+		"magnet":
+			return "+%d%% coins" % tier
+		"scout":
+			return "+%d m sooner" % tier
+		"hero":
+			return "+%d%% hero move" % tier
+	return ""
+
+
+func hero_power_bonus() -> float:
+	return 0.01 * tiers("hero")
+
+
 ## Coins a run pays out before multipliers.
 ## The run's coins. The bounty is what the kills paid (see Bounty).
 static func coins_for_run(bounty: int, bosses: int, gates: int) -> int:
@@ -84,15 +150,15 @@ static func endless_unlocked(best_level: int) -> bool:
 # --- effects ---------------------------------------------------------------
 
 func start_squad() -> int:
-	return 1 + 2 * level("start")
+	return 1 + 2 * level("start") + tiers("start") / ENLIST_START_PER
 
 
 func damage_mult() -> float:
-	return 1.0 + 0.12 * level("power")
+	return 1.0 + 0.12 * level("power") + 0.01 * tiers("power")
 
 
 func gate_bonus() -> int:
-	return 2 * level("gate")
+	return 2 * level("gate") + tiers("gate") / ENLIST_GATE_PER
 
 
 ## Fraction of the squad a brute eats, after armor.
@@ -102,15 +168,15 @@ func brute_bite_fraction(base: float) -> float:
 
 ## What every heavy bite (brute, boss, spit, lightning) is scaled by.
 func bite_mult() -> float:
-	return 1.0 - 0.12 * level("armor")
+	return maxf(0.25, 1.0 - 0.12 * level("armor") - 0.005 * tiers("armor"))
 
 
 func core_mult_bonus() -> float:
-	return 0.5 * level("slayer")
+	return 0.5 * level("slayer") + 0.01 * tiers("slayer")
 
 
 func coin_mult() -> float:
-	return 1.0 + 0.2 * level("magnet")
+	return 1.0 + 0.2 * level("magnet") + 0.01 * tiers("magnet")
 
 
 func start_bombs() -> int:
@@ -150,7 +216,7 @@ static func effect_text(id: String, lvl: int) -> String:
 
 
 func reveal_bonus() -> float:
-	return 8.0 * level("scout")
+	return 8.0 * level("scout") + 1.0 * tiers("scout")
 
 
 func shotgun_unlocked() -> bool:

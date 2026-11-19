@@ -693,6 +693,44 @@ button pulses on `bomb_worth_throwing`.
 redeploys `_level_entry_count` instead of the carry-over. Once a run,
 levels mode only.
 
+## Sinks: something to spend it on (0.54)
+
+Two weeks in, a tester had every upgrade at MAX and every locker item
+owned, and asked what the gold and stars were for now. A maxed save
+is the end of the meta loop, so the loop needed a floor that never
+arrives. Three sinks, each pure and tested:
+
+`Boosts` is the shop's top shelf, FOR THE NEXT RUN: BOMB DROP, HOT
+ROUNDS, DOUBLE PAY and SPARE WIND, one of each, at a fixed price, armed
+in the save and taken by `Boosts.take(mode)` at `start_run` for the
+modes they apply to (`MODES`: levels, endless, rush; the daily and the
+weekly are everyone's same road and leave them armed). The run reads
+them as `run_boosts`: bombs join the belt's, `Squad.boost_damage`
+multiplies `_damage_mult`, `coin_mult` joins the payout line, and
+`extra_winds` adds to `_second_winds_left`, which replaced the
+`_second_wind_used` flag. Boosts are the sink that never fills, and
+they turn coins into a choice before each run rather than a score.
+
+`Meta.enlist` is the shelf past MAX. `ENLIST` names the upgrades that
+keep growing; a tier costs `ENLIST_COST_MULT` times the base price
+growing by `ENLIST_GROWTH` a tier, with no cap. A tier is deliberately
+small (one percent of damage, coins or hero move, half a percent off
+bites, a metre of reveal, a quarter of a soldier at level start, a
+fifth per gate), so the player with a million coins is a little
+stronger and the balance holds; `bite_mult` floors at a quarter so
+armor can never make bites free. The tile shows the tiers so far and
+what the next buys, and the button says ENLIST with the price.
+
+Stars got a ROAD tab in the locker (`Wardrobe` category "road": six
+deck paints, `deck_colour()`, applied by `World.set_deck` at boot and
+on equip, so the home screen shows it) and GOLD SQUAD, a crew style.
+These are cosmetic by design: stars are rarer than coins and the
+locker is where they show.
+
+The quieter lesson is that a tester maxing out in two weeks means the
+0.42 payout curve is generous; the data-driven balance pass should
+look at late-game coin income once the boards have numbers.
+
 ## The Foreman
 
 `Boss.Kind.FOREMAN` holds back at `FOREMAN_HOLD_Z` and sways like the

@@ -96,6 +96,9 @@ var _level_peak := 1
 ## The upgrades in force for the current run: the real ones, or a blank
 ## set for the daily so everyone plays the same game.
 var run_meta := Meta.new()
+## Per-run boosts: armed in the shop, taken by the next run.
+var boosts := Boosts.new()
+var run_boosts := Boosts.new()
 var daily_day := 0
 var daily_results: Dictionary = {}
 var week_number := 0
@@ -112,7 +115,8 @@ var _bets_won := 0
 var _bets_lost := 0
 var _help_from_pause := false
 ## Second wind: one comeback per run from the shop.
-var _second_wind_used := false
+## Comebacks left this run: the SECOND WIND upgrade plus a SPARE WIND boost.
+var _second_winds_left := 0
 var _second_wind_pending := false
 var _vehicles_formed := 0
 var weekly_results: Dictionary = {}
@@ -140,6 +144,7 @@ var _smoke_endless := false
 var _smoke_daily := false
 var _smoke_weekly := false
 var _smoke_upgrades := false
+var _smoke_boosts := false
 ## --smoke-idle: the bot does nothing at all, to measure what a squad
 ## left alone gets away with.
 var _smoke_idle := false
@@ -201,6 +206,7 @@ func _ready() -> void:
 	_smoke_weekly = args.has("--weekly")
 	# --smoke-upgrades: play with every shop upgrade maxed, to exercise them.
 	_smoke_upgrades = args.has("--smoke-upgrades")
+	_smoke_boosts = args.has("--smoke-boosts")
 	_smoke_idle = args.has("--smoke-idle")
 	# --smoke-retry: after a wipe, tap through the results and play again,
 	# so the game-over screen and the restart run in CI too.
@@ -244,9 +250,18 @@ func _ready() -> void:
 		modifier = "hard" if args.has("--hard") else ("nightmare" if args.has("--nightmare") else "normal")
 	coins = SaveData.load_coins()
 	meta.levels = SaveData.load_upgrades()
+	meta.enlist = SaveData.load_enlist()
+	boosts.from_dict(SaveData.load_boosts())
 	if _smoke_upgrades:
 		for id in Meta.ORDER:
 			meta.levels[id] = Meta.max_level(id)
+	if _smoke_boosts:
+		# The sinks: every boost armed, a tier of every enlistable upgrade.
+		for id in Boosts.ORDER:
+			boosts.buy(id, 100000)
+		for id in Meta.ENLIST:
+			meta.levels[id] = Meta.max_level(id)
+			meta.enlist_tier(id, 1000000)
 	squad_type = SaveData.load_squad_type()
 	if _smoke_squad in Meta.SQUAD_TYPES:
 		meta.levels[_smoke_squad] = Meta.max_level(_smoke_squad) if _smoke_squad != "rifle" else 0
@@ -382,6 +397,7 @@ func _build_scene() -> void:
 	world = World.new()
 	world.meta = meta
 	add_child(world)
+	world.set_deck(wardrobe.deck_colour())
 	world.gate_passed.connect(_on_gate_passed)
 	world.gate_robbed.connect(_on_gate_robbed)
 	world.spit_landed.connect(_on_spit_landed)
@@ -493,6 +509,7 @@ func _build_scene() -> void:
 	hud.copy_pressed.connect(copy_result)
 	hud.shop_closed.connect(show_title)
 	hud.buy_pressed.connect(buy_upgrade)
+	hud.boost_pressed.connect(buy_boost)
 	hud.squad_toggled.connect(toggle_squad)
 	hud.mode_pressed.connect(cycle_mode)
 	hud.menu_pressed.connect(show_title)
@@ -1008,6 +1025,7 @@ func show_title() -> void:
 		"modifier": modifier, "mode_hint": hint,
 		"streak_line": Streak.line(streak, Daily.day_number(int(Time.get_unix_time_from_system()))),
 		"event_line": Events.banner(int(Time.get_unix_time_from_system())),
+		"boost_line": boosts.summary(),
 		"rush_best": SaveData.load_best("rush"),
 	})
 
@@ -1191,6 +1209,9 @@ func _on_item_pressed(id: String) -> void:
 		SaveData.save_wardrobe(wardrobe.to_dict())
 	elif what == "equipped":
 		sfx.play("click")
+	if what != "" and Wardrobe.category(id) == "road":
+		SaveData.save_wardrobe(wardrobe.to_dict())
+		world.set_deck(wardrobe.deck_colour())
 	_show_locker()
 	if what != "" and _preview != null and _preview.get_child_count() > 0:
 		_preview.get_child(0).cheer()
@@ -1264,18 +1285,34 @@ func _result_text(r: Dictionary) -> String:
 
 func open_shop() -> void:
 	sfx.play("click")
-	hud.show_shop(meta, coins)
+	hud.show_shop(meta, coins, boosts)
 
 
+## A level, or past max an ENLIST tier.
 func buy_upgrade(id: String) -> void:
-	var left := meta.buy(id, coins)
+	var left := meta.enlist_tier(id, coins) if meta.is_maxed(id) else meta.buy(id, coins)
 	if left == coins:
 		return
 	coins = left
 	SaveData.save_coins(coins)
 	SaveData.save_upgrades(meta.levels)
+	SaveData.save_enlist(meta.enlist)
+	Diag.note("shop", {"id": id, "level": meta.level(id), "tier": meta.tiers(id)})
 	sfx.play("gate_good", -4.0)
-	hud.show_shop(meta, coins)
+	hud.show_shop(meta, coins, boosts)
+	hud.shop_bought(id)
+
+
+func buy_boost(id: String) -> void:
+	var left := boosts.buy(id, coins)
+	if left == coins:
+		return
+	coins = left
+	SaveData.save_coins(coins)
+	SaveData.save_boosts(boosts.to_dict())
+	Diag.note("boost", {"id": id})
+	sfx.play("gate_good", -4.0)
+	hud.show_shop(meta, coins, boosts)
 	hud.shop_bought(id)
 
 
@@ -1300,6 +1337,11 @@ func start_run(p_mode: String = "levels") -> void:
 	run_seed = _smoke_seed if smoke else randi()
 	# The daily: one seed for everyone, no upgrades, rifles.
 	run_meta = Meta.new() if mode in ["daily", "weekly"] else meta
+	run_boosts = Boosts.new()
+	run_boosts.from_dict(boosts.take(mode))
+	if run_boosts.any_armed() and not smoke:
+		SaveData.save_boosts(boosts.to_dict())
+	squad.boost_damage = run_boosts.damage_mult()
 	var now_unix := int(Time.get_unix_time_from_system())
 	_events = Events.for_run(mode, now_unix)
 	if smoke:
@@ -1332,10 +1374,12 @@ func start_run(p_mode: String = "levels") -> void:
 	perks = Perks.new()
 	combo.reset()
 	powerups.reset()
-	for i in range(run_meta.start_bombs()):
+	for i in range(run_meta.start_bombs() + run_boosts.bombs()):
 		powerups.grant("bomb", 0.0)
 	hud.set_bombs(powerups.bombs)
-	_second_wind_used = false
+	_second_winds_left = (1 if run_meta.has_second_wind() else 0) + run_boosts.extra_winds()
+	if smoke and run_boosts.any_armed():
+		print("SMOKE_BOOSTS ", JSON.stringify({"armed": run_boosts.armed.keys(), "bombs": powerups.bombs, "damage": squad.boost_damage, "winds": _second_winds_left, "coin_mult": run_boosts.coin_mult(), "tiers": meta.enlist, "start_squad": run_meta.start_squad(), "left_armed": boosts.any_armed()}))
 	_revive_used = false
 	_revive_open = false
 	_second_wind_pending = false
@@ -1421,7 +1465,7 @@ func end_run() -> void:
 	var today := Daily.day_number(int(Time.get_unix_time_from_system()))
 	var streak_after := Streak.advance(streak, today) if not smoke else streak
 	var streak_days := Streak.days(streak_after, today)
-	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * world.mod("coins") * squad.veterans.coin_mult() * Streak.bonus_mult(streak_days)))
+	var earned := 0 if mode in ["daily", "weekly"] else int(round(float(Economy.coins_for_bounty(run_bounty)) * perks.coin_mult() * meta.coin_mult() * run_boosts.coin_mult() * world.mod("coins") * squad.veterans.coin_mult() * Streak.bonus_mult(streak_days)))
 	if not smoke:
 		streak = streak_after
 		SaveData.save_streak(streak)
@@ -1697,7 +1741,7 @@ func use_ability() -> void:
 		print("SMOKE_ABILITY ", JSON.stringify({"id": id, "uses": _ability_uses, "level": world.level, "frame": _frames}))
 	match id:
 		"volley":
-			squad.volley(Abilities.volley_shots(squad.count), Abilities.VOLLEY_DAMAGE_MULT * Abilities.power(level), Abilities.VOLLEY_PIERCE)
+			squad.volley(Abilities.volley_shots(squad.count), Abilities.VOLLEY_DAMAGE_MULT * Abilities.power(level) * (1.0 + meta.hero_power_bonus()), Abilities.VOLLEY_PIERCE)
 			sfx.play("rally", -2.0, 1.3)
 			_punch(4.0)
 		"shockwave":
@@ -2800,8 +2844,8 @@ func _on_wiped_out() -> void:
 		_close_lesson()
 	if _pit_open:
 		_pit_leave()
-	if state == State.RUNNING and run_meta.has_second_wind() and not _second_wind_used:
-		_second_wind_used = true
+	if state == State.RUNNING and _second_winds_left > 0:
+		_second_winds_left -= 1
 		_second_wind_pending = true
 		call_deferred("_second_wind")
 		return
@@ -3220,8 +3264,18 @@ func _shots_walkthrough() -> void:
 		hud.set_show_fps(false)
 		crowd.queue_free()
 		show_title()
+		coins = 5000
+		boosts.buy("pay", 100000)
+		meta.levels["power"] = Meta.max_level("power")
+		meta.enlist["power"] = 3
 		open_shop()
 		await _capture("q15_shop.png", 8)
+		wardrobe.stars = 20
+		wardrobe.tap("deck_gold")
+		world.set_deck(wardrobe.deck_colour())
+		_locker_tab = "road"
+		_show_locker()
+		await _capture("q19_road_paint.png", 8)
 		_quit_with(0)
 		return
 	open_shop()

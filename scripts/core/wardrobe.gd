@@ -9,8 +9,8 @@ extends RefCounted
 ## and none of this shows; the stars still accrue so switching it on later
 ## has something to spend.
 
-const CATEGORIES := ["hero", "outfit", "hat", "weapon", "back", "crew"]
-const CATEGORY_TITLES := {"hero": "HEROES", "outfit": "OUTFITS", "hat": "HATS", "weapon": "WEAPONS", "back": "BACKS", "crew": "CREW"}
+const CATEGORIES := ["hero", "outfit", "hat", "weapon", "back", "crew", "road"]
+const CATEGORY_TITLES := {"hero": "HEROES", "outfit": "OUTFITS", "hat": "HATS", "weapon": "WEAPONS", "back": "BACKS", "crew": "CREW", "road": "ROAD"}
 
 ## Every item: category, display name, star cost (0 is free), and the
 ## look fields it sets. Heroes carry a face and a line.
@@ -69,9 +69,17 @@ const CATALOG := {
 	"shadow": {"cat": "crew", "name": "SHADOW", "cost": 6},
 	"plain": {"cat": "crew", "name": "NO HATS", "cost": 2},
 	"twins": {"cat": "crew", "name": "TWINS", "cost": 8},
+	"golden": {"cat": "crew", "name": "GOLD SQUAD", "cost": 12},
+	# Road paint: the colour of the bridge deck.
+	"deck_blue": {"cat": "road", "name": "BLUE", "cost": 0, "deck": Color(0.13, 0.3, 0.62)},
+	"deck_red": {"cat": "road", "name": "RED", "cost": 6, "deck": Color(0.6, 0.14, 0.14)},
+	"deck_green": {"cat": "road", "name": "GREEN", "cost": 7, "deck": Color(0.12, 0.42, 0.24)},
+	"deck_purple": {"cat": "road", "name": "PURPLE", "cost": 9, "deck": Color(0.36, 0.14, 0.55)},
+	"deck_black": {"cat": "road", "name": "BLACK", "cost": 12, "deck": Color(0.1, 0.1, 0.13)},
+	"deck_gold": {"cat": "road", "name": "GOLD", "cost": 15, "deck": Color(0.72, 0.52, 0.12)},
 }
 
-const DEFAULTS := {"hero": "max", "outfit": "ranger", "hat": "helmet", "weapon": "standard", "back": "pack", "crew": "match"}
+const DEFAULTS := {"hero": "max", "outfit": "ranger", "hat": "helmet", "weapon": "standard", "back": "pack", "crew": "match", "road": "deck_blue"}
 
 var stars := 0
 var owned: Dictionary = {}
@@ -238,6 +246,13 @@ func crew_look() -> Dictionary:
 			l.erase("name")
 		"twins":
 			l.erase("name")
+		"golden":
+			l.top = Color(0.95, 0.75, 0.2)
+			l.pants = Color(0.55, 0.4, 0.1)
+			l.erase("skin")
+			l.erase("hair")
+			l.erase("hair_style")
+			l.erase("name")
 		_:
 			l.erase("skin")
 			l.erase("hair")
@@ -245,6 +260,12 @@ func crew_look() -> Dictionary:
 			l.erase("name")
 	l.hero = false
 	return l
+
+
+## The colour of the bridge deck: the equipped road paint.
+func deck_colour() -> Color:
+	var id := str(equipped.get("road", "deck_blue"))
+	return CATALOG.get(id, CATALOG["deck_blue"]).get("deck", CATALOG["deck_blue"]["deck"])
 
 
 ## The classic look: helmet, pack, vest by squad type. What the game

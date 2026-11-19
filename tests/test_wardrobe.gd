@@ -104,8 +104,24 @@ func test_crew() -> void:
 	w.tap("twins")
 	check(w.crew_look().has("skin") and not w.crew_look().has("name"), "twins share the face, not the tag")
 	check(not w.can_afford_something() or w.stars > 0, "nudge is consistent")
+	w.stars = 30
+	w.tap("golden")
+	check(w.crew_look().top.r > 0.9 and w.crew_look().top.b < 0.3, "gold squad is gold")
 	var w2 := Wardrobe.new()
 	w2.stars = 1
 	check(w2.can_afford_something(), "a star buys a cap")
+
+
+func test_road_paint() -> void:
+	var w := Wardrobe.new()
+	check(w.is_equipped("deck_blue") and w.deck_colour().b > 0.5, "blue deck by default")
+	w.stars = 20
+	check_eq(w.tap("deck_gold"), "bought", "gold paint costs stars")
+	check_eq(w.stars, 5, "fifteen of them")
+	check(w.deck_colour().r > 0.6 and w.deck_colour().b < 0.2, "and the deck turns gold")
+	check(w.look().top.r < 0.5, "paint is not an outfit")
+	var w2 := Wardrobe.new()
+	w2.from_dict(w.to_dict())
+	check(w2.is_equipped("deck_gold"), "paint round-trips")
 	w2.stars = 0
 	check(not w2.can_afford_something(), "nothing for nothing")

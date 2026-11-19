@@ -110,12 +110,14 @@ static func sections() -> Array:
 			"%s (%s), %s (%s), %s (%s), %s, %s, and the GOLD TURRET: a gun that rides the curb beside you and fires on its own at whatever is nearest, its damage on top of the squad's and outside its cap, %d at most. Each costs more the more you hold. Nothing here outlives the run." % [PitStop.title("rounds"), PitStop.effect_text("rounds", 1), PitStop.title("rifles"), PitStop.effect_text("rifles", 1), PitStop.title("armor"), PitStop.effect_text("armor", 1), PitStop.title("bomb"), PitStop.title("dressing"), Difficulty.MAX_TURRETS]},
 		{"title": "COINS AND THE SHOP", "body":
 			"The SHOP sells permanent upgrades as a wall of tiles: a picture of each, its level in gold pips, what it does now and what the next level does, and the price. Tiles you can afford glow. They are: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers and ten seconds of AGRO (double fire, double damage, nothing bites), extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
-			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades."},
+			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades.\n" +
+			"Past MAX an upgrade does not stop: ENLIST buys it one more tier at a time, forever. A tier is small (one percent of damage or coins, half a percent off bites, a quarter of a soldier) and each costs more than the last, so there is always something to put coins into.\n" +
+			"The top of the SHOP is FOR THE NEXT RUN: boosts you buy once and spend on your next normal, endless or boss rush run. BOMB DROP (%d extra bombs), HOT ROUNDS (+%d%% damage), DOUBLE PAY (twice the coins) and SPARE WIND (one more comeback). The home screen says what is armed. The daily and the weekly leave them armed for later." % [Boosts.BOMBS, int(round((Boosts.DAMAGE_MULT - 1.0) * 100.0))]},
 		{"title": "STARS AND THE LOCKER", "body":
 			"Stars are the other currency. A run pays one star per boss, one per four perfect gates, and one for getting through at least three gates. " +
 			"The daily pays one extra, the weekly two, and hard and nightmare pay bonus stars. Achievements pay stars too. " +
 			"Turn CHARACTERS on in Settings and the LOCKER opens: %d heroes, outfits, %d hats, weapon skins, backs and crew styles, all bought with stars. " % [heroes, hats] +
-			"Your hero leads the squad with a name tag, and always escapes."},
+			"Your hero leads the squad with a name tag, and always escapes. The ROAD tab sells paint for the bridge deck, and GOLD SQUAD dresses the whole crew in gold."},
 		{"title": "MODES", "body":
 			"NORMAL is the road as it comes. HARD opens at %d trophies: bigger waves, meaner bosses, 1.5x score and coins. " % int(Road.UNLOCKS["hard"]) +
 			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +

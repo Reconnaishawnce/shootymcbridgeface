@@ -12,6 +12,7 @@ signal copy_pressed
 signal shop_opened
 signal shop_closed
 signal buy_pressed(id: String)
+signal boost_pressed(id: String)
 signal squad_toggled
 signal mode_pressed
 signal menu_pressed
@@ -178,6 +179,7 @@ var _toast_tween: Tween
 var _over_copy: Button
 var _shop_coins: Label
 var _shop_rows: Dictionary = {}
+var _boost_rows: Dictionary = {}
 
 var _combo: Label
 var _combo_bar: ColorRect
@@ -1442,6 +1444,32 @@ func _build_shop(root: Control) -> void:
 	_shop_coins = _label(30, HORIZONTAL_ALIGNMENT_CENTER)
 	_shop_coins.add_theme_color_override("font_color", COIN)
 	box.add_child(_shop_coins)
+	# The next run: boosts spent on one run, a sink that never fills.
+	var next_head := _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	next_head.text = "FOR THE NEXT RUN"
+	box.add_child(next_head)
+	var next_blurb := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
+	next_blurb.text = "Spent on your next normal, endless or rush run."
+	next_blurb.modulate = Color(0.85, 0.85, 0.9)
+	box.add_child(next_blurb)
+	var next_grid := GridContainer.new()
+	next_grid.columns = 2
+	next_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	next_grid.add_theme_constant_override("h_separation", 12)
+	next_grid.add_theme_constant_override("v_separation", 12)
+	next_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(next_grid)
+	for id in Boosts.ORDER:
+		var tile := _tile(id, Boosts.icon(id), func() -> void: boost_pressed.emit(id))
+		next_grid.add_child(tile.panel)
+		_boost_rows[id] = tile
+	var up_head := _label(26, HORIZONTAL_ALIGNMENT_CENTER)
+	up_head.text = "UPGRADES"
+	box.add_child(up_head)
+	var up_blurb := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
+	up_blurb.text = "Forever. Past MAX, ENLIST adds a tier at a time with no end."
+	up_blurb.modulate = Color(0.85, 0.85, 0.9)
+	box.add_child(up_blurb)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1492,7 +1520,7 @@ func _tile(id: String, kind: String, on_buy: Callable) -> Dictionary:
 
 ## Fills a tile: [param n] of [param max_n] pips lit (none drawn past
 ## 8), the effect line, the price or MAX, and the glow when affordable.
-func _fill_tile(tile: Dictionary, title: String, n: int, max_n: int, effect: String, price: int, maxed: bool, affordable: bool, unit: String) -> void:
+func _fill_tile(tile: Dictionary, title: String, n: int, max_n: int, effect: String, price: int, maxed: bool, affordable: bool, unit: String, maxed_text: String = "MAX", verb: String = "") -> void:
 	var name: Label = tile.name
 	name.text = title
 	var pips: HBoxContainer = tile.pips
@@ -1516,11 +1544,11 @@ func _fill_tile(tile: Dictionary, title: String, n: int, max_n: int, effect: Str
 	var buy: Button = tile.buy
 	var icon: ShopIcon = tile.icon
 	if maxed:
-		buy.text = "MAX"
+		buy.text = maxed_text
 		buy.disabled = true
 		icon.lit = true
 	else:
-		buy.text = "%d %s" % [price, unit]
+		buy.text = ("%s %d" % [verb, price]) if verb != "" else ("%d %s" % [price, unit])
 		buy.disabled = not affordable
 		icon.lit = affordable
 	var panel: PanelContainer = tile.panel
@@ -1529,7 +1557,7 @@ func _fill_tile(tile: Dictionary, title: String, n: int, max_n: int, effect: Str
 
 ## The bounce when a tile's thing is bought.
 func shop_bought(id: String) -> void:
-	var tile: Dictionary = _shop_rows.get(id, _pit_tiles.get(id, {}))
+	var tile: Dictionary = _shop_rows.get(id, _pit_tiles.get(id, _boost_rows.get(id, {})))
 	if tile.is_empty():
 		return
 	var icon: ShopIcon = tile.icon
@@ -1915,6 +1943,8 @@ func show_title(t: Dictionary) -> void:
 		lines.append(Modifiers.blurb(modifier))
 	if mode_hint != "":
 		lines.append(mode_hint)
+	if str(t.get("boost_line", "")) != "":
+		lines.append(str(t.get("boost_line", "")))
 	_records.text = "\n".join(lines)
 	_records.visible = not lines.is_empty()
 	_mode_button.text = Modifiers.title(modifier)
@@ -2068,6 +2098,8 @@ func show_locker(w: Wardrobe, tab: String) -> void:
 		_locker_line.text = "%s: %s" % [w.hero_name(), Wardrobe.hero_line(w.equipped.get("hero", "max"))]
 	elif tab == "crew":
 		_locker_line.text = "How everyone behind %s dresses." % w.hero_name()
+	elif tab == "road":
+		_locker_line.text = "Paint for the bridge deck. It shows on the home screen too."
 	else:
 		_locker_line.text = "Stars come from bosses, perfect gates and finishing runs."
 
@@ -2106,16 +2138,25 @@ func toast(text: String) -> void:
 	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.4)
 
 
-func show_shop(meta: Meta, coins: int) -> void:
+func show_shop(meta: Meta, coins: int, boosts: Boosts = null) -> void:
 	_hide_cards()
 	_shop_card.visible = true
 	_shop_coins.text = "%d COINS" % coins
+	for id in Boosts.ORDER:
+		var armed := boosts != null and boosts.is_armed(id)
+		_fill_tile(_boost_rows[id], Boosts.title(id), 1 if armed else 0, 1, Boosts.description(id), Boosts.cost(id), armed, boosts != null and boosts.can_buy(id, coins), "COINS", "ARMED")
 	for id in Meta.ORDER:
 		var lvl := meta.level(id)
 		var now := Meta.effect_text(id, lvl)
 		var effect := now if meta.is_maxed(id) else "%s  >  %s" % [now, Meta.effect_text(id, lvl + 1)]
 		if lvl == 0 and not meta.is_maxed(id):
 			effect = "%s\n%s" % [Meta.description(id), Meta.effect_text(id, 1)]
+		if meta.is_maxed(id) and Meta.enlistable(id):
+			# Past max: the tiers so far and the next one, bought with ENLIST.
+			var t := meta.tiers(id)
+			effect = "%s\nENLISTED x%d: %s" % [now, t, Meta.enlist_text(id, t)] if t > 0 else "%s\nENLIST: %s a tier" % [now, Meta.enlist_text(id, 1)]
+			_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), effect, meta.enlist_cost(id), false, meta.can_enlist(id, coins), "COINS", "MAX", "ENLIST")
+			continue
 		_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), effect, meta.cost(id), meta.is_maxed(id), meta.can_buy(id, coins), "COINS")
 
 func show_running() -> void:

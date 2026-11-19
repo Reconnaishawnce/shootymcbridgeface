@@ -45,6 +45,8 @@ var active := false
 var world: World
 var perks: Perks
 var meta: Meta
+## HOT ROUNDS: a per-run damage boost, 1.0 when none.
+var boost_damage := 1.0
 var powerups: Powerups
 var squad_type := "rifle"
 ## Sideways stretch of the formation, player-controlled.
@@ -431,7 +433,7 @@ func _fire_mult() -> float:
 
 
 func _damage_mult() -> float:
-	var m := meta.damage_mult() if meta != null else 1.0
+	var m := (meta.damage_mult() if meta != null else 1.0) * boost_damage
 	if is_shotgun():
 		m *= SHOTGUN_DAMAGE_MULT
 	elif is_medic():

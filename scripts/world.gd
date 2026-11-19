@@ -62,6 +62,8 @@ signal perk_felt(id: String, amount: int)
 ## A build card did something worth showing: a bounce (from, to), a
 ## blast or a last stand (at, radius in to.x).
 signal card_felt(id: String, from: Vector3, to: Vector3)
+## A STORM FRONT's lightning line was called down on the gates.
+signal theme_struck
 ## A supply panel paid off, or could not be paid.
 signal supply_bought(id: String, amount: int, cost: int)
 signal supply_refused(cost: int)
@@ -155,6 +157,12 @@ var rush := false
 const RUSH_GATES := 1
 ## The event knobs this run carries (Events.mods); resting by default.
 var event_mods: Dictionary = Events.DEFAULT_MODS
+## This level's theme (Themes) and the knobs in force right now: the
+## run's events with the theme's rule merged over them.
+var theme := "day"
+var mods_now: Dictionary = Events.DEFAULT_MODS
+var theme_strikes := 0
+var _theme_strike_timer := 0.0
 ## False once the player has had no hand on the road for a few seconds:
 ## panels stop climbing, so a squad left to itself takes what is printed.
 var hands_on := true
@@ -285,6 +293,9 @@ func _clear_bet() -> void:
 func start_level(n: int) -> void:
 	level = n
 	phase = Phase.GATES
+	theme = Themes.for_level(n)
+	mods_now = Events.merge(event_mods.duplicate(), Themes.mods(theme))
+	_theme_strike_timer = Themes.STRIKE_FIRST
 	_refresh_turrets()
 	# Waves that outlived the level are gone with it; so is any open bet.
 	_wave_alive.clear()
@@ -302,10 +313,10 @@ func start_level(n: int) -> void:
 	_crate_plan = gen.crates_for_level(level) if gen != null else []
 	_saw_plan = gen.saws_for_level(level) if gen != null else []
 	# A saw storm: more saws, placed by the same generator.
-	for i in range(int(event_mods.get("saws_extra", 0))):
+	for i in range(int(mods_now.get("saws_extra", 0))):
 		if gen != null and level >= Difficulty.SAW_LEVEL:
 			_saw_plan.append({"index": gen.rng.randi_range(1, Difficulty.GATES_PER_LEVEL - 2), "x": gen.rng.randf_range(-0.7, 0.7), "aim": false})
-	_barricade_plan = gen.barricades_for_level(level, _saw_plan) if gen != null else []
+	_barricade_plan = gen.barricades_for_level(level, _saw_plan, int(mods_now.get("barricades_extra", 0))) if gen != null else []
 	_bay_due = PitStop.has_bay(level)
 	_bay_lane_open = false
 	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
@@ -396,7 +407,7 @@ func boss_at() -> float:
 
 ## Advance the world by one frame. Returns the scroll speed used.
 func advance(delta: float, p_squad: Squad) -> float:
-	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level) + float(event_mods.get("speed_bonus", 0.0))
+	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level) + float(mods_now.get("speed_bonus", 0.0))
 	if powerups != null:
 		target *= powerups.world_speed_mult(now)
 	world_speed = lerpf(world_speed, target, 1.0 - exp(-2.5 * delta))
@@ -404,6 +415,7 @@ func advance(delta: float, p_squad: Squad) -> float:
 	match phase:
 		Phase.GATES:
 			_spawn()
+			_theme_strikes(delta)
 		Phase.BOSS:
 			_tick_boss(delta, p_squad)
 		Phase.CLEAR:
@@ -761,7 +773,7 @@ func _spawn() -> void:
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
 		if Difficulty.saw_distance(n) - level_distance <= SPAWN_AHEAD:
 			var sx := squad.position.x if (bool(plan.get("aim", false)) and squad != null) else float(plan.x) * road_half
-			spawn_saw(sx, -(Difficulty.saw_distance(n) - level_distance), false, float(event_mods.get("saw_speed", 0.0)))
+			spawn_saw(sx, -(Difficulty.saw_distance(n) - level_distance), false, float(mods_now.get("saw_speed", 0.0)))
 			_saw_plan.erase(plan)
 	for plan in _crate_plan.duplicate():
 		var n: int = plan.index + ((level - 1) * Difficulty.GATES_PER_LEVEL if endless else 0)
@@ -836,7 +848,7 @@ func _note_wave_id(n: int, wave: int) -> void:
 ## A wave spec with the modifier applied: more bodies, more health.
 func _spec(p_level: int, index: int, count: int) -> Dictionary:
 	var convoy := squad.vehicles_alive() if squad != null else 0
-	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV, Difficulty.is_elite(endless, index) or bool(event_mods.get("elite_all", false)))
+	var spec := Difficulty.wave_for(p_level, index, count + convoy * Difficulty.CONVOY_SOLDIER_EQUIV, Difficulty.is_elite(endless, index) or bool(mods_now.get("elite_all", false)))
 	var bw := Difficulty.band_wave(band())
 	var w := mod("wave") * bw
 	var h := mod("hp") * bw
@@ -971,7 +983,7 @@ func _gate_ahead_of(z: float) -> Gate:
 
 
 func _move_gates(delta: float, p_squad: Squad) -> void:
-	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0) + float(event_mods.get("reveal_penalty", 0.0))
+	var reveal_z := REVEAL_Z - (perks.reveal_bonus() if perks != null else 0.0) - (meta.reveal_bonus() if meta != null else 0.0) + float(mods_now.get("reveal_penalty", 0.0))
 	for g in gates.duplicate():
 		g.position.z += world_speed * delta
 		g.update_hot(now)
@@ -1135,7 +1147,7 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 		if z.latched:
 			_tick_latched(delta, z, p_squad)
 			continue
-		var pace: float = _pace() * z.pace_mult()
+		var pace: float = _pace() * z.pace_mult() * float(mods_now.get("pace_mult", 1.0))
 		z.position.z += (world_speed + z.speed * pace) * delta
 		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-road_half + 0.4, z.lane_min), minf(road_half - 0.4, z.lane_max))
 		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
@@ -1521,6 +1533,28 @@ func _nearest_zombie(at: Vector3, max_range: float, skip: Array) -> Zombie:
 			best_d = d
 			best = z
 	return best
+
+
+## STORM FRONT: every few seconds of the gates a line of bolts crosses
+## the road with one gap. Not inside a fork or the pit lane, where the
+## gap could land on a road you cannot reach.
+func _theme_strikes(delta: float) -> void:
+	if not bool(mods_now.get("strikes", false)) or squad == null or fork_side != 0 or _bay_lane_open:
+		return
+	_theme_strike_timer -= delta * _pace()
+	if _theme_strike_timer <= 0.0:
+		_theme_strike_timer = Themes.STRIKE_INTERVAL
+		theme_strikes += 1
+		_storm_line(0.0)
+		theme_struck.emit()
+
+
+## The lamp heads along the road: brighter after dark.
+func set_lamps(energy: float) -> void:
+	var mat := Mats.glow(WINDOW, energy)
+	for p in _posts:
+		if p.get_child_count() > 2:
+			(p.get_child(2) as MeshInstance3D).material_override = mat
 
 
 ## Slows every zombie on the road: KOFI's hero move.

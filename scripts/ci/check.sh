@@ -57,6 +57,15 @@ fail_on_script_errors "rush smoke"
 grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a boss"; exit 1; }
 grep -q "SMOKE_CARD " "$LOG" || { echo "::error::a boss fell and no build card was drafted"; exit 1; }
 
+echo "== level themes: a storm level throws lightning, a long run changes places"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1500 --smoke-level=4 --smoke-upgrades 2>&1 | tee "$LOG"
+fail_on_script_errors "storm smoke"
+grep "SMOKE_THEMES" "$LOG" | grep -q '"now":"storm"' || { echo "::error::level 4 is not the storm front"; exit 1; }
+grep "SMOKE_THEMES" "$LOG" | grep -q '"strikes":[1-9]' || { echo "::error::the storm front threw no lightning"; exit 1; }
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=4500 2>&1 | tee "$LOG"
+fail_on_script_errors "themes smoke"
+grep "SMOKE_THEME " "$LOG" | grep -q '"id":"gold"' && grep "SMOKE_THEME " "$LOG" | grep -q '"id":"night"' || { echo "::error::a run through three levels did not change theme twice"; exit 1; }
+
 echo "== heroes: each one's power reaches the run"
 for pair in max:move_soldiers zuri:gate_soldiers luna:ghost kofi:calm rex:shove mei:refill; do
   hero="${pair%%:*}"; fx="${pair##*:}"

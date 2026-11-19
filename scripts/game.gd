@@ -50,6 +50,15 @@ const CAM_HOME := Vector3(0.0, 11.0, 9.0)
 const CAM_BACK := Vector3(0.0, 2.6, 3.8)
 var _cam_pull := 0.0
 var _sun: DirectionalLight3D
+## The level's look (Themes.look): what is on screen now, and the parts
+## of the scene it drives.
+var _look: Dictionary = {}
+var _look_tween: Tween
+var _look_flags := ""
+var _sky_mat: ProceduralSkyMaterial
+var _fill: DirectionalLight3D
+var _rain: CPUParticles3D
+var _headlight: OmniLight3D
 var _env: Environment
 var _vignette: ColorRect
 var world: World
@@ -65,12 +74,16 @@ var _draft_ids: Array = []
 ## Something that wanted the screen while the draft had it.
 var _after_draft: Callable = Callable()
 var _card_fx_last := 0.0
+## Themes this run has been through, for the bot.
+var _themes_seen: Dictionary = {}
 ## The hero whose power is live this run (Heroes.active), and how often
 ## each part of it fired, for the bot.
 var run_hero := ""
 var _hero_fx: Dictionary = {}
 ## --smoke-hero=id: the bot runs as this hero.
 var _smoke_hero := ""
+## --smoke-level=N: the bot's run starts at level N.
+var _smoke_level := 0
 var combo := Combo.new()
 var powerups := Powerups.new()
 var waves_cleared := 0
@@ -245,6 +258,8 @@ func _ready() -> void:
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-level="):
+			_smoke_level = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-hero="):
 			_smoke_hero = a.trim_prefix("--smoke-hero=")
 		elif a.begins_with("--smoke-cards="):
@@ -359,6 +374,10 @@ func _build_scene() -> void:
 	sky_mat.sun_curve = 0.12
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
+	# The sky changes with the level's theme; spread the relight over a
+	# few frames instead of one long one.
+	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
+	_sky_mat = sky_mat
 	e.background_mode = Environment.BG_SKY
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -400,6 +419,7 @@ func _build_scene() -> void:
 	fill.light_color = Palette.FILL
 	fill.light_energy = 0.45
 	add_child(fill)
+	_fill = fill
 
 	# The camera rides a rig: the rig sways with the steering and leans
 	# into it, the camera keeps its framing.
@@ -479,6 +499,7 @@ func _build_scene() -> void:
 			hud.show_float("SAW!", false))
 	world.perk_felt.connect(_on_perk_felt)
 	world.card_felt.connect(_on_card_felt)
+	world.theme_struck.connect(_on_theme_struck)
 	world.pit_stop_reached.connect(_on_pit_stop)
 	world.pit_lane_opened.connect(func() -> void:
 		if not smoke:
@@ -859,6 +880,10 @@ func _apply_graphics(safe: bool) -> void:
 	if _vignette != null:
 		_vignette.visible = not safe
 	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if safe else Viewport.MSAA_2X
+	# The theme's extras (rain, the squad's lamp) follow the setting.
+	if not _look.is_empty() and _look_tween == null:
+		_look_flags = ""
+		_set_look(_look, true)
 
 
 ## What the report says about this save: enough to reproduce, no secrets.
@@ -1372,7 +1397,6 @@ func start_run(p_mode: String = "levels") -> void:
 	_event_mods = Events.mods(_events)
 	world.event_mods = _event_mods
 	world.rush = mode == "rush"
-	_apply_event_look(bool(_event_mods.get("fog", false)))
 	if mode == "daily":
 		daily_day = Daily.day_number(int(Time.get_unix_time_from_system()))
 		run_seed = Daily.seed_for_day(daily_day)
@@ -1439,6 +1463,8 @@ func start_run(p_mode: String = "levels") -> void:
 	# The bot runs plain unless told to be someone, so its numbers hold.
 	run_hero = (_smoke_hero if Heroes.known(_smoke_hero) else "") if smoke else Heroes.active(str(wardrobe.equipped.get("hero", "")), character_mode, mode)
 	_hero_fx = {}
+	_themes_seen = {}
+	world.theme_strikes = 0
 	squad.hero = run_hero
 	world.hero = run_hero
 	world.card_fx = {}
@@ -1464,6 +1490,8 @@ func start_run(p_mode: String = "levels") -> void:
 	# Reset before RUNNING: a road snapping back to two lanes must not
 	# banner, chime or glide the camera like a mid-run widening.
 	world.reset(run_seed)
+	if smoke and _smoke_level > 1:
+		world.start_level(_smoke_level)
 	# The bot's granted SENTRY cards stand their turrets up too.
 	for i in range(cards.stack("sentry")):
 		world.add_turret()
@@ -2144,7 +2172,7 @@ func _on_gate_stepped(gate: Gate, index: int) -> void:
 
 func _on_zombie_killed(zombie: Zombie) -> void:
 	kills += 1
-	bounty += int(round(float(Bounty.for_kind(zombie.kind_name())) * float(_event_mods.get("bounty_mult", 1.0))))
+	bounty += int(round(float(Bounty.for_kind(zombie.kind_name())) * float(world.mods_now.get("bounty_mult", 1.0))))
 	world.supply_funds = bounty
 	# Greed shows on the counter as it happens, not only at the end.
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
@@ -2393,22 +2421,131 @@ func _on_card_felt(id: String, from: Vector3, to: Vector3) -> void:
 				_shake = minf(1.0, _shake + 0.15)
 
 
-## Fog: a thick grey haze that eats the far road; off again after.
-func _apply_event_look(fog: bool) -> void:
-	if _env == null:
+# --- level themes ----------------------------------------------------------
+
+## Dresses the scene for theme [param id]: sky, sun, fill, fog, water,
+## lamps, rain, the squad's lamp. Blends over a second and a half, or
+## cuts at once ([param instant], safe graphics, the first look).
+func _apply_theme(id: String, instant: bool) -> void:
+	if _env == null or smoke:
 		return
-	if fog:
-		_env.fog_light_color = Color(0.62, 0.66, 0.72)
-		_env.fog_density = 0.028
-		_env.fog_sky_affect = 0.6
-	else:
-		_env.fog_light_color = Palette.FOG
-		_env.fog_density = 0.005
-		_env.fog_sky_affect = 0.15
+	var target: Dictionary = Themes.look(id).duplicate()
+	# A fog event or the weekly's fog lays its haze over any level.
+	if bool(world.mods_now.get("fog", false)) and id != "fog":
+		var haze := Themes.look("fog")
+		target.fog = haze.fog
+		target.fog_density = haze.fog_density
+		target.fog_sky = haze.fog_sky
+	if _look_tween != null:
+		_look_tween.kill()
+		_look_tween = null
+	Diag.note("theme", {"id": id, "level": world.level})
+	if instant or _look.is_empty() or SaveData.load_safe_graphics():
+		_set_look(target, true)
+		return
+	var from := _look.duplicate()
+	_look_tween = create_tween()
+	_look_tween.tween_method(func(t: float) -> void: _set_look(Themes.blend(from, target, t), false), 0.0, 1.0, 1.5)
+	_look_tween.tween_callback(func() -> void: _set_look(target, true))
+
+
+## Puts one look on the scene. The sky is the dear part (it relights
+## the ambient), so mid-blend it only moves every few frames.
+func _set_look(l: Dictionary, final: bool) -> void:
+	_look = l
+	if final or Engine.get_frames_drawn() % 6 == 0:
+		_sky_mat.sky_top_color = l.sky_top
+		_sky_mat.sky_horizon_color = l.sky_horizon
+		_sky_mat.ground_horizon_color = l.ground_horizon
+		_sky_mat.ground_bottom_color = l.ground_bottom
+	_sun.light_color = l.sun
+	_sun.light_energy = float(l.sun_energy)
+	_sun.rotation_degrees = Vector3(float(l.sun_pitch), float(l.sun_yaw), 0.0)
+	_fill.light_color = l.fill
+	_fill.light_energy = float(l.fill_energy)
+	_env.ambient_light_energy = float(l.ambient)
+	_env.fog_light_color = l.fog
+	_env.fog_density = float(l.fog_density)
+	_env.fog_sky_affect = float(l.fog_sky)
+	_env.tonemap_exposure = float(l.exposure)
+	var water := Mats.water()
+	water.set_shader_parameter("deep", l.water_deep)
+	water.set_shader_parameter("light", l.water_light)
+	water.set_shader_parameter("foam", l.foam)
+	# The switches: once per change, not once per frame.
+	var flags := "%s|%s|%.1f" % [l.rain, l.headlight, float(Themes.look(world.theme).lamps)]
+	if flags != _look_flags:
+		_look_flags = flags
+		var safe := SaveData.load_safe_graphics()
+		_set_rain(bool(l.rain) and not safe)
+		_set_headlight(bool(l.headlight) and not safe)
+		world.set_lamps(float(Themes.look(world.theme).lamps))
+
+
+## Rain: one particle system over the road ahead of the camera.
+func _set_rain(on: bool) -> void:
+	if not on:
+		if _rain != null:
+			_rain.emitting = false
+		return
+	if _rain == null:
+		_rain = CPUParticles3D.new()
+		_rain.amount = 150
+		_rain.lifetime = 0.65
+		_rain.local_coords = false
+		_rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_rain.emission_box_extents = Vector3(9.0, 0.4, 13.0)
+		_rain.direction = Vector3(0.12, -1.0, 0.05)
+		_rain.spread = 2.0
+		_rain.initial_velocity_min = 17.0
+		_rain.initial_velocity_max = 21.0
+		_rain.gravity = Vector3(0.0, -20.0, 0.0)
+		var drop := BoxMesh.new()
+		drop.size = Vector3(0.025, 0.55, 0.025)
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(0.75, 0.85, 1.0, 0.45)
+		drop.material = mat
+		_rain.mesh = drop
+		_rain.position = Vector3(0.0, 11.0, -9.0)
+		add_child(_rain)
+	_rain.emitting = true
+
+
+## The squad's lamp: a warm pool of light it carries through the dark.
+func _set_headlight(on: bool) -> void:
+	if _headlight == null:
+		if not on:
+			return
+		_headlight = OmniLight3D.new()
+		_headlight.light_color = Color(1.0, 0.9, 0.7)
+		_headlight.light_energy = 2.4
+		_headlight.omni_range = 12.0
+		_headlight.omni_attenuation = 1.3
+		_headlight.shadow_enabled = false
+		_headlight.position = Vector3(0.0, 2.6, -3.0)
+		squad.add_child(_headlight)
+	_headlight.visible = on
+
+
+## Lightning on the gates: the sky blinks and it thunders.
+func _on_theme_struck() -> void:
+	if smoke:
+		return
+	hud.flash(0.14)
+	sfx.play("boss_roar", -12.0, 0.55)
+	if world.theme_strikes == 1:
+		hud.show_hint("LIGHTNING: STAND IN THE GAP", 2.4)
 
 
 func _on_level_started(level: int) -> void:
 	Diag.mark("level:%d" % level)
+	Diag.set_gauge("theme", world.theme)
+	_apply_theme(world.theme, level <= 1)
+	_themes_seen[world.theme] = true
+	if smoke:
+		print("SMOKE_THEME ", JSON.stringify({"level": level, "id": world.theme, "frame": _frames}))
 	if level == 1 and not _events.is_empty() and not smoke:
 		var id := str(_events[0])
 		hud.show_banner("%s\n%s" % [Events.title(id), Events.body(id)], 2.6)
@@ -2416,11 +2553,15 @@ func _on_level_started(level: int) -> void:
 		hud.show_banner("BOSS RUSH\nONE GATE, THEN THE BOSS. AGAIN.", 2.2)
 	if level <= 1:
 		return
-	hud.show_banner("LEVEL %d" % level, 1.0)
+	# The banner names the place and its rule; daybreak is just the level.
+	hud.show_banner(Themes.banner(level, world.theme), 2.8 if Themes.rule(world.theme) != "" else 1.0)
 	hud.show_hint(Progression.hint_for(level), 3.6)
+	_refresh_pause_perks()
 	for id in Lessons.for_level(level):
 		if _teach(id):
 			break
+	if Themes.rule(world.theme) != "":
+		_teach("theme")
 	_level_peak = 1
 	_level_gates = 0
 	_level_perfect = 0
@@ -2774,6 +2915,8 @@ func _lb_send_pending() -> void:
 ## The pause menu's line: perks held, then the veterans by name.
 func _refresh_pause_perks() -> void:
 	var parts := []
+	if Themes.rule(world.theme) != "":
+		parts.append("%s: %s" % [Themes.title(world.theme), Themes.rule(world.theme)])
 	if run_hero != "":
 		parts.append("%s: %s. %s." % [Wardrobe.title(run_hero), Heroes.passive_text(run_hero), Heroes.twist_text(run_hero)])
 	if cards.total() > 0:
@@ -3252,6 +3395,7 @@ func _smoke_tick() -> void:
 			"retries": _smoke_retries,
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
+		print("SMOKE_THEMES ", JSON.stringify({"seen": _themes_seen.keys(), "strikes": world.theme_strikes, "now": world.theme}))
 		if run_hero != "":
 			print("SMOKE_HERO ", JSON.stringify({"id": run_hero, "fx": _hero_fx, "uses": _ability_uses, "squad": squad.count, "peak": peak_squad}))
 		if cards.total() > 0:
@@ -3507,6 +3651,14 @@ func _shots_walkthrough() -> void:
 		hud.set_bombs(2)
 		hud.set_ability("VOLLEY", 0.65, true)
 		await _capture("q16_crowd.png", 8)
+		for id in Themes.ORDER:
+			world.theme = id
+			_apply_theme(id, true)
+			hud.show_banner(Themes.banner(3, id), 5.0)
+			await _capture("t_%s.png" % id, 12)
+		world.theme = "day"
+		_apply_theme("day", true)
+		hud.show_banner("", 0.01)
 		var shown := Cards.new()
 		shown.take("burn")
 		var hand := []

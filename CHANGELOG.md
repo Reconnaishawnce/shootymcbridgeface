@@ -3,6 +3,31 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.57 (level themes and the look that goes with them: phase 3)
+
+- LEVEL THEMES. Every level is now a place with its own rule and its
+  own look. Level 1 is DAYBREAK, the plain road; then seven themes come
+  round in order:
+  - GOLD HOUR: the road runs fast and every kill pays double. A low
+    orange sun, long shadows, copper water.
+  - NIGHT SHIFT: zombies are 20% faster and kills pay half again.
+    Moonlight, bright lamps, and the squad carries its own light.
+  - STORM FRONT: a line of lightning crosses the road every 6 seconds
+    of the gates with one gap to stand in. Rain, grey water, thunder.
+  - FOG BANK: panels show late and the far road is grey.
+  - ROADWORKS: two more walls across the road. High noon, green water.
+  - SAW MILL: two more saws, and faster. A red dawn.
+  - and DAYBREAK again every seventh level.
+- The banner at the start of a level names the place and its rule, the
+  pause menu repeats it, and a one-time lesson explains themes.
+- The look blends in over a second and a half: sky, sun colour and
+  angle, fill light, fog, water, lamp glow. Rain and the squad's lamp
+  switch off under SAFE GRAPHICS.
+- Themes are the same for everyone, so they run in the daily and the
+  weekly; a weekend event or the weekly's challenge stacks on top.
+- The bot has `--smoke-level=N`; `check.sh` proves a storm level
+  throws lightning and that a three-level run changes place twice.
+
 ## 0.56 (heroes that play differently, a cleaner home: phase 2)
 
 - HEROES. Each of the eight heroes now changes the run: one thing that

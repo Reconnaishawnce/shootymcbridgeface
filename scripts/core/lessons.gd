@@ -58,11 +58,13 @@ const CATALOG := {
 		"body": "A wall of zombies creeps up behind you while the road is stopped for the boss, and whenever your hands leave the road. Kill the boss fast, keep steering, or it starts eating."},
 	"veterans": {"title": "VETERANS",
 		"body": "A survivor of every boss steps up with a name, a beret and a trait the whole squad feels: DEADEYE hits harder, TOUGH softens heavy bites, a FIELD MEDIC brings soldiers back, LUCKY pays more at the end. Up to three a run. A heavy bite can take one with it, so keep them out of the brutes."},
+	"theme": {"title": "A NEW PLACE",
+		"body": "Every level has its own weather and its own rule: a fast gold evening, a night where they run, a storm that throws lightning, fog, roadworks, a saw mill. The banner at the start of the level names the place and says the rule. Read it: the same build plays differently in each."},
 	"rally": {"title": "RALLY",
 		"body": "Squad at zero? Once a run you can buy a few soldiers back for stars, if you decide in five seconds. Not in the daily or weekly."},
 }
 ## The order lessons are listed on the LEARN page.
-const ORDER := ["basics", "shoot_panels", "fire_modes", "ability", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "pitstop", "turret", "vehicle", "saw", "barricade", "splitter", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "rally"]
+const ORDER := ["basics", "shoot_panels", "fire_modes", "ability", "bounty", "hidden", "expr", "perk", "fork", "dash", "clinger", "hot", "deal", "supply", "pitstop", "turret", "vehicle", "saw", "barricade", "splitter", "boss_walker", "boss_spitter", "boss_storm", "boss_foreman", "horde", "veterans", "theme", "rally"]
 ## Seconds between two pop-ups, so a busy gate does not stack three.
 const COOLDOWN := 4.0
 

@@ -861,14 +861,16 @@ static func turret_dps(level: int) -> float:
 
 ## Where the walls stand this level: gate indices and sides. Never the
 ## opener, never a fork gate, never where a saw is.
-func barricades_for_level(level: int, saw_plan: Array = []) -> Array:
+func barricades_for_level(level: int, saw_plan: Array = [], extra: int = 0) -> Array:
 	if level < BARRICADE_LEVEL:
 		return []
 	var used := {}
 	for p in saw_plan:
 		used[int(p.index)] = true
 	var out := []
-	var count := 2 if level >= BARRICADE_TWO_LEVEL else 1
+	# ROADWORKS adds walls; never more than the gates there are to put
+	# them between.
+	var count := mini((2 if level >= BARRICADE_TWO_LEVEL else 1) + extra, GATES_PER_LEVEL - 3)
 	for i in range(count):
 		var index := rng.randi_range(1, GATES_PER_LEVEL - 2)
 		var tries := 0

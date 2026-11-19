@@ -343,10 +343,12 @@ changes where they pay. Five phases, each a release:
    hero move, so stars buy ways to play; the home screen is PLAY,
    MODES, and a bottom bar of SHOP, LOCKER and MORE. See DESIGN,
    "Heroes" and "The home screen".
-3. Levels with an identity, and the graphics pass that goes with them:
-   a signature rule and a look per level (night bridge with headlights,
-   a collapsing lane, a convoy to escort, the horde at your back), plus
-   lighting, materials and effects across the board.
+3. Levels with an identity, and the graphics pass that goes with them
+   (0.57, done). Seven themes cycle with the levels, each a rule built
+   from the road's knobs and a look of its own (sky, sun, fog, water,
+   rain, the squad's lamp at night). See DESIGN, "Level themes". Left
+   for later because they need new road geometry or a new objective:
+   a collapsing lane, a convoy to escort.
 4. Chests, a lower coin curve, and rivals: quest, road and season
    rewards become chests you tap open with a rare jackpot; late-game
    coin income comes down now that the sinks exist; the run shows the

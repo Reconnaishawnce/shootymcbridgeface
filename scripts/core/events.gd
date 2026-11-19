@@ -10,6 +10,9 @@ extends RefCounted
 const DEFAULT_MODS := {
 	"bounty_mult": 1.0, "fog": false, "reveal_penalty": 0.0,
 	"saws_extra": 0, "saw_speed": 0.0, "elite_all": false, "speed_bonus": 0.0,
+	# Turned by level themes (Themes): zombie pace, lightning lines in
+	# the gates, extra walls.
+	"pace_mult": 1.0, "strikes": false, "barricades_extra": 0,
 }
 const CATALOG := {
 	"double_bounty": {"title": "DOUBLE BOUNTY", "body": "Every kill pays twice. Spend it at the pit.", "mods": {"bounty_mult": 2.0}},
@@ -55,19 +58,25 @@ static func weekly_challenge(week: int) -> String:
 static func mods(ids: Array) -> Dictionary:
 	var out := DEFAULT_MODS.duplicate()
 	for id in ids:
-		if not CATALOG.has(id):
-			continue
-		var m: Dictionary = CATALOG[id]["mods"]
-		for k in m:
-			match k:
-				"bounty_mult":
-					out[k] = float(out[k]) * float(m[k])
-				"saws_extra":
-					out[k] = int(out[k]) + int(m[k])
-				"fog", "elite_all":
-					out[k] = bool(out[k]) or bool(m[k])
-				_:
-					out[k] = maxf(float(out[k]), float(m[k]))
+		if CATALOG.has(id):
+			merge(out, CATALOG[id]["mods"])
+	return out
+
+
+## Folds one set of knobs [param m] into [param out] and returns it:
+## multipliers multiply, counts add, flags or together, bonuses take the
+## larger. A level's theme is merged over the run's events this way.
+static func merge(out: Dictionary, m: Dictionary) -> Dictionary:
+	for k in m:
+		match k:
+			"bounty_mult", "pace_mult":
+				out[k] = float(out.get(k, 1.0)) * float(m[k])
+			"saws_extra", "barricades_extra":
+				out[k] = int(out.get(k, 0)) + int(m[k])
+			"fog", "elite_all", "strikes":
+				out[k] = bool(out.get(k, false)) or bool(m[k])
+			_:
+				out[k] = maxf(float(out.get(k, 0.0)), float(m[k]))
 	return out
 
 

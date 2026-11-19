@@ -978,6 +978,58 @@ screen is exactly where phones were struggling.
 the best it says SO CLOSE, otherwise the gap; nothing on a first run
 or a new best.
 
+## Level themes (0.57)
+
+Cards made runs differ from each other; themes make the levels inside
+a run differ. Until now level 5 was level 2 with bigger numbers, on the
+same blue bridge under the same sun.
+
+`Themes` (pure, tested) gives each level a theme: `for_level` walks
+`ORDER` (daybreak, gold hour, night shift, storm front, fog bank,
+roadworks, saw mill), level 1 is always daybreak, and a level too
+early for a theme's rule falls back to daybreak. A theme is two
+things:
+
+- A rule, as knobs. The knobs are the ones events already turn
+  (`Events.DEFAULT_MODS`), plus three new ones: `pace_mult` (zombie
+  pace), `strikes` (lightning lines in the gates) and
+  `barricades_extra`. `World.start_level` merges the theme over the
+  run's events with `Events.merge` into `mods_now`, and everything
+  that used to read `event_mods` reads `mods_now`. So a weekend saw
+  storm inside the saw mill stacks, and the weekly's challenge rides
+  on top of whatever the level is.
+- A look, as data: `LOOKS[id]` holds sky, sun and fill colours,
+  energies and angles, fog, exposure, the water's three colours, the
+  lamp glow, and flags for rain and the squad's lamp.
+
+The one new mechanic is the storm's: `World._theme_strikes` calls the
+storm boss's `_storm_line` every `STRIKE_INTERVAL` seconds of the
+gates phase (first at `STRIKE_FIRST`), never inside a fork or the pit
+lane where the gap could land on a road you cannot reach. The rest
+reuse tested systems on purpose; a collapsing lane and an escort were
+considered and left out because they need new geometry and a new
+objective, which is a phase of its own.
+
+`Game._apply_theme` dresses the scene. `_set_look` writes one look to
+the sky material, both lights, the environment and the water shader;
+`Themes.blend` gives the look partway between two, and a tween walks
+it for a second and a half. The sky is the dear part (it relights the
+ambient), so the `Sky` is in incremental mode and mid-blend it only
+moves every sixth frame. Rain is one `CPUParticles3D` of 150 drops;
+the night lamp is one unshadowed `OmniLight3D` on the squad; the lamp
+posts swap one shared glow material. All three are off in safe
+graphics, and the whole look is skipped for the bot.
+
+The camera looks down the road, so the sky itself is barely on screen:
+what the player sees of a theme is the water, the light on the deck
+and the crowd, the fog on the far road, and the weather. Two looks
+needed a second pass for readability (`test_looks_read` holds the
+floor): roadworks was a haze and became a clear high noon, and the saw
+mill's red sun swallowed the red crowd until it got a cool fill.
+
+Balance: gold hour and night shift pay more bounty, which the coin
+pass in phase 4 has to count.
+
 ## Heroes (0.56)
 
 Eight heroes were eight faces. Now each is a way to play, which is

@@ -54,6 +54,10 @@ static func sections() -> Array:
 			"The heavier side pays better panels. Read both and pick. " +
 			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
 				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
+		{"title": "LEVEL THEMES", "body":
+			"Every level is a different place with its own weather and its own rule. The banner at the start of the level names it and says the rule, and the pause menu repeats it. Level 1 is always DAYBREAK, the plain road; after that the themes come round in order, with a plain daybreak every seventh level to catch your breath.\n" +
+			_theme_lines() +
+			"In a STORM FRONT a line of lightning crosses the road every %d seconds of the gates with one gap in it: a red ring shows where each bolt lands, so stand where there is none, or dash through. Themes are the same for everyone, so they run in the daily and the weekly too, and a weekend event stacks on top." % int(Themes.STRIKE_INTERVAL)},
 		{"title": "BUILD CARDS", "body":
 			"Every time a boss falls the road stops and deals you three BUILD CARDS. Pick one. It is yours until the run ends, and it changes what your bullets and your squad do, so no two runs play the same. In the BOSS RUSH it is every other boss.\n" +
 			"Cards come in three kinds: COMMON (blue), RARE (purple) and EPIC (gold, and not often). Most can be taken more than once and get stronger each time.\n" +
@@ -166,6 +170,14 @@ static func sections() -> Array:
 		{"title": "RECORDS", "body":
 			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
 	]
+
+
+static func _theme_lines() -> String:
+	var out := ""
+	for id in Themes.ORDER:
+		if Themes.rule(id) != "":
+			out += "%s: %s\n" % [Themes.title(id), Themes.rule(id)]
+	return out
 
 
 static func _hero_lines() -> String:

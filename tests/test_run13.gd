@@ -50,6 +50,10 @@ func test_help_text() -> void:
 	for id in Heroes.ORDER:
 		check(all.contains(Heroes.passive_text(id)) and all.contains(Heroes.twist_text(id)), "help says what %s does" % id)
 	check(all.contains("MODES holds") and all.contains("Along the bottom: SHOP"), "help maps the home screen")
+	for id in Themes.ORDER:
+		check(all.contains(Themes.title(id)), "help names the theme %s" % id)
+		if Themes.rule(id) != "":
+			check(all.contains(Themes.rule(id)), "help says the rule of %s" % id)
 	check(all.contains("level %d" % Progression.DASH_LEVEL), "dash level comes from the constant")
 	check(all.contains("%d gates and a boss" % Difficulty.GATES_PER_LEVEL), "gates per level from the constant")
 

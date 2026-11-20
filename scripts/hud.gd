@@ -46,6 +46,9 @@ signal characters_toggled(on: bool)
 signal shadows_toggled(on: bool)
 signal safe_graphics_toggled(on: bool)
 signal report_pressed(note: String)
+## LOGGING was tapped; the crash card's SEND, with what the player wrote.
+signal logging_toggled
+signal crash_report_pressed(note: String)
 ## The problem card: what happened (froze / slow / glitch / other) and a line.
 signal problem_sent(what: String, note: String)
 signal problem_closed
@@ -108,6 +111,9 @@ var _over_template := ""
 var _over_count_tween: Tween
 var _over_tick_at := 0.0
 var _crash_body: Label
+var _crash_note: LineEdit
+var _settings_logging: Button
+var _settings_log_line: Label
 var _problem_card: Control
 var _draft_card: Control
 var _chest_card: Control
@@ -871,6 +877,13 @@ func set_lessons(on: bool) -> void:
 	_settings_lessons.text = "LESSONS: %s" % ("ON" if on else "OFF")
 
 
+## The LOGGING button's words and the line under it that says what is
+## happening.
+func set_logging(label: String, status: String) -> void:
+	_settings_logging.text = label
+	_settings_log_line.text = status
+
+
 func set_reports(on: bool) -> void:
 	_settings_reports.text = "SEND REPORTS: %s" % ("ON" if on else "OFF")
 
@@ -951,9 +964,17 @@ func _build_crash(root: Control) -> void:
 	_crash_body = body
 	body.modulate = Color(0.9, 0.9, 0.95)
 	box.add_child(body)
+	_crash_note = LineEdit.new()
+	_crash_note.placeholder_text = "What were you doing? (optional)"
+	_crash_note.max_length = 300
+	_crash_note.custom_minimum_size = Vector2(520.0, 56.0)
+	_crash_note.add_theme_font_size_override("font_size", 22)
+	box.add_child(_crash_note)
 	var send := _button("SEND THE REPORT", 34)
 	send.pressed.connect(func() -> void:
-		report_pressed.emit("The game stopped suddenly during the previous session.")
+		var said := _crash_note.text.strip_edges()
+		_crash_note.text = ""
+		crash_report_pressed.emit(said)
 		crash_dismissed.emit())
 	box.add_child(send)
 	var no := _button("NOT NOW", 28)
@@ -1013,11 +1034,13 @@ func hide_problem_card() -> void:
 	_problem_card.visible = false
 
 
-func show_crash_card(sent: bool = false) -> void:
+func show_crash_card(sent: bool = false, logging_note: String = "") -> void:
 	_crash_card.move_to_front()
 	_crash_card.visible = true
-	_crash_body.text = ("The game stopped suddenly last time. A report (phone, graphics, what the game was doing) has already gone to the developer. Add a word about what you were doing and send it again, or carry on." if sent
-		else "The game stopped suddenly last time. A report (phone, graphics, what the game was doing) helps fix it. Tap SEND to upload it; if there is no connection it goes by email instead.")
+	_crash_body.text = ("The game stopped suddenly last time. A report (phone, graphics, the last seconds before it stopped) has already gone to the developer. Say what you were doing and send it again, or carry on." if sent
+		else "The game stopped suddenly last time. A report (phone, graphics, the last seconds before it stopped) helps fix it. Tap SEND to upload it; if there is no connection it goes by email instead.")
+	if logging_note != "":
+		_crash_body.text += "\n\n" + logging_note
 
 
 func hide_crash_card() -> void:
@@ -1227,6 +1250,9 @@ func _build_title(root: Control) -> void:
 	var more_help := _button("HOW TO PLAY", 32)
 	more_help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(more_help)
+	var more_problem := _button("REPORT A PROBLEM", 32)
+	more_problem.pressed.connect(func() -> void: show_problem_card(false))
+	box.add_child(more_problem)
 	var settings := _button("SETTINGS", 32)
 	settings.pressed.connect(func() -> void: settings_opened.emit())
 	box.add_child(settings)
@@ -1578,61 +1604,80 @@ func _build_settings(root: Control) -> void:
 	var head := _label(48, HORIZONTAL_ALIGNMENT_CENTER)
 	head.text = "SETTINGS"
 	box.add_child(head)
-	_settings_sound = _button("SOUND: ON", 29)
+	# Two columns of switches, so the card has room for what is under them.
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(grid)
+	_settings_sound = _button("SOUND: ON", 22)
 	_settings_sound.pressed.connect(_on_sound_pressed)
-	box.add_child(_settings_sound)
-	_settings_music = _button("MUSIC: ON", 29)
+	grid.add_child(_settings_sound)
+	_settings_music = _button("MUSIC: ON", 22)
 	_settings_music.pressed.connect(_on_music_pressed)
-	box.add_child(_settings_music)
-	_settings_characters = _button("CHARACTERS: OFF", 29)
+	grid.add_child(_settings_music)
+	_settings_characters = _button("CHARACTERS: OFF", 22)
 	_settings_characters.pressed.connect(_on_characters_pressed)
-	box.add_child(_settings_characters)
-	_settings_shadows = _button("SHADOWS: ON", 29)
+	grid.add_child(_settings_characters)
+	_settings_shadows = _button("SHADOWS: ON", 22)
 	_settings_shadows.pressed.connect(func() -> void:
 		var on := not _settings_shadows.text.ends_with("ON")
 		set_shadows(on)
 		shadows_toggled.emit(on))
-	box.add_child(_settings_shadows)
-	_settings_lessons = _button("LESSONS: ON", 29)
+	grid.add_child(_settings_shadows)
+	_settings_lessons = _button("LESSONS: ON", 22)
 	_settings_lessons.pressed.connect(func() -> void:
 		var on := not _settings_lessons.text.ends_with("ON")
 		set_lessons(on)
 		lessons_toggled.emit(on))
-	box.add_child(_settings_lessons)
-	_settings_safe = _button("SAFE GRAPHICS: OFF", 29)
+	grid.add_child(_settings_lessons)
+	_settings_safe = _button("SAFE GRAPHICS: OFF", 22)
 	_settings_safe.pressed.connect(func() -> void:
 		var on := not _settings_safe.text.ends_with("ON")
 		set_safe_graphics(on)
 		safe_graphics_toggled.emit(on))
-	box.add_child(_settings_safe)
-	_settings_notch = _button("NOTCH ROOM: AUTO", 29)
+	grid.add_child(_settings_safe)
+	_settings_notch = _button("NOTCH ROOM: AUTO", 22)
 	_settings_notch.pressed.connect(func() -> void:
 		var next: String = {"auto": "on", "on": "off", "off": "auto"}[_notch_mode]
 		set_notch_mode(next)
 		notch_changed.emit(next))
-	box.add_child(_settings_notch)
-	_settings_haptics = _button("HAPTICS: ON", 29)
+	grid.add_child(_settings_notch)
+	_settings_haptics = _button("HAPTICS: ON", 22)
 	_settings_haptics.pressed.connect(func() -> void:
 		var on := not _settings_haptics.text.ends_with("ON")
 		set_haptics(on)
 		haptics_toggled.emit(on))
-	box.add_child(_settings_haptics)
-	_settings_reports = _button("SEND REPORTS: ON", 29)
+	grid.add_child(_settings_haptics)
+	_settings_reports = _button("SEND REPORTS: ON", 22)
 	_settings_reports.pressed.connect(func() -> void:
 		var on := not _settings_reports.text.ends_with("ON")
 		set_reports(on)
 		reports_toggled.emit(on))
-	box.add_child(_settings_reports)
-	_settings_fps = _button("SHOW FPS: OFF", 29)
+	grid.add_child(_settings_reports)
+	_settings_fps = _button("SHOW FPS: OFF", 22)
 	_settings_fps.pressed.connect(func() -> void:
 		var on := not _settings_fps.text.ends_with("ON")
 		set_show_fps(on)
 		show_fps_toggled.emit(on))
-	box.add_child(_settings_fps)
+	grid.add_child(_settings_fps)
+	for b in grid.get_children():
+		(b as Button).custom_minimum_size = Vector2(288.0, 56.0)
+	# Logging: the flight recorder goes to the server as the game runs.
+	_settings_logging = _button("LOGGING: OFF", 26)
+	_settings_logging.add_theme_color_override("font_color", COIN)
+	_settings_logging.pressed.connect(func() -> void: logging_toggled.emit())
+	box.add_child(_settings_logging)
+	_settings_log_line = _label(19, HORIZONTAL_ALIGNMENT_CENTER)
+	_settings_log_line.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_settings_log_line.custom_minimum_size.x = 560.0
+	_settings_log_line.modulate = Color(1.0, 0.95, 0.8)
+	box.add_child(_settings_log_line)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Haptics: the phone buzzes with the game.  Send reports: crashes, freezes and slowdowns reach the developer on their own; never your name.  Shake the phone after a slowdown to send one yourself."
+	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Send reports: crashes, freezes and slowdowns reach the developer on their own; never your name.  Shake the phone after a slowdown to send one yourself."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
-	blurb.custom_minimum_size.x = 520.0
+	blurb.custom_minimum_size.x = 560.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
 	box.add_child(blurb)
 	# Bug reports: a line for what happened, a button that opens the mail

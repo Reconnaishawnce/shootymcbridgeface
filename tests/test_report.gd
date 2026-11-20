@@ -19,6 +19,11 @@ func test_export_declares_what_the_code_uses() -> void:
 		check(preset.contains("permissions/vibrate=true"), "the game vibrates, so the Android preset grants VIBRATE")
 	if game.contains("HTTPRequest"):
 		check(preset.contains("permissions/internet=true"), "the game talks to the network, so the preset grants INTERNET")
+	# Godot 4.4 leaves the motion sensors off unless the project asks:
+	# without this line the accelerometer reads zero and a shake is never
+	# felt, which is how shake to report shipped dead in 0.53.
+	if game.contains("get_accelerometer"):
+		check(bool(ProjectSettings.get_setting("input_devices/sensors/enable_accelerometer", false)), "the game reads the accelerometer, so the project switches it on")
 
 
 func test_log_lines_and_trim() -> void:

@@ -36,6 +36,29 @@ var _trace_frames := 0
 ## 900 fixed frames in a second, which is one wall-clock sample.
 var trace_every_frames := 0
 var _trace_ms := 0.0
+## The flight recorder (Flight): one row a second, in memory and in a
+## file that survives a crash. `session` names this launch;
+## `previous_flight` is the last launch's file, parsed.
+var session := ""
+var flight_rows: Array = []
+var flight_events: Array = []
+var flight_sent_t := -1.0
+var flight_seq := 0
+var flight_trouble := false
+var flight_logging := false
+var previous_flight: Dictionary = {}
+## The bot samples by frame, like the trace.
+var flight_every_frames := 0
+var _flight_file: FileAccess
+var _flight_lines := 0
+var _flight_at := 0.0
+var _flight_frames := 0
+var _flight_ms := 0.0
+var _flight_max := 0.0
+var _flight_head_written := false
+## Lines from before the first row: they wait, so the header is written
+## once the game has said whether logging is on.
+var _flight_early: Array = []
 ## A single frame of Telemetry.LONG_FRAME_SECONDS or more, in the
 ## foreground: a freeze the game should report.
 signal long_frame(seconds: float, crumb: String)
@@ -48,7 +71,11 @@ func _ready() -> void:
 	started = Time.get_unix_time_from_system()
 	_last_wall = Time.get_ticks_msec() * 0.001
 	_last_beat = _last_wall
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	session = Flight.new_session(rng)
 	if _enabled:
+		_flight_rotate()
 		previous = _read_heartbeat()
 		if not previous.is_empty():
 			previous.age = int(started - float(previous.get("last", started)))
@@ -83,6 +110,13 @@ func _process(_delta: float) -> void:
 			_trace_ms = 0.0
 		if ms > 50.0:
 			worst_frames = Telemetry.note_worst(worst_frames, {"ms": snappedf(ms, 0.1), "t": snappedf(now, 0.01), "state": state_name, "crumb": crumb})
+		# The flight recorder: the second's average and its worst frame.
+		_flight_frames += 1
+		_flight_ms += ms
+		_flight_max = maxf(_flight_max, ms)
+		var flight_due := (_flight_frames >= flight_every_frames) if flight_every_frames > 0 else (now - _flight_at >= Flight.SAMPLE_EVERY)
+		if flight_due:
+			_flight_sample(now)
 	if Report.is_stall(wall) and _clean == false and _frames > 2:
 		if stalls.size() < MAX_STALLS:
 			stalls.append({"t": snappedf(now, 0.01), "seconds": snappedf(wall, 0.01), "state": state_name, "crumb": crumb})
@@ -130,6 +164,147 @@ func note(event: String, data: Dictionary = {}) -> void:
 	var t := Time.get_ticks_msec() * 0.001
 	events.append(Report.line(t, state_name, event, data))
 	events = Report.trim(events)
+	var line := Flight.event_line(t, event, data)
+	flight_events.append(line)
+	if flight_events.size() > 200:
+		flight_events = flight_events.slice(flight_events.size() - 200)
+	_flight_write(line)
+
+
+# --- the flight recorder ---------------------------------------------------
+
+func _counts() -> Dictionary:
+	return {
+		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"draw": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		"prims": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		"vram": int(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0),
+	}
+
+
+## Megabytes in use on the device, as a number.
+func _mem_used_mb() -> int:
+	var info := OS.get_memory_info()
+	var physical := float(info.get("physical", 0))
+	return int((physical - float(info.get("free", 0))) / 1048576.0) if physical > 0.0 else 0
+
+
+## What the device is, for the file's header and every chunk.
+func _device_info() -> Dictionary:
+	return {
+		"version": str(ProjectSettings.get_setting("application/config/version", "dev")),
+		"device": "%s (%s)" % [OS.get_model_name(), OS.get_name()],
+		"os": OS.get_version() if OS.get_version() != "" else OS.get_version_alias(),
+		"gpu": "%s / %s" % [RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor()],
+		"screen": "%s @ %sHz" % [str(DisplayServer.screen_get_size()), str(snappedf(DisplayServer.screen_get_refresh_rate(), 0.1))],
+		"renderer": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")),
+	}
+
+
+func flight_head() -> Dictionary:
+	return Flight.header(session, int(started), _device_info(), flight_logging)
+
+
+## One row: into memory for reports and uploads, and onto the disk.
+func _flight_sample(now: float) -> void:
+	var n := maxi(_flight_frames, 1)
+	var r := Flight.row(now, _flight_ms / float(n), _flight_max, _flight_frames, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, _counts(), _mem_used_mb(), gauges, state_name, crumb)
+	_flight_at = now
+	_flight_frames = 0
+	_flight_ms = 0.0
+	_flight_max = 0.0
+	flight_rows.append(r)
+	if flight_rows.size() > Flight.PENDING_ROWS:
+		flight_rows = flight_rows.slice(flight_rows.size() - Flight.PENDING_ROWS)
+	if Flight.is_trouble(r):
+		flight_trouble = true
+	_flight_write(r)
+
+
+## The game says whether logging is live. Written into the header, so
+## the next launch knows whether this session's tail is owed.
+func set_logging(on: bool) -> void:
+	if on == flight_logging:
+		return
+	flight_logging = on
+	note("logging", {"on": on})
+
+
+## Rows and events the server has not had yet.
+func flight_unsent() -> Dictionary:
+	return Flight.unsent(flight_rows, flight_events, flight_sent_t)
+
+
+func flight_unsent_count() -> int:
+	var n := 0
+	for r in flight_rows:
+		if float(r[0]) > flight_sent_t:
+			n += 1
+	return n
+
+
+## Chunk [param seq] reached the server with rows up to [param t].
+func flight_uploaded(seq: int, t: float) -> void:
+	flight_seq = seq + 1
+	flight_sent_t = maxf(flight_sent_t, t)
+	flight_trouble = false
+	_flight_write(Flight.mark_line(seq, flight_sent_t))
+
+
+## The last launch's file becomes the previous one, and is read: the
+## header from its first line, everything else from its last 64 KB.
+func _flight_rotate() -> void:
+	if FileAccess.file_exists(Flight.PATH):
+		if FileAccess.file_exists(Flight.PREV_PATH):
+			DirAccess.remove_absolute(Flight.PREV_PATH)
+		DirAccess.rename_absolute(Flight.PATH, Flight.PREV_PATH)
+	if FileAccess.file_exists(Flight.PREV_PATH):
+		previous_flight = Flight.parse(_tail(Flight.PREV_PATH))
+		var f := FileAccess.open(Flight.PREV_PATH, FileAccess.READ)
+		if f != null:
+			var first := Flight.parse(f.get_line())
+			f.close()
+			if not (first.header as Dictionary).is_empty():
+				previous_flight.header = first.header
+	_flight_file = FileAccess.open(Flight.PATH, FileAccess.WRITE)
+
+
+## One line to the file, flushed at once so a crash cannot take it.
+func _flight_write(v: Variant) -> void:
+	if _flight_file == null:
+		return
+	if not _flight_head_written:
+		# The header waits for the first row (a second in), by when the
+		# game has loaded its settings and said whether logging is on.
+		if not (v is Array) and _flight_early.size() < 40:
+			_flight_early.append(v)
+			return
+		_flight_head_written = true
+		_flight_file.store_line(JSON.stringify(flight_head()))
+		for early in _flight_early:
+			_flight_file.store_line(JSON.stringify(early))
+		_flight_early = []
+	_flight_file.store_line(JSON.stringify(v))
+	_flight_file.flush()
+	_flight_lines += 1
+	if _flight_lines > Flight.FILE_ROWS:
+		_flight_cut()
+
+
+## The file has grown past its limit: start it again from its tail.
+func _flight_cut() -> void:
+	_flight_file.close()
+	_flight_file = FileAccess.open(Flight.PATH, FileAccess.WRITE)
+	if _flight_file == null:
+		return
+	_flight_file.store_line(JSON.stringify(flight_head()))
+	var keep := flight_rows.slice(maxi(0, flight_rows.size() - Flight.TAIL_ROWS))
+	for r in keep:
+		_flight_file.store_line(JSON.stringify(r))
+	if flight_seq > 0:
+		_flight_file.store_line(JSON.stringify(Flight.mark_line(flight_seq - 1, flight_sent_t)))
+	_flight_file.flush()
+	_flight_lines = keep.size() + 2
 
 
 ## Memory in use, in megabytes, as the OS sees it: the static counter is
@@ -187,6 +362,10 @@ func context(save: Dictionary, p_note: String = "") -> Dictionary:
 		"uptime": snappedf(Time.get_ticks_msec() * 0.001, 0.1),
 		"perf": perf(),
 		"trace": trace.duplicate(true),
+		"session": session,
+		"flight": Flight.tail(flight_rows),
+		"previous_flight": Flight.tail(previous_flight.get("rows", [])),
+		"previous_session": str(previous_flight.get("header", {}).get("session", "")),
 	}
 
 
@@ -199,6 +378,9 @@ func report(save: Dictionary, p_note: String = "") -> String:
 func bundle(save: Dictionary, kind: String, p_note: String = "") -> Dictionary:
 	var c := context(save, p_note)
 	c.kind = kind
+	# The last launch's final seconds belong in its crash report only.
+	if kind != "crash":
+		c.previous_flight = {}
 	return Telemetry.payload(c)
 
 
@@ -233,6 +415,7 @@ func _beat(force: bool) -> void:
 		"crumb": crumb,
 		"clean": _clean,
 		"frames": _frames,
+		"session": session,
 		"events": Report.trim(events, 12),
 	}
 	var f := FileAccess.open(HEARTBEAT_PATH, FileAccess.WRITE)

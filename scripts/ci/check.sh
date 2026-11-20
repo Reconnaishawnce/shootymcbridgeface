@@ -25,11 +25,22 @@ echo "== unit tests"
 fail_on_script_errors "unit tests"
 
 echo "== smoke play (900 fixed frames, auto-steer)"
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke 2>&1 | tee "$LOG"
+DUMP="$(mktemp)"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-dump="$DUMP" 2>&1 | tee "$LOG"
 fail_on_script_errors "smoke play"
 grep -q "SMOKE_RESULT" "$LOG" || { echo "::error::smoke run produced no result line"; exit 1; }
 grep "SMOKE_LB" "$LOG" | grep -q '"closed":true' && grep "SMOKE_LB" "$LOG" | grep -q '"opened":true' || { echo "::error::the leaderboard page did not open and close over the home screen"; exit 1; }
 grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"fits":true' && grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"signed":true' || { echo "::error::the crash report did not build, fit and sign"; exit 1; }
+grep "SMOKE_FLIGHT" "$LOG" | grep -q '"fits":true' && grep "SMOKE_FLIGHT" "$LOG" | grep -q '"signed":true' && grep "SMOKE_FLIGHT" "$LOG" | grep -q '"gauges":true' && grep "SMOKE_FLIGHT" "$LOG" | grep -q '"rows":1[0-9]' || { echo "::error::the flight recorder did not record a row a second and build a signed chunk"; exit 1; }
+grep "SMOKE_FLIGHT" "$LOG" | grep -q '"in_report":[1-9]' || { echo "::error::the report does not carry the flight recorder"; exit 1; }
+# The game's own report and log chunk, given to the Worker's own code:
+# if signing, sizes or shapes drift apart, it shows here.
+if command -v node >/dev/null 2>&1; then
+  node leaderboard/accept.mjs "$DUMP" || { echo "::error::the Worker would refuse what the game sends"; exit 1; }
+else
+  echo "(node not found: skipping the game-to-Worker check)"
+fi
+rm -f "$DUMP"
 grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"traced":true' || { echo "::error::the report carries no performance trace with game gauges"; exit 1; }
 
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"volley"' || { echo "::error::the rifle squad never fired its volley"; exit 1; }

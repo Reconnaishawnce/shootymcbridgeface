@@ -363,7 +363,9 @@ changes where they pay. Five phases, each a release:
    person holding a phone to judge, which this pass did not have.
 
 Performance runs alongside: the 0.53 traces decide whether the crowd
-moves to batched instances.
+moves to batched instances. 0.60 added the flight recorder and LOGGING
+(DESIGN, "The flight recorder") after shake to report turned out never
+to have worked on a phone: the accelerometer was off in the project.
 
 ## The graphics arc: from stick figures to a stylized, polished look
 

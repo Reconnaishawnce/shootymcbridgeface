@@ -3,6 +3,43 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.60 (the flight recorder, logging, and a shake that works)
+
+- SHAKE TO REPORT NEVER WORKED ON A PHONE. Godot 4.4 keeps the motion
+  sensors off unless the project asks for them, and the project did
+  not, so the accelerometer read zero and no shake was ever felt. The
+  setting is on now, a test holds it there, and REPORT A PROBLEM is
+  also under MORE on the home screen for a phone with no sensor.
+- THE FLIGHT RECORDER. Once a second the game writes one row to a file
+  on the phone: the second's average frame time and its worst single
+  frame, frames drawn, script and physics time, nodes, draw calls,
+  primitives, video memory, device memory, zombies, squad, level,
+  effects, the game's state and where in it. Each line is flushed as
+  it is written, so the file survives a crash. Always on, local only.
+- CRASH REPORTS NOW CARRY THE LAST SECONDS. The report sent after a
+  sudden stop includes the last 90 rows of the session that died, and
+  every other report includes this session's last 90. This needs no
+  server change.
+- LOGGING, in SETTINGS. While it is on the recorder goes to the server
+  as the game runs: a chunk every two minutes, or within thirty seconds
+  of a bad second, and the tail of the last session (with how it
+  ended) when the game is next opened. After a sudden stop it turns
+  itself on for the next five launches, says so on the crash card, and
+  SETTINGS turns it off.
+- REPORTING A CRASH MARKS THE LOG. The crash card has a line for what
+  you were doing; SEND marks that session's log as reported by the
+  player, and uploads its last minutes if it was not being logged.
+- THE SERVER. `POST /log` keeps one document per session (fourteen
+  days), one write a chunk; `/logs?key=...&html=1` lists sessions with
+  how they ended, the worst frame and the slow seconds; `/log/<id>`
+  shows every second as a table, slow seconds in red and the last
+  fifteen before a crash outlined. THE WORKER MUST BE REDEPLOYED for
+  these routes (leaderboard/README.md).
+- `check.sh` now gives the report and the log chunk the game builds to
+  the Worker's own code (`leaderboard/accept.mjs`), so a mismatch in
+  signing, size or shape fails the build instead of a phone.
+- SETTINGS is two columns of switches, to make room.
+
 ## 0.59 (sound: phase 5)
 
 - MUSIC. The three loops were a bass pulse and a drone at three

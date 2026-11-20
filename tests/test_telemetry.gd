@@ -50,6 +50,21 @@ func test_trace() -> void:
 	check(small.to_utf8_buffer().size() <= 1500 and (parsed.trace as Array).size() < tr.size(), "a tight limit cuts the trace from the front")
 
 
+func test_flight_in_reports() -> void:
+	var rows := []
+	for i in range(Flight.REPORT_ROWS):
+		rows.append(Flight.row(float(i), 16.7, 20.0, 60, 8.0, 1.0, {"nodes": 2000}, 900, {"zombies": i}, "running", "gate:1"))
+	var p := Telemetry.payload({"kind": "crash", "session": "abcd", "flight": Flight.tail(rows), "previous_session": "ef01", "previous_flight": Flight.tail(rows)})
+	check_eq((p.previous_flight.rows as Array).size(), Flight.REPORT_ROWS, "a crash report carries the dead session's last rows")
+	check_eq(str(p.previous_session), "ef01", "and names that session")
+	var whole: Dictionary = JSON.parse_string(Telemetry.text(p))
+	check_eq((whole.flight.rows as Array).size(), Flight.REPORT_ROWS, "and this session's, when there is room")
+	var tight: Dictionary = JSON.parse_string(Telemetry.text(p, 9000))
+	check((tight.flight.rows as Array).size() < Flight.REPORT_ROWS, "this session's rows are cut first")
+	check_eq((tight.previous_flight.rows as Array).size(), Flight.REPORT_ROWS, "the dead session's are kept")
+	check(Telemetry.text(p, 600).to_utf8_buffer().size() <= 600, "and the very last resort still fits")
+
+
 func test_frame_buckets() -> void:
 	check_eq(Telemetry.hist_bucket(10.0), 0, "a good frame")
 	check_eq(Telemetry.hist_bucket(40.0), 2, "a dropped frame")

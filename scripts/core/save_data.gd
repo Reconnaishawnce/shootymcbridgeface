@@ -316,6 +316,33 @@ static func save_reports_on(on: bool) -> void:
 	_write(SETTINGS, "reports_on", on)
 
 
+## LOGGING: the flight recorder goes to the server as the game runs.
+static func load_logging_on() -> bool:
+	return bool(_read(SETTINGS, "logging_on", false))
+
+
+static func save_logging_on(on: bool) -> void:
+	_write(SETTINGS, "logging_on", on)
+
+
+## Launches of logging a crash switched on by itself, and the crash
+## that did it (so one crash does it once).
+static func load_log_auto_left() -> int:
+	return int(_read(SETTINGS, "log_auto_left", 0))
+
+
+static func save_log_auto_left(n: int) -> void:
+	_write(SETTINGS, "log_auto_left", maxi(0, n))
+
+
+static func load_log_auto_marker() -> String:
+	return str(_read(SETTINGS, "log_auto_marker", ""))
+
+
+static func save_log_auto_marker(marker: String) -> void:
+	_write(SETTINGS, "log_auto_marker", marker)
+
+
 ## A random id that only groups one phone's reports; made on first use.
 static func load_telemetry_id() -> String:
 	return str(_read(SETTINGS, "telemetry_id", ""))

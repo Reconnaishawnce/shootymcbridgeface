@@ -309,6 +309,68 @@ window is pinned to the second and the step. Reports carry
 `OS.get_memory_info` numbers because the engine's static counter is
 zero in release builds.
 
+## The flight recorder (0.60)
+
+Reports kept failing to arrive from the phones that most needed to
+send them, and the one tool for a player to send one, the shake, had
+never worked: Godot 4.4 leaves the motion sensors off unless
+`input_devices/sensors/enable_accelerometer` is set, the project did
+not set it, and `Input.get_accelerometer()` returned zero on every
+phone. `test_export_declares_what_the_code_uses` now holds the
+setting. The lesson is the older one: a path that needs the player,
+the sensor, the network and the moment all at once will not fire when
+it matters. So the recorder is built the other way round.
+
+Record locally, always; upload when allowed; let the next launch
+speak for a session that could not. `Flight` (pure, tested) is the
+format and the rules:
+
+- A row a second (`COLS`): the second's average frame time, its
+  worst single frame (an average hides a hitch), frames drawn, script
+  and physics time, scene counts, memory, the game's gauges, state
+  and breadcrumb. `Diag._flight_sample` builds it.
+- The file (`user://flight.log`): a header line, then rows, events
+  and upload marks, one JSON value a line, flushed line by line so a
+  kill cannot take what was written. The header waits for the first
+  row so it knows whether logging is on. At boot the file becomes
+  `flight_prev.log` and is read back from its last 64 KB; a line the
+  crash cut short is skipped (`JSON.new().parse`, which returns an
+  error where `parse_string` would also print one).
+- Reports: `Flight.tail` puts the last `REPORT_ROWS` of this session
+  in every report and, for a crash report, the last rows of the
+  session that died. `Telemetry.text` gives those up last. This rides
+  the existing `/report` route, so it works before the Worker is
+  redeployed.
+- Logging (`Flight.active`): the switch in SETTINGS, or
+  `AUTO_SESSIONS` launches after a crash when reports are allowed.
+  `Game._log_tick` asks `should_upload`: a chunk every `UPLOAD_EVERY`
+  seconds, or after `TROUBLE_GAP` when a row `is_trouble`. A chunk
+  that lands writes a mark in the file. `_log_previous` sends the
+  last session's unsent tail at the first home screen with "clean" or
+  "crash"; `_log_mark_previous` (the crash card's SEND) marks it as
+  reported, with the player's words, and uploads the tail itself if
+  that session was not being logged.
+
+On the Worker a session is one KV document (`log:<start>:<session>`),
+appended to by each chunk: one write a chunk, plus one per new session
+for the per-install daily cap and the per-address limiter, which
+`/log` only touches when a chunk starts a session (a chunk is refused
+on its signature before anything is read). The free plan's thousand
+writes a day is the real limit, and a logging phone already spends
+about thirty an hour. A chunk seen before
+is not added twice. The list page reads only key metadata.
+
+`leaderboard/accept.mjs` closes the gap that hid for seven versions
+between "the game builds a report" and "the server takes it": the bot
+writes the report and chunk it would send (`--smoke-dump`), and
+`check.sh` hands them to the Worker's own `handle`.
+
+What this cannot do: a phone with no network, or one that is never
+opened again, sends nothing. And the automatic five launches are a
+judgement call: they send more than a crash report does, without a
+tap, on the grounds that SEND REPORTS is already on and the crash card
+says so in words.
+
 ## Reports that send themselves
 
 `Telemetry` (pure) is the form; `Diag` fills it; `Game` decides when.

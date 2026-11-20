@@ -63,6 +63,35 @@ The page says "no admin key" until step 1 is done, and the game keeps
 reports in its save while it is offline and sends them on the next
 visit to the home screen.
 
+## Session logs (0.60)
+
+With LOGGING on in the game's SETTINGS (or for five launches after a
+crash, by itself), the game sends its flight recorder to `POST /log`:
+one row a second of frame times and what was on screen, in chunks of
+up to four minutes, signed over `log|` + the text. All of a session's
+chunks land in one document, kept fourteen days, with how the session
+ended and whether the player reported it.
+
+**Redeploy the Worker** with the current `worker.js` to get these
+routes (Edit code, select all, paste, Deploy). Nothing else changes:
+the same `BOARD`, `SIGNING_SECRET` and `ADMIN_KEY`. Until then the
+game's log uploads get a 404 and it stops trying for that launch;
+crash reports still arrive, and still carry the last seconds.
+
+- `https://<your worker>/logs?key=<ADMIN_KEY>&html=1`: every session,
+  newest first. Red is a crash the player reported, amber a session
+  that ended in a crash, with the worst frame and the slow seconds.
+- Tap a session for every second of it as a table. Slow seconds are
+  red; the last fifteen before a crash are outlined. The columns are
+  the average frame time (`ms`), the worst frame in the second
+  (`max`), frames drawn (`fps`), script and physics time, node count,
+  draw calls, primitives, video and device memory, zombies, squad,
+  level, effects, the state and the breadcrumb.
+
+Cost in KV writes: one per chunk and three more per session, so a phone
+with logging on uses about thirty an hour. The free plan allows a
+thousand a day across everything.
+
 ## What it stores
 
 Per player: a random id the game made, the chosen name, a hidden

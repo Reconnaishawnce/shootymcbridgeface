@@ -35,6 +35,9 @@ const FIELDS := {
 	"state": "", "crumb": "", "uptime": 0.0, "note": "",
 	"previous": {}, "stalls": [], "events": [], "previous_errors": [], "current_errors": [],
 	"save": {}, "perf": {}, "trace": [],
+	# The flight recorder (Flight.tail): this session's last rows, and
+	# for a crash the last rows of the session that died.
+	"session": "", "flight": {}, "previous_session": "", "previous_flight": {},
 }
 
 
@@ -63,25 +66,34 @@ static func text(p: Dictionary, limit: int = MAX_BYTES) -> String:
 	var q := p.duplicate(true)
 	var s := JSON.stringify(q)
 	var step := 0
-	while s.to_utf8_buffer().size() > limit and step < 12:
+	while s.to_utf8_buffer().size() > limit and step < 24:
 		step += 1
 		var ev: Array = q.get("events", [])
 		var tr: Array = q.get("trace", [])
+		var fl: Array = (q.get("flight", {}) as Dictionary).get("rows", [])
+		var pf: Array = (q.get("previous_flight", {}) as Dictionary).get("rows", [])
+		# Cheapest first; the dead session's last seconds go last of all.
 		if tr.size() > 10:
 			q.trace = tr.slice(tr.size() / 2)
 		elif ev.size() > 8:
 			q.events = ev.slice(ev.size() / 2)
+		elif fl.size() > 10:
+			q.flight.rows = fl.slice(fl.size() / 2)
 		elif not (q.get("previous_errors", []) as Array).is_empty() or not (q.get("current_errors", []) as Array).is_empty():
 			q.previous_errors = []
 			q.current_errors = []
 		elif not (q.get("stalls", []) as Array).is_empty():
 			q.stalls = []
+		elif pf.size() > 10:
+			q.previous_flight.rows = pf.slice(pf.size() / 2)
 		else:
 			q.events = []
 			q.previous = {}
 			q.save = {}
 			q.perf = {}
 			q.trace = []
+			q.flight = {}
+			q.previous_flight = {}
 		s = JSON.stringify(q)
 	return s
 

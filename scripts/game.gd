@@ -21,6 +21,9 @@ const SMOKE_SEED := 12345
 var _smoke_seed := SMOKE_SEED
 ## Ignore taps for a moment after dying so a frantic tap does not restart.
 const RETRY_LOCKOUT := 0.6
+## The day whose quests the bot plays (19 November 2026, as a count of
+## days since 1970): a day its standard run completes two of.
+const SMOKE_QUEST_UNIX_DAY := 20776
 const KEY_STEER_SPEED := 7.0
 
 var state: int = State.TITLE
@@ -110,6 +113,22 @@ var _tap_index := -1
 ## random id, and the caps for this session and run.
 var reports_on := true
 var _tele_id := ""
+## LOGGING (Flight): the switch, the launches a crash turned it on for
+## (counting this one), whether it is live now, and the uploads.
+var logging_on := false
+var _log_auto_left := 0
+var _log_active := false
+var _log_busy := false
+var _log_last := 0.0
+var _log_sent := 0
+## The server refused a chunk outright (no /log route yet, a bad
+## signature): stop asking for the rest of this launch.
+var _log_dead := false
+var _log_prev_done := false
+var _log_prev_tries := 0
+## --smoke-dump=PATH: the bot writes the report and log bodies it would
+## send, so the Worker's own code can be run against them.
+var _smoke_dump := ""
 var _tele_sent := 0
 var _tele_freezes_run := 0
 ## Shake to report: the detector, and whether the card paused the run.
@@ -240,6 +259,7 @@ func _ready() -> void:
 	smoke = args.has("--smoke")
 	if smoke:
 		Diag.trace_every_frames = 30
+		Diag.flight_every_frames = 60
 	_smoke_endless = args.has("--endless")
 	_smoke_daily = args.has("--daily")
 	_smoke_weekly = args.has("--weekly")
@@ -268,6 +288,8 @@ func _ready() -> void:
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-dump="):
+			_smoke_dump = a.trim_prefix("--smoke-dump=")
 		elif a.begins_with("--smoke-level="):
 			_smoke_level = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-hero="):
@@ -345,6 +367,7 @@ func _ready() -> void:
 	hud.set_notch_mode(SaveData.load_notch_mode())
 	reports_on = SaveData.load_reports_on()
 	hud.set_reports(reports_on)
+	_load_logging()
 	haptics_on = SaveData.load_haptics_on()
 	_fps_shown = SaveData.load_show_fps()
 	hud.set_show_fps(_fps_shown)
@@ -602,6 +625,13 @@ func _build_scene() -> void:
 		Diag.note("safe_graphics", {"on": on})
 		sfx.play("click"))
 	hud.report_pressed.connect(_send_report)
+	hud.logging_toggled.connect(_toggle_logging)
+	hud.crash_report_pressed.connect(func(said: String) -> void:
+		var text := "The game stopped suddenly during the previous session."
+		if said != "":
+			text += " The player said: " + said
+		_send_report(text)
+		_log_mark_previous(said))
 	hud.problem_sent.connect(_send_problem)
 	hud.problem_closed.connect(_close_problem)
 	hud.show_fps_toggled.connect(func(on: bool) -> void:
@@ -992,6 +1022,151 @@ func _tele_flush() -> void:
 	_tele_post(text, true)
 
 
+# --- logging: the flight recorder goes to the server -----------------------
+
+## Reads the switch. A crash turns logging on by itself for a few
+## launches, when reports are allowed at all: the phone that just died
+## is the one whose next sessions are worth watching.
+func _load_logging() -> void:
+	logging_on = SaveData.load_logging_on()
+	_log_auto_left = SaveData.load_log_auto_left()
+	if Diag.had_bad_exit() and reports_on and not logging_on and not smoke:
+		var marker := Telemetry.crash_marker(Diag.previous)
+		if marker != "" and SaveData.load_log_auto_marker() != marker:
+			SaveData.save_log_auto_marker(marker)
+			_log_auto_left = Flight.AUTO_SESSIONS
+	_log_active = Flight.active(logging_on, _log_auto_left) and not smoke
+	_log_last = Time.get_ticks_msec() * 0.001
+	Diag.set_logging(_log_active)
+	_refresh_logging()
+	# This launch is one of the automatic ones.
+	if not logging_on and _log_auto_left > 0 and not smoke:
+		SaveData.save_log_auto_left(_log_auto_left - 1)
+
+
+## The LOGGING button: on, or off again (which also ends the automatic
+## launches a crash started).
+func _toggle_logging() -> void:
+	sfx.play("click")
+	if Flight.active(logging_on, _log_auto_left):
+		logging_on = false
+		_log_auto_left = 0
+	else:
+		logging_on = true
+		_log_dead = false
+		# The first chunk goes in about twenty seconds, so it can be seen
+		# to work.
+		_log_last = Time.get_ticks_msec() * 0.001 - Flight.UPLOAD_EVERY + 20.0
+	SaveData.save_logging_on(logging_on)
+	SaveData.save_log_auto_left(_log_auto_left)
+	_log_active = logging_on
+	Diag.set_logging(_log_active)
+	_refresh_logging()
+
+
+## The line under the LOGGING button: what it does and how it is going.
+func _log_status() -> String:
+	if not Leaderboard.configured():
+		return "This build has no server to send logs to."
+	if not _log_active:
+		return "Turn LOGGING on if the game freezes or slows down. It sends frame times and what is on screen every two minutes, and the last seconds before a crash. Never your name."
+	if _log_dead:
+		return "Logging is on, but the server would not take the last upload. The log is still kept on this phone and goes with a crash report."
+	var s := "Logging is on: %d %s sent this launch." % [_log_sent, "upload" if _log_sent == 1 else "uploads"]
+	if not logging_on and _log_auto_left > 0:
+		s += " It came on by itself after the game stopped suddenly, for %d launches." % _log_auto_left
+	return s
+
+
+func _refresh_logging() -> void:
+	hud.set_logging(Flight.label(logging_on, _log_auto_left), _log_status())
+
+
+## Every half second: is a chunk due? Two minutes since the last one,
+## or thirty seconds when the recorder has seen trouble.
+func _log_tick() -> void:
+	if not _log_active or _log_busy or _log_dead or smoke or _shots_dir != "" or not Leaderboard.configured():
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	if Flight.should_upload(now - _log_last, Diag.flight_unsent_count(), Diag.flight_trouble, Diag.flight_seq):
+		_log_upload()
+
+
+## Sends the rows the server has not had as the session's next chunk.
+func _log_upload() -> void:
+	var u := Diag.flight_unsent()
+	var rows: Array = u.rows
+	if rows.is_empty() or _log_busy:
+		return
+	_log_busy = true
+	_log_last = Time.get_ticks_msec() * 0.001
+	var seq := Diag.flight_seq
+	var upto := float(rows[-1][0])
+	var text := Flight.text(Flight.chunk(Diag.flight_head(), _tele_id, seq, rows, u.events))
+	_log_post(text, func(ok: bool, code: int) -> void:
+		_log_busy = false
+		if ok:
+			_log_sent += 1
+			Diag.flight_uploaded(seq, upto)
+		elif code in [400, 403, 404, 413]:
+			_log_dead = true
+		Diag.note("log_upload", {"ok": ok, "code": code, "seq": seq, "rows": rows.size()})
+		_refresh_logging())
+
+
+## POSTs one chunk. [param done] hears (ok, http code).
+func _log_post(text: String, done: Callable) -> void:
+	var req := HTTPRequest.new()
+	req.timeout = 12.0
+	add_child(req)
+	req.request_completed.connect(func(result: int, code: int, _headers: PackedStringArray, raw: PackedByteArray) -> void:
+		req.queue_free()
+		var parsed = JSON.parse_string(raw.get_string_from_utf8()) if result == HTTPRequest.RESULT_SUCCESS and code == 200 else null
+		done.call(parsed is Dictionary and bool(parsed.get("ok", false)), code))
+	if req.request(Flight.url(LeaderboardConfig.URL), ["Content-Type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(Flight.body(text, LeaderboardConfig.SECRET))) != OK:
+		req.queue_free()
+		done.call(false, 0)
+
+
+## The last launch was being logged: send what it never got to send,
+## and say how it ended. This is what puts the final seconds before a
+## crash on the server.
+func _log_previous() -> void:
+	if _log_prev_done or _log_busy or not Leaderboard.configured():
+		return
+	var p := Diag.previous_flight
+	var head: Dictionary = p.get("header", {})
+	if str(head.get("session", "")) == "" or not Flight.was_logging(p):
+		_log_prev_done = true
+		return
+	var u := Flight.unsent(p.get("rows", []), p.get("events", []), float(p.get("sent_t", -1.0)))
+	var ended := "crash" if Diag.had_bad_exit() else "clean"
+	_log_prev_tries += 1
+	_log_busy = true
+	var text := Flight.text(Flight.chunk(head, _tele_id, mini(int(p.get("seq", -1)) + 1, Flight.MAX_SEQ + 1), u.rows, u.events, ended))
+	_log_post(text, func(ok: bool, code: int) -> void:
+		_log_busy = false
+		Diag.note("log_previous", {"ok": ok, "code": code, "ended": ended, "rows": (u.rows as Array).size()})
+		if ok or _log_prev_tries >= 3 or code in [400, 403, 404, 413]:
+			_log_prev_done = true)
+
+
+## The player reported the crash: the dead session's log is marked as
+## reported, with what they said. If that session was not being logged,
+## its last minutes go up now, so a reported crash always has a log.
+func _log_mark_previous(said: String) -> void:
+	if not Leaderboard.configured():
+		return
+	var p := Diag.previous_flight
+	var head: Dictionary = p.get("header", {})
+	if str(head.get("session", "")) == "":
+		return
+	var u := Flight.unsent(p.get("rows", []), p.get("events", []), float(p.get("sent_t", -1.0)))
+	var text := Flight.text(Flight.chunk(head, _tele_id, mini(int(p.get("seq", -1)) + 1, Flight.MAX_SEQ + 1), u.rows, u.events, "crash", true, said))
+	_log_post(text, func(ok: bool, code: int) -> void:
+		Diag.note("log_marked", {"ok": ok, "code": code}))
+
+
 ## The previous session died in the foreground: report it once.
 func _tele_report_crash() -> void:
 	if not Diag.had_bad_exit():
@@ -1059,6 +1234,7 @@ func show_title() -> void:
 		_lb_teaser()
 		_tele_report_crash()
 		_tele_flush()
+		_log_previous()
 	sfx.set_music("calm")
 	# The home screen plays the road's own tune.
 	sfx.set_lead("lead_levels")
@@ -1098,7 +1274,7 @@ func show_title() -> void:
 
 func _offer_crash_report() -> void:
 	if state == State.TITLE:
-		hud.show_crash_card(_tele_crash_sent)
+		hud.show_crash_card(_tele_crash_sent, "LOGGING is on for the next %d launches of the game, so the developer can see what leads up to it. SETTINGS turns it off." % _log_auto_left if (_log_auto_left > 0 and not logging_on) else "")
 
 
 func _quests_left() -> int:
@@ -1218,6 +1394,7 @@ func close_help() -> void:
 
 func open_settings() -> void:
 	sfx.play("click")
+	_refresh_logging()
 	hud.show_settings()
 
 
@@ -1764,8 +1941,10 @@ func end_run() -> void:
 	var quests_done: Array = []
 	var season_rewards: Array = []
 	# Quests and the season run for the auto-player too (so the code is
-	# exercised); only a real player's progress is kept.
-	var day := Daily.day_number(int(Time.get_unix_time_from_system()))
+	# exercised); only a real player's progress is kept. The bot plays a
+	# fixed day's quests: with today's, the build's checks passed or
+	# failed by the calendar.
+	var day := Daily.day_number((SMOKE_QUEST_UNIX_DAY * 86400) if smoke else int(Time.get_unix_time_from_system()))
 	var qa := Quests.advance(quest_state, day, run_stats)
 	quests_done = qa.completed
 	var quest_coins := 0
@@ -1942,6 +2121,8 @@ func _process(delta: float) -> void:
 	_apply_shake(delta)
 	_watch_fps()
 	_feed_shake()
+	if _frames % 30 == 0:
+		_log_tick()
 	if _frames % 15 == 0:
 		if _fps_shown:
 			hud.set_fps(Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
@@ -3580,6 +3761,16 @@ func _smoke_tick() -> void:
 		var tele_parsed: Dictionary = JSON.parse_string(tele_text)
 		var tele_trace: Array = tele_parsed.get("trace", [])
 		print("SMOKE_TELEMETRY ", JSON.stringify({"bytes": tele_text.length(), "kind": bundle.kind, "signed": Telemetry.body(tele_text, "x").sig.length() == 64, "fits": tele_text.length() <= Telemetry.MAX_BYTES, "trace": tele_trace.size(), "traced": tele_trace.size() > 0 and tele_trace[-1].has("zombies") and tele_trace[-1].has("proc")}))
+		# The flight recorder's chunk, built the way a phone would.
+		var log_text := Flight.text(Flight.chunk(Diag.flight_head(), "0123456789abcdef", 0, Diag.flight_unsent().rows, Diag.flight_unsent().events))
+		var log_parsed: Dictionary = JSON.parse_string(log_text)
+		var log_rows: Array = log_parsed.get("rows", [])
+		print("SMOKE_FLIGHT ", JSON.stringify({"rows": log_rows.size(), "cols": (log_parsed.get("cols", []) as Array).size(), "bytes": log_text.length(), "fits": log_text.to_utf8_buffer().size() <= Flight.MAX_BYTES, "signed": str(Flight.body(log_text, "x").sig).length() == 64, "in_report": (tele_parsed.get("flight", {}) as Dictionary).get("rows", []).size(), "gauges": log_rows.size() > 0 and int(Flight.value(log_rows[-1], "squad")) > 0}))
+		if _smoke_dump != "":
+			var dump := FileAccess.open(_smoke_dump, FileAccess.WRITE)
+			if dump != null:
+				dump.store_string(JSON.stringify({"secret": "x", "report": Telemetry.body(tele_text, "x"), "log": Flight.body(log_text, "x")}))
+				dump.close()
 		print("SMOKE_RESULT ", JSON.stringify(summary))
 		var ok := gates_passed >= 3 and total_distance > 100.0
 		_quit_with(0 if ok else 1)
@@ -3718,6 +3909,10 @@ func _shots_walkthrough() -> void:
 		await _capture("q2_title_hero.png", 5)
 		open_settings()
 		await _capture("q3_settings.png", 5)
+		show_title()
+		hud.show_crash_card(true, "LOGGING is on for the next 5 launches of the game, so the developer can see what leads up to it. SETTINGS turns it off.")
+		await _capture("q29_crash_card.png", 5)
+		hud.hide_crash_card()
 		show_title()
 		hud._show_more()
 		await _capture("q4_more.png", 5)

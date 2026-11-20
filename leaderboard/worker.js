@@ -13,6 +13,14 @@
 // kept thirty days. GET /reports?key=ADMIN_KEY lists them (add &html=1
 // for a page you can read on a phone), GET /report/<id>?key=ADMIN_KEY
 // shows one.
+//
+// Logs: with LOGGING on, the game POSTs its flight recorder to /log in
+// chunks, signed over "log|" + the text: one row a second of frame
+// times and what was on screen. All of a session's chunks are kept in
+// one document for fourteen days, with how the session ended (clean,
+// or in a crash) and whether the player reported it. GET
+// /logs?key=ADMIN_KEY&html=1 lists sessions, GET
+// /log/<id>?key=ADMIN_KEY&html=1 shows one.
 
 export const EPOCH_DAY = 20748; // matches scripts/core/daily.gd
 export const TOP_KEPT = 200;
@@ -36,6 +44,17 @@ export const REPORT_TTL_SECONDS = 30 * 86400;
 export const REPORTS_PER_INSTALL_PER_DAY = 10;
 export const REPORT_KINDS = ["crash", "freeze", "slow", "manual"];
 export const REPORTS_LIST_MAX = 100;
+export const LOG_MAX_BYTES = 48000;
+export const LOG_TTL_SECONDS = 14 * 86400;
+export const LOG_SESSIONS_PER_INSTALL_PER_DAY = 40;
+export const LOG_MAX_SEQ = 210;
+export const LOG_CHUNK_ROWS = 400;
+export const LOG_DOC_ROWS = 7200;
+export const LOG_DOC_EVENTS = 600;
+export const LOGS_LIST_MAX = 100;
+// A row is trouble when its worst frame or its average is this long (ms).
+export const LOG_TROUBLE_MAX_MS = 400;
+export const LOG_TROUBLE_AVG_MS = 45;
 
 const enc = new TextEncoder();
 
@@ -240,6 +259,30 @@ export function traceHtml(trace) {
   return `<p>Trace (${trace.length} samples, oldest first; red rows are frames over 33 ms)</p><table><tr>${head}</tr>${body}</table>`;
 }
 
+// Whether a flight row (an array in the order of cols) shows trouble.
+export function rowTrouble(cols, row) {
+  const mx = Number(row[cols.indexOf("max")]);
+  const ms = Number(row[cols.indexOf("ms")]);
+  return mx >= LOG_TROUBLE_MAX_MS || ms >= LOG_TROUBLE_AVG_MS;
+}
+
+// The flight recorder as a table: one row a second, oldest first. Slow
+// seconds are red; with lastN, the final rows are marked as the last
+// seconds before the end.
+export function flightHtml(flight, title, lastN = 0) {
+  if (!flight || !Array.isArray(flight.cols) || !Array.isArray(flight.rows) || flight.rows.length === 0) return "";
+  const cols = flight.cols;
+  const head = cols.map((k) => `<th>${esc(k)}</th>`).join("");
+  const n = flight.rows.length;
+  const body = flight.rows.map((row, i) => {
+    const cls = [rowTrouble(cols, row) ? "slow" : "", lastN > 0 && i >= n - lastN ? "last" : ""].filter(Boolean).join(" ");
+    return `<tr${cls ? ` class="${cls}"` : ""}>${cols.map((_, j) => `<td>${esc(row[j] === undefined || row[j] === null ? "" : row[j])}</td>`).join("")}</tr>`;
+  }).join("");
+  return `<p>${esc(title)} (${n} seconds, oldest first; red is a slow second${lastN > 0 ? ", outlined is the last " + Math.min(lastN, n) + " before the end" : ""})</p><div class="scroll"><table><tr>${head}</tr>${body}</table></div>`;
+}
+
+const PAGE_STYLE = "body{font:15px/1.4 system-ui;margin:12px;background:#111;color:#eee}a{color:#8cf}summary{cursor:pointer;padding:6px 0}pre{white-space:pre-wrap;word-break:break-word;background:#1b1b22;padding:10px;border-radius:8px;font-size:12px}details{border-bottom:1px solid #333}table{border-collapse:collapse;font-size:11px;margin:6px 0}td,th{padding:1px 6px;text-align:right;border-bottom:1px solid #222;white-space:nowrap}tr.slow td{background:#4a1a1a}tr.last td{border-left:2px solid #fc6}.scroll{overflow-x:auto}.bad{color:#f66;font-weight:bold}.warn{color:#fc6;font-weight:bold}.ok{color:#8d8}li{margin:6px 0}";
+
 function reportsHtml(rows) {
   const items = rows.map((r) => {
     const when = new Date(r.t * 1000).toISOString().replace("T", " ").slice(0, 16);
@@ -247,13 +290,15 @@ function reportsHtml(rows) {
     let trace = "";
     try {
       const parsed = JSON.parse(r.text);
-      trace = traceHtml(parsed.trace);
+      trace = flightHtml(parsed.previous_flight, "The session that died: its last seconds", 15) + traceHtml(parsed.trace) + flightHtml(parsed.flight, "This session's flight recorder");
       delete parsed.trace;
+      delete parsed.flight;
+      delete parsed.previous_flight;
       pretty = JSON.stringify(parsed, null, 2);
     } catch (e) { /* keep raw */ }
     return `<details><summary><b>${esc(r.kind)}</b> &middot; v${esc(r.version)} &middot; ${esc(r.device)} &middot; ${esc(r.state)}/${esc(r.crumb)} &middot; ${when}${r.note ? " &middot; <i>" + esc(r.note) + "</i>" : ""}</summary>${trace}<pre>${esc(pretty)}</pre></details>`;
   });
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty reports</title><style>body{font:15px/1.4 system-ui;margin:12px;background:#111;color:#eee}summary{cursor:pointer;padding:6px 0}pre{white-space:pre-wrap;word-break:break-word;background:#1b1b22;padding:10px;border-radius:8px;font-size:12px}details{border-bottom:1px solid #333}table{border-collapse:collapse;font-size:11px;margin:6px 0}td,th{padding:1px 6px;text-align:right;border-bottom:1px solid #222}tr.slow td{background:#4a1a1a}</style><h2>Reports (${rows.length}, newest first)</h2>${items.join("") || "<p>None yet.</p>"}`;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty reports</title><style>${PAGE_STYLE}</style><h2>Reports (${rows.length}, newest first)</h2>${items.join("") || "<p>None yet.</p>"}`;
 }
 
 export async function reports(env, key, limit, html) {
@@ -280,6 +325,128 @@ export async function reportOne(env, key, id) {
   return json({ ok: true, id, ...row });
 }
 
+// --- logs ---------------------------------------------------------------
+
+function logKey(started, session) {
+  return `log:${String(started).padStart(12, "0")}:${session}`;
+}
+
+// What the list page needs to know about a session, kept as the key's
+// metadata so listing costs no reads.
+function logMeta(doc) {
+  let worst = 0;
+  let slow = 0;
+  const mx = doc.cols.indexOf("max");
+  for (const row of doc.rows) {
+    worst = Math.max(worst, Number(row[mx]) || 0);
+    if (rowTrouble(doc.cols, row)) slow++;
+  }
+  return { v: doc.version, d: doc.device, e: doc.ended, r: doc.reported, n: doc.rows.length, w: Math.round(worst), s: slow, c: doc.chunks, u: doc.updated };
+}
+
+// One chunk of a session's flight recorder. All chunks of a session go
+// into one document; a chunk seen before is not added twice; a chunk
+// can also say how the session ended and that the player reported it.
+export async function logChunk(env, body, nowUnix, ip = "") {
+  if (!body || typeof body.text !== "string" || typeof body.sig !== "string") return json({ ok: false, error: "bad body" }, 400);
+  if (enc.encode(body.text).length > LOG_MAX_BYTES) return json({ ok: false, error: "too big" }, 413);
+  const expect = await hmacHex(env.SIGNING_SECRET, `log|${body.text}`);
+  if (!timingEqual(expect, body.sig)) return json({ ok: false, error: "bad signature" }, 403);
+  let p;
+  try {
+    p = JSON.parse(body.text);
+  } catch (e) {
+    return json({ ok: false, error: "bad json" }, 400);
+  }
+  if (!p || typeof p !== "object") return json({ ok: false, error: "bad chunk" }, 400);
+  if (typeof p.session !== "string" || !/^[a-f0-9]{8,32}$/.test(p.session)) return json({ ok: false, error: "bad session" }, 400);
+  const started = Number(p.started);
+  if (!Number.isInteger(started) || started <= 0 || started > nowUnix + 86400 || nowUnix - started > 60 * 86400) return json({ ok: false, error: "bad start" }, 400);
+  const seq = Number(p.seq);
+  if (!Number.isInteger(seq) || seq < 0 || seq > LOG_MAX_SEQ) return json({ ok: false, error: "bad seq" }, 400);
+  if (!Array.isArray(p.cols) || p.cols.length < 3 || p.cols.length > 32 || !p.cols.every((c) => typeof c === "string" && c.length <= 16)) return json({ ok: false, error: "bad cols" }, 400);
+  if (!Array.isArray(p.rows) || p.rows.length > LOG_CHUNK_ROWS || !p.rows.every((r) => Array.isArray(r) && r.length === p.cols.length)) return json({ ok: false, error: "bad rows" }, 400);
+  const events = Array.isArray(p.events) ? p.events.slice(0, 100) : [];
+  const install = typeof p.install === "string" && /^[a-f0-9]{8,32}$/.test(p.install) ? p.install : "anon";
+  const key = logKey(started, p.session);
+  let doc = await env.BOARD.get(key, "json");
+  if (!doc) {
+    // A new session: the only place a log counts against the address
+    // and the install, so a chunk of a running session costs one write.
+    if (ip && (await rateLimited(env, ip))) return json({ ok: false, error: "slow down" }, 429);
+    const dayKey = `lr:${install}:${dayNumber(nowUnix)}`;
+    const n = parseInt((await env.BOARD.get(dayKey)) || "0", 10) + 1;
+    await env.BOARD.put(dayKey, String(n), { expirationTtl: 86400 });
+    if (n > LOG_SESSIONS_PER_INSTALL_PER_DAY) return json({ ok: false, error: "enough for today" }, 429);
+    doc = {
+      t: started, install, session: p.session,
+      version: String(p.version || "?").slice(0, 32), device: String(p.device || "?").slice(0, 80),
+      os: String(p.os || "?").slice(0, 80), gpu: String(p.gpu || "?").slice(0, 120),
+      screen: String(p.screen || "?").slice(0, 60), renderer: String(p.renderer || "?").slice(0, 40),
+      cols: p.cols, rows: [], events: [], seq: -1, chunks: 0, ended: "", reported: false, note: "", updated: nowUnix,
+    };
+  }
+  const dup = p.rows.length > 0 && seq <= doc.seq;
+  if (!dup && (p.rows.length > 0 || events.length > 0)) {
+    doc.rows = doc.rows.concat(p.rows).slice(-LOG_DOC_ROWS);
+    doc.events = doc.events.concat(events).slice(-LOG_DOC_EVENTS);
+    doc.seq = Math.max(doc.seq, seq);
+    doc.chunks += 1;
+  }
+  if (p.ended === "clean" || p.ended === "crash") doc.ended = p.ended;
+  if (p.reported === true) {
+    doc.reported = true;
+    if (typeof p.note === "string" && p.note) doc.note = p.note.slice(0, 600);
+  }
+  doc.updated = nowUnix;
+  await env.BOARD.put(key, JSON.stringify(doc), { expirationTtl: LOG_TTL_SECONDS, metadata: logMeta(doc) });
+  return json({ ok: true, id: key.slice("log:".length), seq: doc.seq, dup });
+}
+
+function logFlag(m) {
+  if (m.r) return '<span class="bad">CRASH REPORTED BY THE PLAYER</span>';
+  if (m.e === "crash") return '<span class="warn">ENDED IN A CRASH</span>';
+  if (m.e === "clean") return '<span class="ok">ended cleanly</span>';
+  return "no ending yet (still running, or never reopened)";
+}
+
+function logsHtml(rows, key) {
+  const items = rows.map((r) => {
+    const when = new Date(Number(r.id.slice(0, 12)) * 1000).toISOString().replace("T", " ").slice(0, 16);
+    const m = r.meta;
+    return `<li><a href="/log/${esc(r.id)}?key=${encodeURIComponent(key)}&html=1">${when}</a> &middot; ${logFlag(m)} &middot; v${esc(m.v)} &middot; ${esc(m.d)} &middot; ${esc(m.n)} s recorded &middot; worst frame ${esc(m.w)} ms &middot; ${esc(m.s)} slow seconds</li>`;
+  });
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty logs</title><style>${PAGE_STYLE}</style><h2>Session logs (${rows.length}, newest first)</h2><p>One line per launch of the game with LOGGING on. Open one to see every second of it.</p><ul>${items.join("") || "<li>None yet.</li>"}</ul>`;
+}
+
+export async function logs(env, key, limit, html) {
+  const why = adminOk(env, key);
+  if (why) return json({ ok: false, error: why }, env.ADMIN_KEY ? 403 : 503);
+  const n = Math.min(Math.max(parseInt(limit || "50", 10) || 50, 1), LOGS_LIST_MAX);
+  const list = await env.BOARD.list({ prefix: "log:" });
+  const rows = list.keys.sort((a, b) => (a.name < b.name ? 1 : -1)).slice(0, n).map((k) => ({ id: k.name.slice("log:".length), meta: k.metadata || {} }));
+  if (html) return new Response(logsHtml(rows, key), { headers: { "content-type": "text/html; charset=utf-8" } });
+  return json({ ok: true, total: list.keys.length, rows });
+}
+
+function logHtml(id, doc) {
+  const when = new Date(doc.t * 1000).toISOString().replace("T", " ").slice(0, 16);
+  const m = logMeta(doc);
+  const events = doc.events.map((e) => `${esc(e.t)}  ${esc(e.e)}  ${esc(JSON.stringify(e.d || {}))}`).join("\n");
+  const crashed = doc.ended === "crash" || doc.reported;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shooty log ${esc(id)}</title><style>${PAGE_STYLE}</style><h2>${when} &middot; ${logFlag(m)}</h2><p>v${esc(doc.version)} &middot; ${esc(doc.device)} &middot; ${esc(doc.os)} &middot; ${esc(doc.gpu)} &middot; ${esc(doc.screen)} &middot; ${esc(doc.renderer)}</p><p>${m.n} seconds recorded in ${doc.chunks} uploads &middot; worst frame ${m.w} ms &middot; ${m.s} slow seconds${doc.note ? " &middot; the player said: <i>" + esc(doc.note) + "</i>" : ""}</p>${flightHtml({ cols: doc.cols, rows: doc.rows }, "Every second of the session", crashed ? 15 : 0)}<details><summary>Events (${doc.events.length})</summary><pre>${events}</pre></details>`;
+}
+
+export async function logOne(env, key, id, html) {
+  const why = adminOk(env, key);
+  if (why) return json({ ok: false, error: why }, env.ADMIN_KEY ? 403 : 503);
+  if (!/^[0-9]{12}:[a-f0-9]{8,32}$/.test(id)) return json({ ok: false, error: "bad id" }, 400);
+  const doc = await env.BOARD.get(`log:${id}`, "json");
+  if (!doc) return json({ ok: false, error: "not found" }, 404);
+  if (html) return new Response(logHtml(id, doc), { headers: { "content-type": "text/html; charset=utf-8" } });
+  return json({ ok: true, id, ...doc });
+}
+
 export async function handle(request, env, nowUnix = Math.floor(Date.now() / 1000)) {
   const url = new URL(request.url);
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
@@ -298,6 +465,24 @@ export async function handle(request, env, nowUnix = Math.floor(Date.now() / 100
       return json({ ok: false, error: "bad json" }, 400);
     }
     return report(env, body, nowUnix);
+  }
+  if (request.method === "POST" && url.pathname === "/log") {
+    // A chunk is refused without a valid signature before anything is
+    // read or written; the per-address counter is only touched when a
+    // chunk starts a new session.
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return json({ ok: false, error: "bad json" }, 400);
+    }
+    return logChunk(env, body, nowUnix, ip);
+  }
+  if (request.method === "GET" && url.pathname === "/logs") {
+    return logs(env, url.searchParams.get("key"), url.searchParams.get("limit"), url.searchParams.get("html") === "1");
+  }
+  if (request.method === "GET" && url.pathname.startsWith("/log/")) {
+    return logOne(env, url.searchParams.get("key"), url.pathname.slice("/log/".length), url.searchParams.get("html") === "1");
   }
   if (request.method === "GET" && url.pathname === "/reports") {
     return reports(env, url.searchParams.get("key"), url.searchParams.get("limit"), url.searchParams.get("html") === "1");

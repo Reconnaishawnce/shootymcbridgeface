@@ -368,10 +368,15 @@ armor, a cap on the fork, and an ENLIST whose every tier buys
 something. Its numbers are a first setting from bot runs; the next
 balance pass should move them with what real players reach.
 
-Performance runs alongside: the 0.53 traces decide whether the crowd
-moves to batched instances. 0.60 added the flight recorder and LOGGING
+Performance runs alongside. 0.60 added the flight recorder and LOGGING
 (DESIGN, "The flight recorder") after shake to report turned out never
 to have worked on a phone: the accelerometer was off in the project.
+0.62 read the first fifteen reports: most of the "slow" ones were the
+watchdog timing a pause, and the true ones were 5,400 draw calls for
+143 bodies. Bodies are welded now (DESIGN, "The draw budget"). Next,
+if the reports still show a phone under sixty: the scenery (lamps,
+rails, rubble: about 400 draws on an empty road) is welded the same
+way, and the crowd behind the front rank moves to a MultiMesh.
 
 ## The graphics arc: from stick figures to a stylized, polished look
 

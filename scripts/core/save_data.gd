@@ -76,6 +76,22 @@ static func save_auto_safe_done(done: bool) -> void:
 	_write(SETTINGS, "auto_safe_done", done)
 
 
+static func load_auto_shadows_done() -> bool:
+	return bool(_read(SETTINGS, "auto_shadows_done", false))
+
+
+static func save_auto_shadows_done(done: bool) -> void:
+	_write(SETTINGS, "auto_shadows_done", done)
+
+
+static func load_watchdog_version() -> int:
+	return int(_read(SETTINGS, "watchdog_v", 1))
+
+
+static func save_watchdog_version(v: int) -> void:
+	_write(SETTINGS, "watchdog_v", v)
+
+
 static func load_shadows_on() -> bool:
 	return bool(_read(SETTINGS, "shadows_on", true))
 

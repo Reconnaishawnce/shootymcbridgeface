@@ -62,6 +62,10 @@ var _flight_early: Array = []
 ## A single frame of Telemetry.LONG_FRAME_SECONDS or more, in the
 ## foreground: a freeze the game should report.
 signal long_frame(seconds: float, crumb: String)
+## When the app last came back to the front, in seconds since launch:
+## a frame-rate sample that began before then has a hole in it.
+var resumed_at := 0.0
+var _skip_gap := false
 
 
 func _ready() -> void:
@@ -89,6 +93,12 @@ func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec() * 0.001
 	var wall := now - _last_wall
 	_last_wall = now
+	# The first frame back from the home screen (or a locked phone) is as
+	# long as the player was away. That is not a frame: it used to be
+	# filed as a half-hour freeze.
+	if _skip_gap or (_clean and Report.is_stall(wall)):
+		_skip_gap = false
+		return
 	# A long gap between frames while in the foreground is a stall worth
 	# knowing about: which state, which breadcrumb, how long.
 	if _frames > 2:
@@ -134,6 +144,8 @@ func _notification(what: int) -> void:
 		_beat(true)
 	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_clean = false
+		_skip_gap = true
+		resumed_at = Time.get_ticks_msec() * 0.001
 		_beat(true)
 
 

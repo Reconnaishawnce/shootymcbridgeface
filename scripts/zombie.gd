@@ -65,9 +65,10 @@ var slow_left := 0.0
 var slow_mult := 1.0
 var _status: MeshInstance3D
 var _status_kind := ""
-var _head: MeshInstance3D
 var _base_scale := 1.0
 var _phase := randf() * TAU
+## Set by warm_looks: this tone and shirt, not a roll of the dice.
+var _force_look := -1
 
 
 func _init() -> void:
@@ -127,6 +128,7 @@ func setup(p_hp: float, p_speed: float, p_kind: int) -> void:
 			_base_scale = 1.0
 	_body.scale = Vector3.ONE * _base_scale
 	_build()
+	_refresh_bar()
 	if is_thief():
 		# Thieves run away from the squad, so they face down the lane.
 		_body.rotation.y = PI
@@ -156,9 +158,43 @@ func is_latcher() -> bool:
 	return kind == Kind.LATCHER
 
 
+## Welds every look a walker can have, and one of each other kind,
+## under the loading screen: the first wave of the session then costs
+## what the tenth does.
+static func warm_looks() -> int:
+	var made := 0
+	for look in range(SKIN_TONES * SHIRTS.size()):
+		var z := Zombie.new()
+		z._force_look = look
+		z.setup(1.0, 1.0, Kind.NORMAL)
+		z.free()
+		made += 1
+	for k in range(1, Kind.size()):
+		var z := Zombie.new()
+		z.setup(1.0, 1.0, k)
+		z.free()
+		made += 1
+	return made
+
+
+## How many skin tones a walker comes in. A tone and a shirt name a
+## look, and every zombie of one look shares its meshes.
+const SKIN_TONES := 4
+const INK := 0.03
+
+
+## Five meshes: a trunk (torso, head, face and whatever the kind carries),
+## two legs and two arms. Each is welded from its parts once per look and
+## shared from then on, so a wave of forty is two hundred nodes and no
+## new meshes, where it used to be eight hundred of each.
 func _build() -> void:
-	var skin := SKIN.lerp(SKIN_PALE, randf())
-	var shirt: Color = SHIRTS[randi() % SHIRTS.size()]
+	var tone := mini(int(randf() * float(SKIN_TONES)), SKIN_TONES - 1)
+	var shirt_i := randi() % SHIRTS.size()
+	if _force_look >= 0:
+		tone = _force_look % SKIN_TONES
+		shirt_i = (_force_look / SKIN_TONES) % SHIRTS.size()
+	var skin := SKIN.lerp(SKIN_PALE, float(tone) / float(SKIN_TONES - 1))
+	var shirt: Color = SHIRTS[shirt_i]
 	match kind:
 		Kind.BRUTE:
 			skin = BRUTE_SKIN
@@ -178,113 +214,120 @@ func _build() -> void:
 		Kind.SPLITTER:
 			skin = SPLITTER_SKIN
 			shirt = Color(0.35, 0.4, 0.15)
-	var ink := 0.03
+	var look := "%d|%s|%s" % [kind, skin.to_html(false), shirt.to_html(false)]
 
 	# Shambling thick legs, bare feet.
 	for side in [-1.0, 1.0]:
-		var hip := Node3D.new()
+		var hip := Mats.weld("zleg|" + skin.to_html(false), func() -> Array: return _leg_parts(skin))
 		hip.position = Vector3(side * 0.14, 0.5, 0.0)
-		var leg := Mats.pill(0.1, 0.36, PANTS)
-		leg.position.y = -0.2
-		Mats.ink(leg, ink)
-		hip.add_child(leg)
-		var foot := Mats.ball(0.1, skin.darkened(0.2))
-		foot.position = Vector3(0.0, -0.42, -0.04)
-		foot.scale = Vector3(1.0, 0.6, 1.3)
-		hip.add_child(foot)
+		hip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_body.add_child(hip)
 		_legs.append(hip)
 
+	_body.add_child(Mats.weld("zbody|" + look, func() -> Array: return _trunk_parts(skin, shirt)))
+
+	# Thick arms out front, big open hands.
+	for side in [-1.0, 1.0]:
+		var shoulder := Mats.weld("zarm|" + skin.to_html(false), func() -> Array: return _arm_parts(skin))
+		shoulder.position = Vector3(side * 0.32, 0.98, 0.12)
+		shoulder.rotation_degrees.x = -80.0
+		shoulder.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_body.add_child(shoulder)
+		_arms.append(shoulder)
+
+
+func _leg_parts(skin: Color) -> Array:
+	var leg := Mats.pill(0.1, 0.36, PANTS)
+	leg.position.y = -0.2
+	Mats.ink(leg, INK)
+	var foot := Mats.ball(0.1, skin.darkened(0.2))
+	foot.position = Vector3(0.0, -0.42, -0.04)
+	foot.scale = Vector3(1.0, 0.6, 1.3)
+	Mats.ink(foot, INK)
+	return [leg, foot]
+
+
+func _arm_parts(skin: Color) -> Array:
+	var arm := Mats.pill(0.085, 0.4, skin)
+	arm.position.y = -0.2
+	Mats.ink(arm, INK)
+	var hand := Mats.ball(0.095, skin.darkened(0.1))
+	hand.position.y = -0.42
+	Mats.ink(hand, INK)
+	return [arm, hand]
+
+
+## Everything that rides the hips without moving against them.
+func _trunk_parts(skin: Color, shirt: Color) -> Array:
+	var parts: Array = []
 	# A hunched torso, torn shirt, a rib of darker cloth.
 	var torso := Mats.ball(0.29, shirt)
 	torso.position = Vector3(0.0, 0.76, 0.06)
 	torso.scale = Vector3(1.08, 1.1, 0.9)
 	torso.rotation.x = 0.55 if is_runner() else 0.3
-	Mats.ink(torso, ink)
-	_body.add_child(torso)
+	parts.append(Mats.ink(torso, INK))
 	var tear := Mats.ball(0.12, skin)
 	tear.position = Vector3(0.1, 0.62, -0.17)
 	tear.scale = Vector3(1.0, 1.4, 0.4)
-	_body.add_child(tear)
+	parts.append(tear)
 
 	# A big round head, sunken glowing eyes, a slack jaw.
 	var head := Mats.ball(0.25, skin)
 	head.position = Vector3(0.0, 1.16, 0.16)
-	Mats.ink(head, ink)
-	_body.add_child(head)
-	_head = head
+	parts.append(Mats.ink(head, INK))
 	var eye_r := 0.07 if brute else 0.05
 	for side in [-1.0, 1.0]:
 		var socket := Mats.ball(eye_r + 0.025, skin.darkened(0.45))
 		socket.position = Vector3(side * 0.09, 1.19, 0.37)
 		socket.scale = Vector3(1.0, 1.0, 0.5)
-		_body.add_child(socket)
+		parts.append(socket)
 		var eye := Mats.sphere(eye_r, EYE)
 		eye.material_override = Mats.glow(EYE, 2.2)
 		eye.position = Vector3(side * 0.09, 1.19, 0.4)
-		_body.add_child(eye)
+		parts.append(eye)
 	var jaw := Mats.ball(0.1, skin.darkened(0.3))
 	jaw.position = Vector3(0.0, 0.98, 0.36)
 	jaw.scale = Vector3(1.4, 0.5, 0.7)
-	_body.add_child(jaw)
+	parts.append(jaw)
 	var hair := Mats.ball(0.24, PANTS.darkened(0.2))
 	hair.position = Vector3(0.0, 1.28, 0.12)
 	hair.scale = Vector3(1.0, 0.45, 1.0)
-	_body.add_child(hair)
-
-	# Thick arms out front, big open hands.
-	for side in [-1.0, 1.0]:
-		var shoulder := Node3D.new()
-		shoulder.position = Vector3(side * 0.32, 0.98, 0.12)
-		shoulder.rotation_degrees.x = -80.0
-		var arm := Mats.pill(0.085, 0.4, skin)
-		arm.position.y = -0.2
-		Mats.ink(arm, ink)
-		shoulder.add_child(arm)
-		var hand := Mats.ball(0.095, skin.darkened(0.1))
-		hand.position.y = -0.42
-		shoulder.add_child(hand)
-		_body.add_child(shoulder)
-		_arms.append(shoulder)
+	parts.append(hair)
 
 	if brute:
 		for side in [-1.0, 1.0]:
 			var pad := Mats.box(Vector3(0.36, 0.18, 0.36), PLATE)
 			pad.position = Vector3(side * 0.36, 1.08, 0.06)
-			Mats.ink(pad, ink)
-			_body.add_child(pad)
+			parts.append(Mats.ink(pad, INK))
 		var belt := Mats.torus(0.26, 0.32, PLATE.darkened(0.2))
 		belt.position = Vector3(0.0, 0.52, 0.04)
-		_body.add_child(belt)
+		parts.append(belt)
 	elif is_tank():
 		# A slab of scrap held out front: the thing that eats your bullets.
 		var shield := Mats.gbox(Vector3(1.1, 0.9, 0.12), PLATE.lightened(0.15), 0.8, 0.3, 6)
 		shield.position = Vector3(0.0, 0.8, 0.42)
-		Mats.ink(shield, ink)
-		_body.add_child(shield)
+		parts.append(Mats.ink(shield, INK))
 		for i in range(3):
 			var rivet := Mats.ball(0.04, Color(0.7, 0.7, 0.72))
 			rivet.position = Vector3(-0.4 + 0.4 * float(i), 1.15, 0.49)
-			_body.add_child(rivet)
+			parts.append(rivet)
 	elif is_thief():
 		# A sack over the shoulder: it is here to take, not to bite.
 		var sack := Mats.ball(0.17, Color(0.5, 0.38, 0.2))
 		sack.position = Vector3(-0.22, 1.05, -0.1)
-		Mats.ink(sack, ink)
-		_body.add_child(sack)
+		parts.append(Mats.ink(sack, INK))
 	elif is_splitter():
 		# Bloated: a belly that bulges past the shirt, and the pustules of
 		# the three runners waiting inside.
 		var belly := Mats.ball(0.34, skin)
 		belly.position = Vector3(0.0, 0.68, 0.14)
 		belly.scale = Vector3(1.15, 0.95, 1.0)
-		Mats.ink(belly, ink)
-		_body.add_child(belly)
+		parts.append(Mats.ink(belly, INK))
 		for k in range(3):
 			var pus := Mats.ball(0.09, skin.lightened(0.3))
 			var a := -0.7 + float(k) * 0.7
 			pus.position = Vector3(sin(a) * 0.3, 0.72 + float(k % 2) * 0.12, 0.14 + cos(a) * 0.3)
-			_body.add_child(pus)
+			parts.append(pus)
 	elif is_latcher():
 		# Claws: it holds on.
 		for side in [-1.0, 1.0]:
@@ -292,17 +335,22 @@ func _build() -> void:
 				var claw := Mats.cone(0.02, 0.12, Color(0.9, 0.85, 0.8))
 				claw.position = Vector3(side * 0.27 + (float(k) - 1.0) * 0.04, 0.55, 0.52)
 				claw.rotation_degrees.x = 90.0
-				_body.add_child(claw)
+				parts.append(claw)
+	return parts
 
-	# The health bar only shows once something has been taken off: a
-	# black bar over every healthy head was the heaviest thing on screen.
+
+## The health bar is only made once something has been taken off: a
+## black bar over every healthy head was the heaviest thing on screen,
+## and most walkers die to the first volley without ever needing one.
+func _make_bar() -> void:
 	_bar_bg = Mats.box(Vector3(0.84, 0.1, 0.1), BAR_BG, true)
 	_bar_bg.position.y = 1.72
+	_bar_bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.add_child(_bar_bg)
 	_bar = Mats.box(Vector3(0.8, 0.08, 0.12), BAR_FG, true)
 	_bar.position.y = 1.72
+	_bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_body.add_child(_bar)
-	_refresh_bar()
 
 
 ## Returns true when this hit killed the zombie.
@@ -359,8 +407,8 @@ func die() -> void:
 	alive = false
 	if _cling_ring != null:
 		_cling_ring.visible = false
-	_bar.visible = false
-	if _bar_bg != null:
+	if _bar != null:
+		_bar.visible = false
 		_bar_bg.visible = false
 	var tw := create_tween()
 	tw.set_parallel(true)
@@ -384,11 +432,14 @@ func _vanish() -> void:
 
 func _refresh_bar() -> void:
 	var ratio := clampf(hp / max_hp, 0.0, 1.0)
+	if _bar == null:
+		if ratio >= 0.999:
+			return
+		_make_bar()
 	_bar.scale.x = maxf(ratio, 0.001)
 	_bar.position.x = -(1.0 - ratio) * 0.4
 	_bar.visible = ratio < 0.999
-	if _bar_bg != null:
-		_bar_bg.visible = _bar.visible
+	_bar_bg.visible = _bar.visible
 
 
 ## A small flame or a shard of ice over the head while it burns or drags.
@@ -419,8 +470,6 @@ func _process(delta: float) -> void:
 	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() or latched else 7.0) + _phase
 	_body.rotation.z = sin(t * 0.8) * 0.1
 	_body.position.y = absf(sin(t * 0.5)) * 0.07
-	if _head != null:
-		_head.rotation.z = sin(t * 0.5 + 1.0) * 0.12
 	var swing := 0.65 if is_runner() or is_thief() else 0.5
 	for i in range(_legs.size()):
 		_legs[i].rotation.x = sin(t + PI * i) * swing

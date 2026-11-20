@@ -1181,6 +1181,48 @@ hopping coins; `shake` rattles it for 0.45 s before the open.
 The bot opens its chests into thin air (`SMOKE_CHESTS`) so the code
 runs and nothing is saved.
 
+## The draw budget (0.62)
+
+The Compatibility renderer draws every mesh instance on its own: no
+batching, no instancing across nodes. So the cost of a crowd is the
+number of mesh instances in it, times two with the sun's shadows on.
+A Galaxy S23 Ultra reported 25 frames a second with 143 bodies on
+screen: 5,364 draw calls. The rule since then:
+
+- A BODY IS A HANDFUL OF MESHES. Parts that never move against each
+  other are welded into one mesh (`Mats.weld(key, build, origin)`):
+  each part keeps its colour as a vertex colour, its shape, and its
+  ink line if it had one. Lit plain-coloured parts share one
+  vertex-coloured material (two surfaces if some are inked); glowing,
+  see-through and textured parts keep their own material as a surface.
+  Only what swings is a node: legs, arms, the gun, a cape.
+- A LOOK IS A KEY. `key` names the welded mesh: kind, skin tone and
+  shirt for a zombie's trunk; hat, hair, skin and colour for a
+  soldier's head. The builder only runs the first time. This is why
+  skin comes in a few tones: a different shade each would be a
+  different mesh each.
+- SAME SIZE, SAME MESH. `Mats.ball`, `pill`, `box`, `cone` and `torus`
+  hand out shared meshes keyed by size. Nothing may change a mesh it
+  got from `Mats`. The cache is capped (`MESH_CACHE_MAX`), so sizes
+  rolled at random cannot fill it.
+- SHADOWS FROM THE TRUNK. Legs, arms, guns, bullets and health bars
+  do not cast: a body's shadow is its trunk and head.
+- THE BUDGET IS TESTED. `tests/test_mats.gd`: a zombie at most 14
+  draws and 4 in the shadow pass, a soldier in the crowd 6 and 2, one
+  in the front rank 16, the fanciest outfit 20; a wave of forty makes
+  no new mesh. A new body part goes into a weld, or the test says no.
+
+Measuring: `xvfb-run ... --resolution 180x320 --fixed-fps 60 ++ --smoke
+--smoke-shadows` prints `draw` and `prims` peaks and sums in
+`SMOKE_PERF` (zero under `--headless`, which has no renderer).
+
+The watchdog (`Perf`) has three rules. A sample counts only if the
+game ran through all of it: no pause, no trip to the home screen
+(`sample_valid`). Two slow samples in a row in a run turn shadows off,
+once (`should_drop_shadows`). Five seconds under 22 turn the safe
+renderer on, once (`should_degrade`). The first rule was missing until
+0.62, and the other two fired on pit stops.
+
 ## The lower coin curve (0.58)
 
 The 0.54 tester maxed a 50,000-coin shop in two weeks. Two things

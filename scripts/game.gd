@@ -141,6 +141,8 @@ var _tele_freezes_run := 0
 var _shaker := Shake.new()
 var _problem_paused := false
 var _fps_shown := false
+## The safe renderer was switched back off at launch: say so on the title.
+var _graphics_retried := false
 var _tele_crash_sent := false
 const HANDS_OFF_SECONDS := 4.0
 var _level_peak := 1
@@ -217,7 +219,9 @@ var _smoke_idle_from := 0
 ## --smoke-squad=shotgun|medic: the bot plays that squad (unlocked for it).
 var _smoke_squad := ""
 ## The busiest the scene got this run: nodes, zombies, live effects.
-var _smoke_peak := {"nodes": 0, "zombies": 0, "fx": 0}
+var _smoke_peak := {"nodes": 0, "zombies": 0, "fx": 0, "draw": 0, "prims": 0, "draw_sum": 0, "prims_sum": 0, "samples": 0}
+## The bot run keeps the sun's shadows on: for measuring what they cost.
+var _smoke_shadows := false
 var _shots_dir := ""
 var _shots_quick := false
 var _game_over_at := 0
@@ -230,6 +234,8 @@ var _smoke_wiped := false
 var _warming := false
 var _fps_frames := 0
 var _fps_since := 0.0
+## Slow frame-rate samples in a row, in a run.
+var _fps_low_streak := 0
 var _crash_card_shown := false
 ## The learning round: lessons pop up once each, the first time a thing
 ## appears; LEARN starts a run where every lesson shows again.
@@ -274,6 +280,7 @@ func _ready() -> void:
 	_smoke_boosts = args.has("--smoke-boosts")
 	_smoke_rivals = args.has("--smoke-rivals")
 	_smoke_idle = args.has("--smoke-idle")
+	_smoke_shadows = args.has("--smoke-shadows")
 	# --smoke-retry: after a wipe, tap through the results and play again,
 	# so the game-over screen and the restart run in CI too.
 	_smoke_retry = args.has("--smoke-retry")
@@ -391,6 +398,15 @@ func _ready() -> void:
 		SaveData.save_telemetry_id(_tele_id)
 	Diag.long_frame.connect(_on_long_frame)
 	hud.set_lessons(lessons_on)
+	# A verdict the old watchdog reached by timing a pause is thrown out.
+	if not smoke and _shots_dir == "" and SaveData.load_watchdog_version() < Perf.WATCHDOG_VERSION:
+		if Perf.should_retry(SaveData.load_watchdog_version(), SaveData.load_safe_graphics(), SaveData.load_auto_safe_done()):
+			SaveData.save_safe_graphics(false)
+			SaveData.save_auto_safe_done(false)
+			hud.set_safe_graphics(false)
+			_graphics_retried = true
+			Diag.note("watchdog_retry")
+		SaveData.save_watchdog_version(Perf.WATCHDOG_VERSION)
 	_apply_graphics(SaveData.load_safe_graphics())
 	_apply_looks()
 	Diag.note("ready", {"smoke": smoke, "character_mode": character_mode})
@@ -454,7 +470,7 @@ func _build_scene() -> void:
 	_sun.rotation_degrees = Vector3(-52.0, 34.0, 0.0)
 	_sun.light_color = Palette.SUN
 	_sun.light_energy = 1.5
-	_sun.shadow_enabled = SaveData.load_shadows_on() and not smoke
+	_sun.shadow_enabled = SaveData.load_shadows_on() and (not smoke or _smoke_shadows)
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	_sun.directional_shadow_max_distance = 70.0
 	_sun.shadow_bias = 0.06
@@ -803,12 +819,18 @@ func _warm_up() -> void:
 	var warm := Node3D.new()
 	warm.position = Vector3(0.0, 0.0, -26.0)
 	add_child(warm)
+	# Every look a walker comes in, welded now and shared for the session.
+	Diag.mark("warm_up:looks")
+	var looks_t0 := Time.get_ticks_msec()
+	Diag.note("warm_looks", {"made": Zombie.warm_looks(), "ms": Time.get_ticks_msec() - looks_t0})
 	var x := -7.0
 	for k in Zombie.Kind.values():
 		var zb := Zombie.new()
 		zb.setup(10.0, 0.0, k)
 		zb.position = Vector3(x, 0.0, 0.0)
 		warm.add_child(zb)
+		# Hurt, so the health bar is drawn (and its shader built) here too.
+		zb.take_damage(1.0)
 		x += 1.4
 	x = -6.0
 	for k in Boss.Kind.values():
@@ -894,6 +916,9 @@ func _warm_up() -> void:
 	await get_tree().process_frame
 	hud.show_loading(false)
 	_warming = false
+	if _graphics_retried:
+		_graphics_retried = false
+		hud.toast(Perf.retry_notice())
 	_fps_frames = 0
 	_fps_since = Time.get_ticks_msec() * 0.001
 	Diag.note("warm_up", {"ms": Time.get_ticks_msec() - t0})
@@ -902,14 +927,29 @@ func _warm_up() -> void:
 ## The watchdog: a phone that cannot hold the frame rate gets the safe
 ## renderer, once, and is told.
 func _watch_fps() -> void:
-	if smoke or _warming or _shots_dir != "" or get_tree().paused:
+	if smoke or _warming or _shots_dir != "":
+		return
+	var now := Time.get_ticks_msec() * 0.001
+	# A pause or a trip to the home screen is not a slow stretch: the
+	# sample starts again when play does.
+	if not Perf.sample_valid(get_tree().paused, _fps_since, Diag.resumed_at):
+		_fps_frames = 0
+		_fps_since = now
 		return
 	_fps_frames += 1
-	var now := Time.get_ticks_msec() * 0.001
 	var seconds := now - _fps_since
 	if seconds < Perf.SAMPLE_SECONDS:
 		return
 	var avg := Perf.average_fps(_fps_frames, seconds)
+	# The sun's shadows go first, once: they draw every body twice.
+	_fps_low_streak = Perf.low_streak(_fps_low_streak, avg, state == State.RUNNING and _run_time > Perf.SETTLE_SECONDS)
+	if Perf.should_drop_shadows(_fps_low_streak, SaveData.load_shadows_on(), SaveData.load_safe_graphics(), SaveData.load_auto_shadows_done()):
+		SaveData.save_shadows_on(false)
+		SaveData.save_auto_shadows_done(true)
+		hud.set_shadows(false)
+		_sun.shadow_enabled = false
+		hud.toast(Perf.shadows_notice())
+		Diag.note("auto_shadows_off", {"avg": snappedf(avg, 0.1)})
 	if avg < 40.0:
 		Diag.note("fps_low", {"avg": snappedf(avg, 0.1), "state": State.keys()[state]})
 	# A slow stretch in a run is a report on its own: the trace in it
@@ -936,7 +976,7 @@ func _apply_graphics(safe: bool) -> void:
 		_env.fog_enabled = not safe
 		_env.adjustment_enabled = not safe
 	if _sun != null:
-		_sun.shadow_enabled = SaveData.load_shadows_on() and not smoke and not safe
+		_sun.shadow_enabled = SaveData.load_shadows_on() and (not smoke or _smoke_shadows) and not safe
 	if _vignette != null:
 		_vignette.visible = not safe
 	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if safe else Viewport.MSAA_2X
@@ -3754,6 +3794,14 @@ func _smoke_tick() -> void:
 			_smoke_peak.nodes = maxi(_smoke_peak.nodes, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
 			_smoke_peak.zombies = maxi(_smoke_peak.zombies, world.zombies.size())
 			_smoke_peak.fx = maxi(_smoke_peak.fx, Fx.live_peak)
+			# What the renderer was asked for. Zero without a real one (CI).
+			var draws := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+			var prims := int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
+			_smoke_peak.draw = maxi(_smoke_peak.draw, draws)
+			_smoke_peak.prims = maxi(_smoke_peak.prims, prims)
+			_smoke_peak.draw_sum += draws
+			_smoke_peak.prims_sum += prims
+			_smoke_peak.samples += 1
 		return
 	if _shots_dir != "":
 		return

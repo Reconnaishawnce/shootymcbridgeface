@@ -3,6 +3,69 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.62 (the reports, read: lighter bodies and an honest watchdog)
+
+Fifteen reports came in from two phones. They said two different
+things, and one of them was the game lying about itself.
+
+- THE "3 FPS" REPORTS WERE FALSE. "3.6 fps over 18 s at level 2" was
+  sent straight after a sixteen-second pit stop; "3.1 fps over 7 s"
+  straight after a seven-second draft. The watchdog stopped counting
+  frames while the game was paused but kept the clock running, so every
+  pit stop, draft and pause menu read as a collapse. Worse than the
+  noise: the same sum switched SAFE GRAPHICS on, permanently, for
+  phones that were holding sixty. A sample now only counts if the game
+  ran through all of it (`Perf.sample_valid`). Saves the old watchdog
+  lowered get full graphics back once, with a line saying so; a phone
+  that really needs the safe renderer will be given it again, fairly.
+- THE HALF-HOUR "FREEZE" WAS A LOCKED PHONE. "A frame of 1949.9 s"
+  was the first frame after coming back from the home screen. The
+  recorder now skips that frame, in reports and in the flight log.
+- THE REAL SLOWDOWN: 5,400 DRAW CALLS. The Galaxy S23 Ultra's traces
+  were true: 25 to 40 frames a second on level 1 and 2, with 81
+  soldiers and 62 zombies asking for 5,364 draws and 2.1 million
+  triangles. Every ball and pill of every body was a mesh and a draw
+  of its own, and the sun's shadows drew all of them twice. Bodies are
+  now welded (`Mats.weld`): a zombie is a trunk, two legs and two arms;
+  a soldier is two legs, a trunk, a head and a gun. Each is baked once
+  per look and shared.
+  - a walker: 40 draws with shadows, now 15 (23 without, now 12);
+    11,400 triangles, now 5,400; 25 nodes, now 7.
+  - a soldier in the crowd: 20 draws, now 7. In the front rank: 60,
+    now 19.
+  - the same bot run (seed 7, 3,000 frames, no shadows): 2,015 draws
+    at the peak, now 1,084; 778,000 triangles, now 345,000; 3,381
+    nodes, now 1,911.
+  - the same run with the sun's shadows on, as the Galaxy had them:
+    3,970 draws at the peak, now 1,658; 1.56 million triangles, now
+    510,000.
+  They look the same: same shapes, same colours, same ink line.
+  Skin comes in four tones for walkers and six for soldiers instead
+  of a different one each, so that bodies can share.
+- THE HITCH AT EVERY WAVE. The worst frames in every report were at
+  gates: 140 to 280 ms as a wave arrived. Each zombie was twenty new
+  meshes, made and sent to the graphics card in that one frame. Meshes
+  of one size are now shared (two balls of radius 0.25 are one mesh),
+  and every look a walker can have is welded under the loading screen.
+  A wave of forty took about 70 ms to build on the test machine; it
+  takes 3. Bullets share one mesh a size as well: forty a second used
+  to be eighty new meshes a second.
+- SHADOWS GO FIRST. Two slow samples in a row in a run (under 45
+  frames a second for ten seconds) turn the sun's shadows off, once,
+  and say where the switch is. Before, nothing happened until 22
+  frames a second, and then everything went at once.
+- The health bar over a zombie is made by the first hit, not at birth.
+- Small round things (eyes, hands, rivets) have the triangles their
+  size on screen can show, not the same count as a head.
+- `tests/test_mats.gd` holds the draw budget per body; `--smoke-shadows`
+  and the `draw`/`prims` fields of `SMOKE_PERF` measure a run under a
+  real renderer.
+
+Not changed, and said plainly: nobody has held a phone to this build.
+The numbers above are counts of what the renderer is asked to do, taken
+from the bot under a software renderer, not frame rates on a Galaxy.
+The next reports will say whether sixty holds.
+
 ## 0.61 (a run that starts slow, winds up, and can be lost)
 
 A tester's video showed level 38 with everything bought: the squad

@@ -4,6 +4,9 @@ extends SceneTree
 ## Exit code is non-zero when any test fails.
 
 const TEST_SCRIPTS := [
+	# First on purpose: it builds zombies, and when it ran after the sound
+	# tests the engine reported sfx.gd as still in use at exit.
+	"res://tests/test_mats.gd",
 	"res://tests/test_gate_math.gd",
 	"res://tests/test_difficulty.gd",
 	"res://tests/test_formation.gd",

@@ -309,6 +309,77 @@ window is pinned to the second and the step. Reports carry
 `OS.get_memory_info` numbers because the engine's static counter is
 zero in release builds.
 
+## The shape of a run (0.61)
+
+Two complaints arrived together and turned out to be one. A maxed
+tester at level 38 could not die: his squad swung between 4 and 270
+in a minute and always came back. And new players found the start too
+fast to enjoy. A run had no shape: it began near top speed and never
+ended.
+
+Why nobody died, found by reading the numbers against the video:
+
+- Every heavy bite was a share of the squad (8 to 15%), and every
+  softener multiplied with no floor. Armor was even applied twice to
+  brutes. A maxed squad took about 1% of a bite.
+- The fork's flat panels were `10..14 + 3 x level`: +127 at level 39.
+  Two of those refilled anything.
+- Late zombie health grew 5% a level, and a capped squad still mowed a
+  level 35 crowd before it arrived. A bite that never lands kills no
+  one.
+
+The answer is a curve with two ends.
+
+The start (tempo). `Difficulty.world_speed` begins at `START_SPEED`
+and reaches the old level-10 speed at level 10, then climbs to
+`LATE_SPEED_CAP`. `bullet_speed(level)` is set on `Bullet.speed` by
+`World.start_level`; a bullet's reach is a distance (`Bullet.RANGE`),
+not a lifetime, so slow bullets still arrive. `fire_tempo` and
+`max_shots` slow the squad's fire and cap the bullets in the air;
+`Squad.damage_per_shot` already divides dps by the rate, so the squad
+hits exactly as hard and only the picture changes: a few fat rounds
+you can follow at level 1, a stream by level 11. `crowd_scale` thins
+the first two levels' waves and the walk speed starts lower.
+`World._think` drops the road to `THINK_SLOW` while a gate that needs
+reading (sum, deal, bet, vehicle, supply, the fork's mouth) is between
+`THINK_FROM` and `THINK_TO` metres out: the breath before a decision,
+then speed again.
+
+The end (danger). `danger(level)` is 1 until `DANGER_FROM`, then
+`DANGER_GROWTH` compounding with no cap, and `World._bite` multiplies
+every heavy bite by it. `_bite` is now the one place softeners meet:
+the shop's armor, the hero, `Squad.bite_mult` (medics, veterans, pit
+plating) and thick skin are multiplied and held at
+`MITIGATION_FLOOR` (`mitigated`). `heavy_floor` and `contact_bite`
+are the flat parts, growing with the level, because a share of a
+small squad rounds to nothing and it is the small squad that should
+be in danger. `LATE_HP_GROWTH` went from 5% to 9% so crowds do get
+through. `FORK_LEVEL_CAP` stops the fork's pay at level 10 while its
+threat keeps its own count.
+
+Tuning. The bot was the only instrument, and a perfect bot is a bad
+one: with no upgrades it reaches the 500 cap by level 8, which no
+person does. `--smoke-skill` makes it react late and misread gates.
+Baseline: maxed bot alive at level 28 with 500 soldiers, about two
+bites a level. After: perfect maxed bot alive at level 35 but worn to
+150 to 500; half-skill maxed bot dead at level 21 or 33; half-skill
+fresh bot dead at level 10 in one seed of three. Since the tester in
+the video was already swinging to 4 soldiers under the old rules, a
+person will meet the wall well before the half-skill bot does. These
+constants are a first setting. What real players reach should move
+`DANGER_GROWTH`, `MITIGATION_FLOOR` and `CONTACT_BITE_EVERY` first.
+
+ENLIST. A report said a maxed upgrade took coins and gave nothing,
+and for two upgrades it was literally true: a tier of RECRUITS was a
+quarter of a soldier and of GATE BONUS a fifth, so `int()` ate it.
+Every tier now changes the number on the tile
+(`test_every_enlist_tier_changes_something`): those two give a whole
+soldier at `ENLIST_PRICE` times the cost, `Meta.total_text` is what
+the upgrade does now with tiers included, `enlist_gain` is what one
+more buys, `enlist_capped` takes armor off sale at `ARMOR_FLOOR`, and
+`Game.buy_upgrade` says what the coins bought. Saves carry
+`enlist_v`; `migrate_enlist` rounds old fractions up.
+
 ## The flight recorder (0.60)
 
 Reports kept failing to arrive from the phones that most needed to

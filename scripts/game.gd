@@ -16,7 +16,7 @@ extends Node3D
 
 enum State { TITLE, RUNNING, GAME_OVER }
 
-const SMOKE_FRAMES := 900
+const SMOKE_FRAMES := 1300
 const SMOKE_SEED := 12345
 var _smoke_seed := SMOKE_SEED
 ## Ignore taps for a moment after dying so a frantic tap does not restart.
@@ -79,6 +79,8 @@ var _after_draft: Callable = Callable()
 var _card_fx_last := 0.0
 ## Themes this run has been through, for the bot.
 var _themes_seen: Dictionary = {}
+## Times the road slowed for a thinking gate this run.
+var _think_zones := 0
 ## The hero whose power is live this run (Heroes.active), and how often
 ## each part of it fired, for the bot.
 var run_hero := ""
@@ -129,6 +131,10 @@ var _log_prev_tries := 0
 ## --smoke-dump=PATH: the bot writes the report and log bodies it would
 ## send, so the Worker's own code can be run against them.
 var _smoke_dump := ""
+## --smoke-skill=0..1: how well the bot plays. At 1 it is perfect; below
+## that it reacts late and sometimes walks into the wrong panel, which
+## is closer to a person and a better judge of what kills one.
+var _smoke_skill := 1.0
 var _tele_sent := 0
 var _tele_freezes_run := 0
 ## Shake to report: the detector, and whether the card paused the run.
@@ -288,6 +294,8 @@ func _ready() -> void:
 			_smoke_idle_from = int(a.get_slice("=", 1))
 		elif a.begins_with("--smoke-seed="):
 			_smoke_seed = int(a.get_slice("=", 1))
+		elif a.begins_with("--smoke-skill="):
+			_smoke_skill = clampf(float(a.get_slice("=", 1)), 0.0, 1.0)
 		elif a.begins_with("--smoke-dump="):
 			_smoke_dump = a.trim_prefix("--smoke-dump=")
 		elif a.begins_with("--smoke-level="):
@@ -318,7 +326,12 @@ func _ready() -> void:
 		modifier = "hard" if args.has("--hard") else ("nightmare" if args.has("--nightmare") else "normal")
 	coins = SaveData.load_coins()
 	meta.levels = SaveData.load_upgrades()
-	meta.enlist = SaveData.load_enlist()
+	# Tiers bought before 0.61 came in fractions of a soldier: count them
+	# the new way, once, and never down.
+	var enlist_v := SaveData.load_enlist_version()
+	meta.enlist = Meta.migrate_enlist(SaveData.load_enlist(), enlist_v)
+	if enlist_v < Meta.ENLIST_VERSION and not smoke and not meta.enlist.is_empty():
+		SaveData.save_enlist(meta.enlist)
 	boosts.from_dict(SaveData.load_boosts())
 	chests = SaveData.load_chests()
 	if _smoke_upgrades:
@@ -535,6 +548,7 @@ func _build_scene() -> void:
 	world.card_felt.connect(_on_card_felt)
 	world.theme_struck.connect(_on_theme_struck)
 	world.strike_called.connect(func() -> void: sfx.play_warn())
+	world.think_zone.connect(_on_think_zone)
 	world.pit_stop_reached.connect(_on_pit_stop)
 	world.pit_lane_opened.connect(func() -> void:
 		if not smoke:
@@ -1533,7 +1547,8 @@ func open_shop() -> void:
 
 ## A level, or past max an ENLIST tier.
 func buy_upgrade(id: String) -> void:
-	var left := meta.enlist_tier(id, coins) if meta.is_maxed(id) else meta.buy(id, coins)
+	var enlisting := meta.is_maxed(id)
+	var left := meta.enlist_tier(id, coins) if enlisting else meta.buy(id, coins)
 	if left == coins:
 		return
 	coins = left
@@ -1544,6 +1559,9 @@ func buy_upgrade(id: String) -> void:
 	sfx.play("gate_good", -4.0)
 	hud.show_shop(meta, coins, boosts)
 	hud.shop_bought(id)
+	# Say what the coins just bought, in the number that changed.
+	if enlisting:
+		hud.toast("%s: %s. Now %s." % [Meta.title(id), Meta.enlist_gain(id), meta.total_text(id)])
 
 
 # --- rivals ----------------------------------------------------------------
@@ -1792,6 +1810,7 @@ func start_run(p_mode: String = "levels") -> void:
 	_hero_fx = {}
 	_start_rivals()
 	_themes_seen = {}
+	_think_zones = 0
 	world.theme_strikes = 0
 	squad.hero = run_hero
 	world.hero = run_hero
@@ -2878,6 +2897,21 @@ func _set_headlight(on: bool) -> void:
 	_headlight.visible = on
 
 
+## The road slowed for a gate that needs reading. Said in words the
+## first couple of times in a run, and taught once.
+func _on_think_zone(on: bool) -> void:
+	if smoke:
+		if on:
+			_think_zones += 1
+		return
+	if not on or state != State.RUNNING:
+		return
+	_think_zones += 1
+	if _think_zones <= 2:
+		hud.show_float("SLOW ROAD: READ THE SIGNS", true)
+	_teach("think")
+
+
 ## Lightning on the gates: the sky blinks and it thunders.
 func _on_theme_struck() -> void:
 	if smoke:
@@ -2903,7 +2937,7 @@ func _on_level_started(level: int) -> void:
 	if level <= 1:
 		return
 	# The banner names the place and its rule; daybreak is just the level.
-	hud.show_banner(Themes.banner(level, world.theme), 2.8 if Themes.rule(world.theme) != "" else 1.0)
+	hud.show_banner(Themes.banner(level, world.theme), 2.8 if (Themes.rule(world.theme) != "" or Difficulty.danger(level) > 1.001) else 1.0)
 	hud.show_hint(Progression.hint_for(level), 3.6)
 	_refresh_pause_perks()
 	for id in Lessons.for_level(level):
@@ -2911,6 +2945,8 @@ func _on_level_started(level: int) -> void:
 			break
 	if Themes.rule(world.theme) != "":
 		_teach("theme")
+	if Difficulty.danger(level) > 1.001:
+		_teach("danger")
 	_level_peak = 1
 	_level_gates = 0
 	_level_perfect = 0
@@ -3269,6 +3305,8 @@ func _refresh_pause_perks() -> void:
 	var parts := []
 	if Themes.rule(world.theme) != "":
 		parts.append("%s: %s" % [Themes.title(world.theme), Themes.rule(world.theme)])
+	if Difficulty.danger(world.level) > 1.001:
+		parts.append("DANGER +%d%%: every heavy bite is that much bigger, and armor takes at most %d%% off." % [int(round((Difficulty.danger(world.level) - 1.0) * 100.0)), int(round((1.0 - Difficulty.MITIGATION_FLOOR) * 100.0))])
 	if run_hero != "":
 		parts.append("%s: %s. %s." % [Wardrobe.title(run_hero), Heroes.passive_text(run_hero), Heroes.twist_text(run_hero)])
 	if cards.total() > 0:
@@ -3442,6 +3480,12 @@ func _on_bet_placed() -> void:
 
 
 func _bot_panel(g: Gate) -> int:
+	# A less skilled bot misreads a gate now and then: the same wrong
+	# panel for the same gate of the same run, so a seed still replays.
+	if _smoke_skill < 1.0:
+		var roll := hash("%d:%d:%d" % [run_seed, world.level, gates_passed])
+		if float(roll % 1000) / 1000.0 < (1.0 - _smoke_skill) * 0.5:
+			return (roll / 1000) % g.panels.size()
 	for i in range(g.panels.size()):
 		if GateMath.is_vehicle(g.panels[i]) and squad.count >= Convoy.cost(g.panels[i].power) * 2:
 			return i
@@ -3748,6 +3792,7 @@ func _smoke_tick() -> void:
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
 		print("SMOKE_THEMES ", JSON.stringify({"seen": _themes_seen.keys(), "strikes": world.theme_strikes, "now": world.theme}))
+		print("SMOKE_PACE ", JSON.stringify({"level": world.level, "road": snappedf(Difficulty.world_speed(world.level), 0.1), "bullet": snappedf(Bullet.speed, 0.1), "shots": snappedf(squad.shots_per_second(), 0.1), "max_shots": Difficulty.max_shots(world.level), "think_zones": _think_zones, "danger": snappedf(Difficulty.danger(world.level), 0.01)}))
 		if _smoke_rivals:
 			print("SMOKE_RIVALS ", JSON.stringify({"passed": rivals.passed, "left": rivals.targets.size(), "chip": rivals.chip(score)}))
 		if run_hero != "":
@@ -3780,6 +3825,9 @@ func _smoke_tick() -> void:
 ## otherwise line up the better panel of the next gate.
 func _bot_steer() -> void:
 	_last_input_at = _run_time
+	# A less skilled bot looks up from its phone only every so often.
+	if _smoke_skill < 1.0 and _frames % (1 + int((1.0 - _smoke_skill) * 40.0)) != 0:
+		return
 	# Spread for crowds, tighten for gates and the boss; bomb the heavies.
 	var near := world.nearest_zombie(18.0)
 	var heavy_near := false
@@ -4022,7 +4070,7 @@ func _shots_walkthrough() -> void:
 		for id in Themes.ORDER:
 			world.theme = id
 			_apply_theme(id, true)
-			hud.show_banner(Themes.banner(3, id), 5.0)
+			hud.show_banner(Themes.banner(12, id), 5.0)
 			await _capture("t_%s.png" % id, 12)
 		world.theme = "day"
 		_apply_theme("day", true)

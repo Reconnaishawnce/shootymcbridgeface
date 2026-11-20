@@ -362,6 +362,12 @@ changes where they pay. Five phases, each a release:
    every attack and leave a way out, and a new attack pattern needs a
    person holding a phone to judge, which this pass did not have.
 
+0.61 reshaped the run itself (DESIGN, "The shape of a run"): a slow
+start that winds up, danger that compounds from level 6, a floor under
+armor, a cap on the fork, and an ENLIST whose every tier buys
+something. Its numbers are a first setting from bot runs; the next
+balance pass should move them with what real players reach.
+
 Performance runs alongside: the 0.53 traces decide whether the crowd
 moves to batched instances. 0.60 added the flight recorder and LOGGING
 (DESIGN, "The flight recorder") after shake to report turned out never

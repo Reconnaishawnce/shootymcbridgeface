@@ -2495,8 +2495,13 @@ func show_shop(meta: Meta, coins: int, boosts: Boosts = null) -> void:
 			effect = "%s\n%s" % [Meta.description(id), Meta.effect_text(id, 1)]
 		if meta.is_maxed(id) and Meta.enlistable(id):
 			# Past max: the tiers so far and the next one, bought with ENLIST.
-			var t := meta.tiers(id)
-			effect = "%s\nENLISTED x%d: %s" % [now, t, Meta.enlist_text(id, t)] if t > 0 else "%s\nENLIST: %s a tier" % [now, Meta.enlist_text(id, 1)]
+			# Past max: what it does now (levels and tiers together), then
+			# exactly what one more ENLIST buys. A tier that would change
+			# nothing is not sold.
+			if meta.enlist_capped(id):
+				_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), "MAXED: %s\nNothing more to gain." % meta.total_text(id), 0, true, false, "COINS")
+				continue
+			effect = "MAXED: %s\nENLIST buys %s" % [meta.total_text(id), Meta.enlist_gain(id)]
 			_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), effect, meta.enlist_cost(id), false, meta.can_enlist(id, coins), "COINS", "MAX", "ENLIST")
 			continue
 		_fill_tile(_shop_rows[id], Meta.title(id), lvl, Meta.max_level(id), effect, meta.cost(id), meta.is_maxed(id), meta.can_buy(id, coins), "COINS")

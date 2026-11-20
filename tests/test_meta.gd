@@ -47,21 +47,55 @@ func test_enlist() -> void:
 	m.levels = {"power": Meta.max_level("power"), "start": Meta.max_level("start"), "wind": 1}
 	check(not m.can_enlist("wind", 100000), "one-shot upgrades do not enlist")
 	check_eq(m.enlist_cost("power"), 1250, "the first tier costs 2.5 base")
+	check_eq(m.enlist_cost("start"), 3000, "a whole soldier costs three times as much")
 	check(Meta.enlist_cost_at("power", 10) > Meta.enlist_cost_at("power", 9), "and climbs")
 	check_eq(m.enlist_tier("power", 1249), 1249, "too poor")
 	var before := m.damage_mult()
 	check_eq(m.enlist_tier("power", 1250), 0, "a tier costs what it says")
 	check_near(m.damage_mult() - before, 0.01, 0.0001, "a tier is one percent")
 	check(m.enlist_cost("power") > 1250, "the next costs more")
-	for i in range(4):
-		m.enlist_tier("start", 1000000)
-	check_eq(m.start_squad(), 1 + 2 * Meta.max_level("start") + 1, "four start tiers are one soldier")
-	check(Meta.enlist_text("start", 3).contains("3/4"), "the tile shows the fraction")
+	m.enlist_tier("start", 1000000)
+	check_eq(m.start_squad(), 1 + 2 * Meta.max_level("start") + 1, "one start tier is one soldier")
 	for id in Meta.ENLIST:
-		check(Meta.enlist_text(id, 2) != "", "enlist text for %s" % id)
+		check(Meta.enlist_gain(id) != "", "the tile can say what a tier of %s buys" % id)
 	m.enlist = {"armor": 1000}
 	m.levels = {"armor": Meta.max_level("armor")}
-	check(m.bite_mult() >= 0.25, "armor tiers never make bites free")
+	check_near(m.bite_mult(), Meta.ARMOR_FLOOR, 0.0001, "armor tiers never make bites free")
+	check(m.enlist_capped("armor") and not m.can_enlist("armor", 1000000), "and at the floor no more are sold")
+	check_eq(m.enlist_tier("armor", 1000000), 1000000, "so no coins can go for nothing")
+
+
+## The bug report that started this: you could pay and get nothing. Every
+## tier of every upgrade must change the number the tile shows.
+func test_every_enlist_tier_changes_something() -> void:
+	for id in Meta.ENLIST:
+		var m := Meta.new()
+		m.levels[id] = Meta.max_level(id)
+		for tier in range(6):
+			var before := m.total_text(id)
+			var coins := m.enlist_tier(id, 10000000)
+			check(coins < 10000000, "%s tier %d is sold" % [id, tier + 1])
+			check(m.total_text(id) != before, "%s tier %d changes what the tile says (%s to %s)" % [id, tier + 1, before, m.total_text(id)])
+	for id in Meta.ORDER:
+		if not Meta.enlistable(id):
+			var m := Meta.new()
+			m.levels[id] = Meta.max_level(id)
+			check_eq(m.enlist_tier(id, 10000000), 10000000, "%s is done at MAX: nothing to pay for" % id)
+			check_eq(m.buy(id, 10000000), 10000000, "and cannot be bought again")
+
+
+func test_enlist_migration() -> void:
+	var old := {"start": 3, "gate": 6, "power": 4, "junk": 9, "armor": 0}
+	var now := Meta.migrate_enlist(old, 1)
+	check_eq(int(now.start), 1, "three quarters of a soldier rounds up to one")
+	check_eq(int(now.gate), 2, "six fifths of a soldier rounds up to two")
+	check_eq(int(now.power), 4, "percent tiers are untouched")
+	check(not now.has("junk") and not now.has("armor"), "junk and zeroes are dropped")
+	check_eq(Meta.migrate_enlist(now, 2), now, "a current save is left alone")
+	var m := Meta.new()
+	m.levels = {"start": Meta.max_level("start")}
+	m.enlist = Meta.migrate_enlist({"start": 4}, 1)
+	check_eq(m.start_squad(), 1 + 2 * Meta.max_level("start") + 1, "four old quarters are still exactly one soldier")
 
 
 func test_squad_cycling() -> void:

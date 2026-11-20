@@ -34,6 +34,8 @@ func test_catalog() -> void:
 	check_eq(Themes.title("nonsense"), "DAYBREAK", "an unknown theme is daybreak")
 	check_eq(Themes.banner(1, "day"), "LEVEL 1", "a plain banner")
 	check(Themes.banner(3, "night").begins_with("LEVEL 3  ·  NIGHT SHIFT\n"), "a themed banner names the place and the rule")
+	check(not Themes.banner(3, "night").contains("DANGER"), "no danger line on the early levels")
+	check(Themes.banner(12, "fog").contains("DANGER +") and Themes.banner(8, "day").begins_with("LEVEL 8\nDANGER +"), "later the banner says how much harder the road bites")
 
 
 func test_looks_read() -> void:

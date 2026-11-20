@@ -126,22 +126,128 @@ static func boss_distance() -> float:
 	return gate_distance(GATES_PER_LEVEL - 1) + BOSS_LEAD
 
 
+# --- tempo: the run starts slow and winds up --------------------------------
+# A first level is a stroll: a slow road, slow fat bullets you can watch
+# fly, a thin crowd. Every level turns each of those up a notch, so the
+# speed of the late game is something the player grew into.
+
 ## Metres per second the world scrolls toward the squad during gates:
-## half a metre a level to 14 at level 10, then a slower climb to
-## LATE_SPEED_CAP, so a late endless run keeps asking for faster hands.
-const LATE_SPEED_CAP := 16.5
+## START_SPEED at level 1, 14 at level 10, then a slower climb to
+## LATE_SPEED_CAP, so a late run keeps asking for faster hands.
+const START_SPEED := 7.5
+const SPEED_PER_LEVEL := 0.7225
+const LATE_SPEED_PER_LEVEL := 0.2
+const LATE_SPEED_CAP := 18.0
 
 
 static func world_speed(level: int) -> float:
 	if level > 10:
-		return minf(14.0 + float(level - 10) * 0.15, LATE_SPEED_CAP)
-	return clampf(9.5 + float(level - 1) * 0.5, 9.5, 14.0)
+		return minf(14.0 + float(level - 10) * LATE_SPEED_PER_LEVEL, LATE_SPEED_CAP)
+	return clampf(START_SPEED + float(level - 1) * SPEED_PER_LEVEL, START_SPEED, 14.0)
+
+
+## How fast a bullet flies: slow enough to watch at level 1, a streak by
+## level 10.
+const BULLET_SPEED_START := 26.0
+const BULLET_SPEED_PER_LEVEL := 2.0
+const BULLET_SPEED_MAX := 44.0
+
+
+static func bullet_speed(level: int) -> float:
+	return clampf(BULLET_SPEED_START + float(level - 1) * BULLET_SPEED_PER_LEVEL, BULLET_SPEED_START, BULLET_SPEED_MAX)
+
+
+## The most bullets a second the squad puts in the air, and how fast
+## each soldier fires. Both climb with the level; damage per bullet makes
+## up the difference, so the squad hits exactly as hard either way. What
+## changes is what you see: a few fat rounds, then a stream.
+const SHOTS_START := 12.0
+const SHOTS_PER_LEVEL := 3.0
+const SHOTS_MAX := 42.0
+const FIRE_TEMPO_START := 0.7
+const FIRE_TEMPO_PER_LEVEL := 0.06
+
+
+static func max_shots(level: int) -> float:
+	return clampf(SHOTS_START + float(level - 1) * SHOTS_PER_LEVEL, SHOTS_START, SHOTS_MAX)
+
+
+static func fire_tempo(level: int) -> float:
+	return clampf(FIRE_TEMPO_START + float(level - 1) * FIRE_TEMPO_PER_LEVEL, FIRE_TEMPO_START, 1.0)
+
+
+## How full a wave is on the first levels: thinner crowds while a new
+## player finds the controls.
+const EARLY_CROWD := [0.7, 0.85]
+
+
+static func crowd_scale(level: int) -> float:
+	return float(EARLY_CROWD[level - 1]) if level >= 1 and level <= EARLY_CROWD.size() else 1.0
+
+
+## A gate that asks for thought (a sum, a deal, a bet, a vehicle, the
+## fork) slows the road to this fraction while it comes up, then the
+## road picks up again.
+const THINK_SLOW := 0.6
+## The stretch before such a gate where the road is slow, in metres.
+const THINK_FROM := 30.0
+const THINK_TO := 3.0
+
+
+# --- danger: the late game bites back ---------------------------------------
+# Every bite used to be a share of the squad, softened by armor on top
+# of armor, and gates paid out more every level with no ceiling. A
+# maxed player at level 38 could not die. From DANGER_FROM the bites
+# grow by DANGER_PER_LEVEL a level, a zombie that gets through takes
+# more soldiers, and no stack of armor takes more than
+# 1 - MITIGATION_FLOOR off a bite. Sooner or later the road wins; the
+# question a run asks is how far you got first.
+
+const DANGER_FROM := 5
+## Danger compounds: this much more every level, with no ceiling.
+const DANGER_GROWTH := 1.07
+## Everything that softens a bite, multiplied together, never goes
+## below this: armor, thick skin, veterans, medics, a hero.
+const MITIGATION_FLOOR := 0.3
+## A plain zombie that reaches the squad takes one soldier, and one more
+## for every this many levels.
+const CONTACT_BITE_EVERY := 3
+## Zombies walk a little faster every level past this, up to the cap.
+const LATE_WALK_FROM := 10
+const LATE_WALK_PER_LEVEL := 0.04
+const LATE_WALK_CAP := 1.0
+
+
+## What heavy bites are multiplied by at [param level]: 1 until
+## DANGER_FROM, then up.
+static func danger(level: int) -> float:
+	return pow(DANGER_GROWTH, float(maxi(0, level - DANGER_FROM)))
+
+
+## The least a heavy bite takes at [param level], however small the
+## squad: a brute is never a nibble late in a run.
+static func heavy_floor(level: int) -> int:
+	return 2 * contact_bite(level)
+
+
+## The share of a bite that lands after every softener: their product,
+## held at the floor.
+static func mitigated(product: float) -> float:
+	return clampf(product, MITIGATION_FLOOR, 1.0)
+
+
+## Soldiers a plain zombie takes when it reaches the squad.
+static func contact_bite(level: int) -> int:
+	return 1 + maxi(0, level - 1) / CONTACT_BITE_EVERY
 
 
 ## From LATE_LEVEL on, wave health also grows by LATE_HP_GROWTH a level, so
 ## the road keeps getting harder past the point where the squad is capped.
 const LATE_LEVEL := 8
-const LATE_HP_GROWTH := 1.05
+## 9% a level, compounding. At 5% a capped squad still mowed a level 35
+## crowd before it arrived, so nothing ever reached it; the wall has to
+## come from the crowd, because a bite that never lands kills nobody.
+const LATE_HP_GROWTH := 1.09
 
 
 static func late_growth(level: int) -> float:
@@ -235,6 +341,8 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 		hp = 0.8 + lv * 0.15
 		count = 3 + int(lv * 0.5)
 		runners = 1
+	# The first levels bring thinner crowds.
+	count = maxi(2, int(round(float(count) * crowd_scale(level))))
 	# The crowd keeps pace with the squad's guns and the late levels.
 	hp *= fire_scale(squad_count) * late_growth(level)
 	if elite:
@@ -251,7 +359,9 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 		"tank_hp": hp * 6.0 + float(squad_count) * TANK_HP_PER_SOLDIER,
 		"thief_hp": hp * 1.5,
 		"runner_hp": hp * 0.6,
-		"speed": 2.0 + minf(lv * 0.15 + ix * 0.05, 1.5),
+		# A slow shamble at level 1, a brisk walk by level 10, and from
+		# there a little faster every level.
+		"speed": 1.6 + minf(lv * 0.19 + ix * 0.05, 1.9) + minf(float(maxi(0, level - LATE_WALK_FROM)) * LATE_WALK_PER_LEVEL, LATE_WALK_CAP),
 		"brutes": mini(brutes, MAX_BRUTES + (ELITE_EXTRA_BRUTES if elite else 0)),
 		"thieves": mini(thieves, MAX_THIEVES),
 		"tanks": tanks,
@@ -603,6 +713,9 @@ static func route_needs(level: int, threat: int, squad_count: int = 20) -> int:
 const BET_WIN_CAP := 80
 ## Past BIG_SQUAD a fork's multipliers become flat gains of at most this.
 const BIG_FORK_ADD_CAP := 40
+## A fork's flat gains grow with the level only this far: uncapped, a
+## level 39 fork paid +127 a panel and no squad could be worn down.
+const FORK_LEVEL_CAP := 9
 
 
 ## What a won bet pays a squad of [param count].
@@ -611,11 +724,12 @@ static func bet_win(count: int) -> int:
 
 
 func _route(level: int, threat: int, count: int = 0) -> Dictionary:
-	var lv := level - 1
+	# The pay stops growing at FORK_LEVEL_CAP; the danger does not.
+	var lv := mini(level - 1, FORK_LEVEL_CAP)
 	var route := {
 		"threat": threat,
 		"wave_mult": threat_wave_mult(threat),
-		"extra_brutes": maxi(0, threat - 2) + (int(lv / 3.0) if threat >= 3 else 0),
+		"extra_brutes": maxi(0, threat - 2) + (int(float(level - 1) / 3.0) if threat >= 3 else 0),
 		"panels": [],
 		"needs": route_needs(level, threat),
 	}

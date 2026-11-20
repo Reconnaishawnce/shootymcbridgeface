@@ -3,6 +3,50 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.61 (a run that starts slow, winds up, and can be lost)
+
+A tester's video showed level 38 with everything bought: the squad
+swung 270, 44, 4, 71 inside a minute and could not die. And new
+players asked for the opposite at the start: slower, with bullets you
+can watch. Both are one change to the shape of a run.
+
+- A SLOW START THAT WINDS UP. Level 1's road runs at 7.5 m/s (was
+  9.5), bullets fly at 26 m/s (was 42), each soldier fires at 70% of
+  full rate with at most 12 bullets a second in the air (was 30), and
+  the first two levels bring 30% and 15% fewer zombies, walking slower.
+  Every level turns each of those up: the road is 14 m/s at level 10
+  and climbs to 18, bullets reach 44 m/s, the stream reaches 42 bullets
+  a second. Damage per bullet makes up the difference, so the squad
+  hits exactly as hard at any tempo.
+- SLOW ROAD. A gate that needs reading (a sum, a deal, a bet, a
+  vehicle, the fork) drops the road to 60% speed while it comes up,
+  then it picks up again.
+- DANGER. From level 6 every heavy bite grows 7% a level, compounding,
+  and the level banner shows the total. A zombie that reaches the squad
+  takes one soldier, plus one for every three levels. Late zombies gain
+  9% health a level (was 5%), so crowds eventually get through.
+- ARMOR HAS A LIMIT. Armor, thick skin, veterans, medics, the pit's
+  plating and a hero used to multiply together with no floor (and
+  armor was applied twice to brutes), so a maxed squad took about 1%
+  of a bite. Together they now take at most 70% off.
+- THE FORK STOPS PAYING MORE. Its flat panels grew 3 soldiers a level
+  with no cap: +127 a panel at level 39, which refilled any squad. They
+  stop growing after level 10; the heavy route keeps getting heavier.
+- ENLIST IS HONEST. A report said buying a maxed upgrade took coins and
+  gave nothing, and for RECRUITS and GATE BONUS that was true: a tier
+  was a quarter or a fifth of a soldier. Every tier now buys something
+  the tile shows (those two give one whole soldier, at a higher
+  price), the tile says MAXED and what it does now and exactly what
+  ENLIST buys, a line confirms each purchase with the new total, and
+  ARMOR stops being sold when it can soften nothing more. Old
+  fractional tiers round up to whole soldiers.
+- What the bot says: before, a maxed bot sat at the 500-soldier cap
+  through level 28 and nothing ended a run. Now a bot playing at half
+  skill dies somewhere between level 10 and the low 30s depending on
+  upgrades and luck. A person plays worse than that bot, so expect the
+  wall sooner; these numbers are a first setting, not a final one.
+- The bot has `--smoke-skill=0..1` (slower reactions, misread gates).
+
 ## 0.60 (the flight recorder, logging, and a shake that works)
 
 - SHAKE TO REPORT NEVER WORKED ON A PHONE. Godot 4.4 keeps the motion

@@ -24,7 +24,6 @@ const DETAILED := 19
 ## Soldiers mid-tumble at once; past that they just vanish in dust.
 const MAX_TUMBLING := 10
 const STEER_LERP := 16.0
-const MAX_SHOTS_PER_SECOND := 30.0
 const DPS_PER_SOLDIER := 2.5
 const SHOTGUN_PELLETS := 3
 const SHOTGUN_DAMAGE_MULT := 1.35
@@ -461,7 +460,10 @@ func dps() -> float:
 
 ## Total shots per second. Capped so a huge squad stays cheap to render.
 func shots_per_second() -> float:
-	return minf(float(firing_count()) * DPS_PER_SOLDIER * _fire_mult(), MAX_SHOTS_PER_SECOND)
+	# The level sets the tempo: fewer, fatter rounds early, a stream late.
+	# Damage per shot makes up the difference (damage_per_shot).
+	var lv := world.level if world != null else 1
+	return minf(float(firing_count()) * DPS_PER_SOLDIER * _fire_mult() * Difficulty.fire_tempo(lv), Difficulty.max_shots(lv))
 
 
 ## Damage per shot rises once the rate cap is hit, so DPS stays linear.
@@ -726,7 +728,7 @@ func _spawn_bullet(origin: Vector3, damage: float, vx: float, size: float) -> vo
 		# Converge on the focus point: sideways speed that gets there as the
 		# bullet covers the distance. Focused rounds also hit harder.
 		var dz := maxf(0.5, origin.z - focus_point.z)
-		vx += (focus_point.x - origin.x) / (dz / Bullet.SPEED)
+		vx += (focus_point.x - origin.x) / (dz / Bullet.speed)
 		b.damage *= Progression.FOCUS_DAMAGE_MULT
 	else:
 		# Spray. Close targets still get hit; far ones need aiming.

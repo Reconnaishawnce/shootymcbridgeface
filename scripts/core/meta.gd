@@ -21,14 +21,20 @@ const CATALOG := {
 const ORDER := ["start", "power", "gate", "armor", "belt", "wind", "hero", "slayer", "magnet", "scout", "shotgun", "medic", "sniper"]
 const SQUAD_TYPES := ["rifle", "shotgun", "medic", "sniper"]
 const COST_GROWTH := 1.6
-## ENLIST: past max, an upgrade keeps growing a tier at a time, one
-## percent (or a fraction of a soldier) each, with no end but the cost.
+## ENLIST: past max, an upgrade keeps growing a tier at a time, with no
+## end but the cost. Every tier buys something the tile can show: one
+## percent, or one whole soldier. (Until 0.61 a soldier came in
+## quarters and fifths, so a purchase could change nothing at all.)
 const ENLIST := ["start", "power", "gate", "armor", "slayer", "magnet", "scout", "hero"]
 const ENLIST_COST_MULT := 2.5
 const ENLIST_GROWTH := 1.12
-## Fractions of a soldier per tier for the whole-number upgrades.
-const ENLIST_START_PER := 4
-const ENLIST_GATE_PER := 5
+## A whole soldier costs more than a percent: these multiply the price.
+const ENLIST_PRICE := {"start": 3.0, "gate": 4.0}
+## How the tiers in a save are counted. 1: start and gate tiers were
+## quarters and fifths of a soldier. 2: every tier is a whole step.
+const ENLIST_VERSION := 2
+## Armor's tiers stop where no bite can be softened further.
+const ARMOR_FLOOR := 0.3
 ## Soldiers a second wind brings back.
 const SECOND_WIND_SOLDIERS := 8
 ## Clearing this level unlocks Endless mode.
@@ -91,7 +97,27 @@ static func enlistable(id: String) -> bool:
 
 
 static func enlist_cost_at(id: String, tier: int) -> int:
-	return int(round(float(CATALOG[id]["base"]) * ENLIST_COST_MULT * pow(ENLIST_GROWTH, tier)))
+	return int(round(float(CATALOG[id]["base"]) * ENLIST_COST_MULT * float(ENLIST_PRICE.get(id, 1.0)) * pow(ENLIST_GROWTH, tier)))
+
+
+## A tier that would change nothing is not for sale: armor at its floor.
+func enlist_capped(id: String) -> bool:
+	return id == "armor" and bite_mult() <= ARMOR_FLOOR + 0.0001
+
+
+## Tiers from an older save, counted the way this version counts them:
+## what was paid for in quarters and fifths rounds up to whole soldiers.
+static func migrate_enlist(tiers_in: Dictionary, version: int) -> Dictionary:
+	var out := {}
+	for id in tiers_in:
+		if ENLIST.has(str(id)) and int(tiers_in[id]) > 0:
+			out[str(id)] = int(tiers_in[id])
+	if version < 2:
+		if out.has("start"):
+			out["start"] = int(ceil(float(out["start"]) / 4.0))
+		if out.has("gate"):
+			out["gate"] = int(ceil(float(out["gate"]) / 5.0))
+	return out
 
 
 func enlist_cost(id: String) -> int:
@@ -99,7 +125,7 @@ func enlist_cost(id: String) -> int:
 
 
 func can_enlist(id: String, coins: int) -> bool:
-	return enlistable(id) and is_maxed(id) and coins >= enlist_cost(id)
+	return enlistable(id) and is_maxed(id) and not enlist_capped(id) and coins >= enlist_cost(id)
 
 
 ## Buys one tier. Returns the coins left, or [param coins] unchanged.
@@ -111,26 +137,49 @@ func enlist_tier(id: String, coins: int) -> int:
 	return coins - c
 
 
-## What the tiers add, for the shop tile: "+3% damage", "+1 soldier".
-static func enlist_text(id: String, tier: int) -> String:
+## What ONE more tier buys, in the words the button's tile uses.
+static func enlist_gain(id: String) -> String:
 	match id:
 		"start":
-			return "+%d soldier%s (%d/%d)" % [tier / ENLIST_START_PER, "" if tier / ENLIST_START_PER == 1 else "s", tier % ENLIST_START_PER, ENLIST_START_PER]
+			return "+1 soldier at level start"
 		"gate":
-			return "+%d per gate (%d/%d)" % [tier / ENLIST_GATE_PER, tier % ENLIST_GATE_PER, ENLIST_GATE_PER]
+			return "+1 soldier per blue gate"
 		"power":
-			return "+%d%% damage" % tier
+			return "+1% damage"
 		"armor":
-			return "-%.1f%% on bites" % (0.5 * tier)
+			return "0.5% more off bites"
 		"slayer":
-			return "core +%.2f" % (0.01 * tier)
+			return "+0.01 boss core damage"
 		"magnet":
-			return "+%d%% coins" % tier
+			return "+1% coins"
 		"scout":
-			return "+%d m sooner" % tier
+			return "panels show 1 m sooner"
 		"hero":
-			return "+%d%% hero move" % tier
+			return "+1% hero move power"
 	return ""
+
+
+## What the upgrade does right now, levels and tiers together: the
+## number a purchase changes, so the player can watch it change.
+func total_text(id: String) -> String:
+	match id:
+		"start":
+			return "%d at level start" % start_squad()
+		"gate":
+			return "+%d per blue gate" % gate_bonus()
+		"power":
+			return "+%d%% damage" % int(round((damage_mult() - 1.0) * 100.0))
+		"armor":
+			return "-%s%% on bites" % str(snappedf((1.0 - bite_mult()) * 100.0, 0.1))
+		"slayer":
+			return "core x%.2f" % (3.0 + core_mult_bonus())
+		"magnet":
+			return "+%d%% coins" % int(round((coin_mult() - 1.0) * 100.0))
+		"scout":
+			return "%d m sooner" % int(reveal_bonus())
+		"hero":
+			return "%d s, x%.2f" % [int(Abilities.cooldown(level("hero"))), Abilities.power(level("hero")) * (1.0 + hero_power_bonus())]
+	return effect_text(id, level(id))
 
 
 func hero_power_bonus() -> float:
@@ -150,7 +199,7 @@ static func endless_unlocked(best_level: int) -> bool:
 # --- effects ---------------------------------------------------------------
 
 func start_squad() -> int:
-	return 1 + 2 * level("start") + tiers("start") / ENLIST_START_PER
+	return 1 + 2 * level("start") + tiers("start")
 
 
 func damage_mult() -> float:
@@ -158,7 +207,7 @@ func damage_mult() -> float:
 
 
 func gate_bonus() -> int:
-	return 2 * level("gate") + tiers("gate") / ENLIST_GATE_PER
+	return 2 * level("gate") + tiers("gate")
 
 
 ## Fraction of the squad a brute eats, after armor.
@@ -168,7 +217,7 @@ func brute_bite_fraction(base: float) -> float:
 
 ## What every heavy bite (brute, boss, spit, lightning) is scaled by.
 func bite_mult() -> float:
-	return maxf(0.25, 1.0 - 0.12 * level("armor") - 0.005 * tiers("armor"))
+	return maxf(ARMOR_FLOOR, 1.0 - 0.12 * level("armor") - 0.005 * tiers("armor"))
 
 
 func core_mult_bonus() -> float:

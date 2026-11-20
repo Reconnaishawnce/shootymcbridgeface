@@ -3,8 +3,11 @@ extends Node3D
 ## A tracer that flies down the lane and asks the world what it hit. Shotgun
 ## pellets also drift sideways. Piercing bullets survive a kill or two.
 
-const SPEED := 42.0
-const LIFETIME := 1.8
+## Metres a second. Set by the world each level (Difficulty.bullet_speed):
+## slow enough to watch on the first levels, a streak later.
+static var speed := 42.0
+## How far a bullet flies before it is gone, whatever its speed.
+const RANGE := 66.0
 const COLOR := Color(1.0, 0.9, 0.35)
 ## A DEAD EYE shot: red, fat, triple.
 const CRIT_COLOR := Color(1.0, 0.3, 0.25)
@@ -40,11 +43,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	prev_z = position.z
-	position.z -= SPEED * delta
+	position.z -= speed * delta
 	position.x += vx * delta
 	_age += delta
 	if world != null and world.try_hit(self):
 		queue_free()
 		return
-	if _age > LIFETIME:
+	if _age * speed > RANGE:
 		queue_free()

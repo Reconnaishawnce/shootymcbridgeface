@@ -146,8 +146,14 @@ static func load_enlist() -> Dictionary:
 	return v if v is Dictionary else {}
 
 
+## Tiers are saved with the version that counts them (Meta.ENLIST_VERSION).
 static func save_enlist(tiers: Dictionary) -> void:
 	_write(META, "enlist", tiers)
+	_write(META, "enlist_v", Meta.ENLIST_VERSION)
+
+
+static func load_enlist_version() -> int:
+	return int(_read(META, "enlist_v", 1))
 
 
 static func load_boosts() -> Dictionary:

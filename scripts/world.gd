@@ -66,6 +66,8 @@ signal card_felt(id: String, from: Vector3, to: Vector3)
 signal theme_struck
 ## A lightning ring or line was called down: the warning starts now.
 signal strike_called
+## The road slowed for a gate that needs reading, or picked up again.
+signal think_zone(on: bool)
 ## A supply panel paid off, or could not be paid.
 signal supply_bought(id: String, amount: int, cost: int)
 signal supply_refused(cost: int)
@@ -164,6 +166,8 @@ var event_mods: Dictionary = Events.DEFAULT_MODS
 var theme := "day"
 var mods_now: Dictionary = Events.DEFAULT_MODS
 var theme_strikes := 0
+## The road is slowed for a thinking gate right now.
+var thinking := false
 var _theme_strike_timer := 0.0
 ## False once the player has had no hand on the road for a few seconds:
 ## panels stop climbing, so a squad left to itself takes what is printed.
@@ -295,6 +299,7 @@ func _clear_bet() -> void:
 func start_level(n: int) -> void:
 	level = n
 	phase = Phase.GATES
+	Bullet.speed = Difficulty.bullet_speed(n)
 	theme = Themes.for_level(n)
 	mods_now = Events.merge(event_mods.duplicate(), Themes.mods(theme))
 	_theme_strike_timer = Themes.STRIKE_FIRST
@@ -409,7 +414,7 @@ func boss_at() -> float:
 
 ## Advance the world by one frame. Returns the scroll speed used.
 func advance(delta: float, p_squad: Squad) -> float:
-	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else Difficulty.world_speed(level) + float(mods_now.get("speed_bonus", 0.0))
+	var target := Difficulty.boss_world_speed() if phase == Phase.BOSS else (Difficulty.world_speed(level) + float(mods_now.get("speed_bonus", 0.0))) * _think()
 	if powerups != null:
 		target *= powerups.world_speed_mult(now)
 	world_speed = lerpf(world_speed, target, 1.0 - exp(-2.5 * delta))
@@ -549,17 +554,22 @@ func mod(key: String) -> float:
 
 ## Scale a bite by the modifier and the shop's armor; never below one.
 func _bite(n: int) -> int:
-	var armor := (meta.bite_mult() if meta != null else 1.0) * Heroes.bite_mult(hero)
+	# Everything that softens a bite, multiplied together and held at
+	# Difficulty.MITIGATION_FLOOR: the shop's armor, the hero, veterans,
+	# medics and the pit's plating (squad.bite_mult), thick skin. Stacked
+	# without a floor they made a maxed squad untouchable.
+	var soft := (meta.bite_mult() if meta != null else 1.0) * Heroes.bite_mult(hero)
 	if squad != null:
-		armor *= squad.veterans.bite_mult()
-	var base := maxi(1, int(round(float(n) * mod("bite") * armor * Difficulty.band_bite(band()))))
-	# Thick skin softens every heavy bite, and says so each time.
-	if perks != null and perks.stack("skin") > 0:
-		var softened := maxi(1, int(round(float(base) * perks.brute_bite_mult())))
-		if base - softened > 0:
-			perk_felt.emit("skin", base - softened)
-		return softened
-	return base
+		soft *= squad.bite_mult()
+	var skin := perks.brute_bite_mult() if perks != null and perks.stack("skin") > 0 else 1.0
+	var raw := float(n) * mod("bite") * Difficulty.band_bite(band()) * Difficulty.danger(level)
+	var least := Difficulty.heavy_floor(level)
+	var without_skin := maxi(least, int(round(raw * Difficulty.mitigated(soft))))
+	var bite := maxi(least, int(round(raw * Difficulty.mitigated(soft * skin))))
+	# Thick skin says what it saved, each time it saves something.
+	if without_skin - bite > 0:
+		perk_felt.emit("skin", without_skin - bite)
+	return bite
 
 
 ## The rubber band for the squad as it stands right now.
@@ -1179,14 +1189,13 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			if p_squad.is_shielded():
 				shield_blocked.emit()
 				continue
-			var bite: int = z.bite
+			# A plain zombie takes a soldier, and more of them as the levels
+			# climb; a tank or a brute takes a share of the squad.
+			var bite: int = maxi(z.bite, Difficulty.contact_bite(level))
 			if z.is_tank():
-				bite = _bite(maxi(1, int(Difficulty.tank_bite(p_squad.count) * p_squad.bite_mult())))
+				bite = _bite(Difficulty.tank_bite(p_squad.count))
 			elif z.brute:
-				var fraction := Difficulty.BRUTE_BITE_FRACTION
-				if meta != null:
-					fraction = meta.brute_bite_fraction(fraction)
-				bite = _bite(maxi(1, int(Difficulty.brute_bite(p_squad.count, fraction) * p_squad.bite_mult())))
+				bite = _bite(Difficulty.brute_bite(p_squad.count))
 			p_squad.add(-bite)
 			if z.brute or z.is_tank():
 				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BRUTE)
@@ -1536,6 +1545,25 @@ func _nearest_zombie(at: Vector3, max_range: float, skip: Array) -> Zombie:
 			best_d = d
 			best = z
 	return best
+
+
+## A gate that asks for thought is coming up: the road slows so it can
+## be read, then picks up again. Sums, deals, bets, vehicles and supply
+## panels count, and so does the mouth of the fork.
+func _think() -> float:
+	var slow := false
+	for g in gates:
+		if g.passed or g.position.z < -Difficulty.THINK_FROM or g.position.z > -Difficulty.THINK_TO:
+			continue
+		for panel in g.panels:
+			if GateMath.is_expr(panel) or GateMath.is_deal(panel) or GateMath.is_bet(panel) or GateMath.is_vehicle(panel) or GateMath.is_supply(panel):
+				slow = true
+	if fork != null and not fork.chosen and fork.position.z >= -Difficulty.THINK_FROM and fork.position.z <= -Difficulty.THINK_TO:
+		slow = true
+	if slow != thinking:
+		thinking = slow
+		think_zone.emit(slow)
+	return Difficulty.THINK_SLOW if slow else 1.0
 
 
 ## STORM FRONT: every few seconds of the gates a line of bolts crosses

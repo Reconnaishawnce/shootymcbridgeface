@@ -116,7 +116,7 @@ func _shoot(target: Zombie) -> void:
 	var b := Bullet.new(0.9, TRACER, 0.8)
 	b.damage = dps / shots_per_second
 	var dz := maxf(0.5, origin.z - target.position.z)
-	b.vx = (target.position.x - origin.x) / (dz / Bullet.SPEED)
+	b.vx = (target.position.x - origin.x) / (dz / Bullet.speed)
 	b.world = world
 	b.hits_left = 1
 	world.bullets.add_child(b)

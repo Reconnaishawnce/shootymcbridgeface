@@ -114,6 +114,10 @@ static func blend(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
 ## The banner at the start of a level: "LEVEL 3  ·  NIGHT SHIFT" and the
 ## rule under it. Daybreak has no rule and no second line.
 static func banner(level: int, id: String) -> String:
-	if rule(id) == "":
-		return "LEVEL %d" % level
-	return "LEVEL %d  ·  %s\n%s" % [level, title(id), rule(id)]
+	var text := "LEVEL %d" % level if rule(id) == "" else "LEVEL %d  ·  %s\n%s" % [level, title(id), rule(id)]
+	# Past the early levels the banner also says how much harder the
+	# road now bites.
+	var d := Difficulty.danger(level)
+	if d > 1.001:
+		text += "\nDANGER +%d%%" % int(round((d - 1.0) * 100.0))
+	return text

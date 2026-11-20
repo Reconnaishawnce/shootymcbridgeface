@@ -50,7 +50,7 @@ func test_help_text() -> void:
 	for id in Heroes.ORDER:
 		check(all.contains(Heroes.passive_text(id)) and all.contains(Heroes.twist_text(id)), "help says what %s does" % id)
 	check(all.contains("MODES holds") and all.contains("Along the bottom: SHOP"), "help maps the home screen")
-	for word in ["QUEST CHEST", "ROAD CHEST", "GOLD CHEST", "JACKPOT", "BONUS", "YOUR BEST", "PASSED", "A combo sings", "its own tune", "rising beeps", "FLIGHT RECORDER", "LOGGING in SETTINGS", "REPORT A PROBLEM is also under MORE"]:
+	for word in ["QUEST CHEST", "ROAD CHEST", "GOLD CHEST", "JACKPOT", "BONUS", "YOUR BEST", "PASSED", "A combo sings", "its own tune", "rising beeps", "FLIGHT RECORDER", "LOGGING in SETTINGS", "REPORT A PROBLEM is also under MORE", "SLOW ROAD", "DANGER", "Nobody is unbeatable", "one whole soldier", "MAXED"]:
 		check(all.contains(word), "help mentions %s" % word)
 	for id in Themes.ORDER:
 		check(all.contains(Themes.title(id)), "help names the theme %s" % id)

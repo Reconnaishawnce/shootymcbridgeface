@@ -277,7 +277,7 @@ func tick(delta: float, world: World, focus_on: bool, focus_point: Vector3, fire
 					aiming = true
 			if aiming:
 				var dz := maxf(0.5, origin.z - aim.z)
-				b.vx = (aim.x - origin.x) / (dz / Bullet.SPEED)
+				b.vx = (aim.x - origin.x) / (dz / Bullet.speed)
 			world.bullets.add_child(b)
 			b.global_position = Vector3(origin.x, minf(origin.y, 0.9), origin.z)
 		_recoil = 1.0

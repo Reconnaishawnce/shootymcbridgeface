@@ -18,8 +18,68 @@ func test_level_layout() -> void:
 	check(Difficulty.boss_distance() > Difficulty.gate_distance(Difficulty.GATES_PER_LEVEL - 1), "boss after last gate")
 
 
+## The run starts slow and winds up: road, bullets, fire and crowd.
+func test_tempo() -> void:
+	check(Difficulty.world_speed(1) < 8.0, "a first level is a stroll (%.1f m/s)" % Difficulty.world_speed(1))
+	for level in range(1, 30):
+		check(Difficulty.world_speed(level + 1) >= Difficulty.world_speed(level), "the road never slows from level %d to the next" % level)
+		check(Difficulty.bullet_speed(level + 1) >= Difficulty.bullet_speed(level), "nor do bullets")
+		check(Difficulty.max_shots(level + 1) >= Difficulty.max_shots(level), "nor the stream of fire")
+	check(Difficulty.world_speed(2) > Difficulty.world_speed(1), "level 2 is already a little faster")
+	check(Difficulty.bullet_speed(1) < Difficulty.bullet_speed(10) * 0.65, "a level 1 bullet can be watched (%.0f against %.0f)" % [Difficulty.bullet_speed(1), Difficulty.bullet_speed(10)])
+	check_near(Difficulty.bullet_speed(100), Difficulty.BULLET_SPEED_MAX, 0.001, "bullets top out")
+	check(Difficulty.max_shots(1) <= 12.0 and Difficulty.max_shots(12) >= 40.0, "a few fat rounds early, a stream late")
+	check_near(Difficulty.max_shots(100), Difficulty.SHOTS_MAX, 0.001, "the stream tops out, for the phone's sake")
+	check_near(Difficulty.fire_tempo(1), Difficulty.FIRE_TEMPO_START, 0.001, "soldiers fire slower at first")
+	check_near(Difficulty.fire_tempo(20), 1.0, 0.001, "and at full rate later")
+	check(Difficulty.crowd_scale(1) < Difficulty.crowd_scale(2) and Difficulty.crowd_scale(2) < 1.0, "the first two levels bring thinner crowds")
+	check_near(Difficulty.crowd_scale(3), 1.0, 0.001, "from level 3 the crowd is whole")
+	check_near(Difficulty.crowd_scale(0), 1.0, 0.001, "nonsense is whole")
+	var first := Difficulty.wave_for(1, 4)
+	var third := Difficulty.wave_for(3, 4)
+	check(int(first.count) < int(third.count), "level 1 has fewer zombies than level 3 at the same gate (%d against %d)" % [first.count, third.count])
+	check(float(first.speed) < float(third.speed), "and they walk slower")
+	check(float(Difficulty.wave_for(30, 4).speed) > float(Difficulty.wave_for(10, 4).speed), "late zombies keep getting faster")
+	check(Difficulty.THINK_SLOW < 1.0 and Difficulty.THINK_SLOW >= 0.5, "a thinking gate slows the road, it does not stop it")
+
+
+## The late game bites back: nobody is untouchable.
+func test_danger() -> void:
+	for level in range(1, Difficulty.DANGER_FROM + 1):
+		check_near(Difficulty.danger(level), 1.0, 0.0001, "no danger on the early levels (%d)" % level)
+	for level in range(Difficulty.DANGER_FROM, 60):
+		check(Difficulty.danger(level + 1) > Difficulty.danger(level), "danger climbs every level past %d" % level)
+	check(Difficulty.danger(20) > 2.0 and Difficulty.danger(40) > 8.0, "and it compounds: no squad outlasts it (%.1f at 20, %.1f at 40)" % [Difficulty.danger(20), Difficulty.danger(40)])
+	check_near(Difficulty.mitigated(1.0), 1.0, 0.0001, "no armor, the whole bite")
+	check_near(Difficulty.mitigated(0.52), 0.52, 0.0001, "armor softens it")
+	check_near(Difficulty.mitigated(0.05), Difficulty.MITIGATION_FLOOR, 0.0001, "but every softener stacked still leaves the floor")
+	check_near(Difficulty.mitigated(3.0), 1.0, 0.0001, "and nothing makes a bite bigger here")
+	check_eq(Difficulty.contact_bite(1), 1, "a zombie takes one soldier at level 1")
+	check(Difficulty.contact_bite(9) > Difficulty.contact_bite(1) and Difficulty.contact_bite(30) > Difficulty.contact_bite(9), "and more as the levels climb")
+	check(Difficulty.heavy_floor(20) > Difficulty.heavy_floor(1), "a late brute is never a nibble")
+	# A maxed player's bite, late, is a real share of the squad again.
+	var late := float(Difficulty.boss_bite(200)) * Difficulty.danger(25) * Difficulty.MITIGATION_FLOOR
+	var early := float(Difficulty.boss_bite(200)) * Difficulty.danger(1) * Difficulty.MITIGATION_FLOOR
+	check(late > early * 3.0, "the same armor is worth far less at level 25 (%d soldiers a bite against %d)" % [int(late), int(early)])
+
+
+## A fork's pay stops growing; its danger does not.
+func test_fork_pay_is_capped() -> void:
+	var best := 0
+	for seed in range(40):
+		var d := Difficulty.new(seed)
+		for threat in [3, 4]:
+			for panel in d._route(39, threat).panels:
+				if panel.kind == GateMath.Kind.ADD:
+					best = maxi(best, int(panel.value))
+	check(best <= 14 + 3 * Difficulty.FORK_LEVEL_CAP, "a level 39 fork pays no more than a level 10 one (%d)" % best)
+	check(best >= 30, "which is still worth the risk (%d)" % best)
+	var d2 := Difficulty.new(1)
+	check(int(d2._route(39, 4).extra_brutes) > int(d2._route(10, 4).extra_brutes), "while the heavy route keeps getting heavier")
+
+
 func test_curves_are_bounded_and_increasing() -> void:
-	check_near(Difficulty.world_speed(1), 9.5, 0.001, "base speed")
+	check_near(Difficulty.world_speed(1), Difficulty.START_SPEED, 0.001, "base speed")
 	check(Difficulty.world_speed(100) <= Difficulty.LATE_SPEED_CAP, "speed capped")
 	check(Difficulty.world_speed(20) > Difficulty.world_speed(10), "the late road keeps speeding up")
 	check_near(Difficulty.world_speed(10), 14.0, 0.001, "level ten is where the old cap was")

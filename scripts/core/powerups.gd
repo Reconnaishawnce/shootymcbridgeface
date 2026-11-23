@@ -7,7 +7,7 @@ const CATALOG := {
 	"bomb": {"name": "BOMB", "desc": "Throw it. Clears the road ahead.", "seconds": 0.0},
 	"slow": {"name": "SLOW-MO", "desc": "The road crawls for six seconds.", "seconds": 6.0},
 	"shield": {"name": "SHIELD", "desc": "Nothing bites for six seconds.", "seconds": 6.0},
-	"frenzy": {"name": "FRENZY", "desc": "Double fire rate for six seconds.", "seconds": 6.0},
+	"frenzy": {"name": "FAST FIRE", "desc": "Double fire rate for six seconds.", "seconds": 6.0},
 	# Not a road power-up: the comeback's fury, granted by a second wind
 	# or a rally. Never a mystery result.
 	"agro": {"name": "AGRO", "desc": "Ten seconds of fury: double fire, double damage, nothing bites.", "seconds": 10.0},

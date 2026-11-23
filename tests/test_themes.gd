@@ -5,14 +5,14 @@ func test_cycle() -> void:
 	check_eq(Themes.for_level(1), "day", "level 1 is plain")
 	check_eq(Themes.for_level(0), "day", "nonsense is plain")
 	var seen := {}
-	for level in range(2, 9):
+	for level in range(2, 16):
 		seen[Themes.for_level(level)] = true
-	check_eq(seen.size(), Themes.ORDER.size(), "levels 2 to 8 visit every theme once")
+	check_eq(seen.size(), Themes.ORDER.size(), "two times round visits every theme")
 	check_eq(Themes.for_level(2), "gold", "level 2")
 	check_eq(Themes.for_level(3), "night", "level 3")
-	check_eq(Themes.for_level(4), "storm", "level 4")
+	check_eq(Themes.for_level(4), "day", "the storm front waits: level 4 is daybreak")
+	check_eq(Themes.for_level(11), "storm", "and the storm is level 11")
 	check_eq(Themes.for_level(8), "day", "a breather every seventh")
-	check_eq(Themes.for_level(11), Themes.for_level(4), "and round again")
 	for level in range(1, 40):
 		var id := Themes.for_level(level)
 		check(level >= int(Themes.CATALOG[id]["min_level"]), "level %d is not too early for %s" % [level, id])
@@ -33,9 +33,10 @@ func test_catalog() -> void:
 	check_eq(Themes.rule("day"), "", "daybreak has no rule")
 	check_eq(Themes.title("nonsense"), "DAYBREAK", "an unknown theme is daybreak")
 	check_eq(Themes.banner(1, "day"), "LEVEL 1", "a plain banner")
-	check(Themes.banner(3, "night").begins_with("LEVEL 3  ·  NIGHT SHIFT\n"), "a themed banner names the place and the rule")
-	check(not Themes.banner(3, "night").contains("DANGER"), "no danger line on the early levels")
-	check(Themes.banner(12, "fog").contains("DANGER +") and Themes.banner(8, "day").begins_with("LEVEL 8\nDANGER +"), "later the banner says how much harder the road bites")
+	check_eq(Themes.banner(3, "night"), "LEVEL 3", "early, a level is just its number")
+	check_eq(Themes.banner(12, "fog"), "LEVEL 12\nFOG BANK", "later it names the place, and no more")
+	for level in range(1, 40):
+		check(Notices.words(Themes.banner(level, Themes.for_level(level))) <= 4, "a level banner is four words at most (level %d)" % level)
 
 
 func test_looks_read() -> void:

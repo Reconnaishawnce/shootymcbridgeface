@@ -134,8 +134,8 @@ static func boss_distance() -> float:
 ## Metres per second the world scrolls toward the squad during gates:
 ## START_SPEED at level 1, 14 at level 10, then a slower climb to
 ## LATE_SPEED_CAP, so a late run keeps asking for faster hands.
-const START_SPEED := 7.5
-const SPEED_PER_LEVEL := 0.7225
+const START_SPEED := 6.5
+const SPEED_PER_LEVEL := 0.8334
 const LATE_SPEED_PER_LEVEL := 0.2
 const LATE_SPEED_CAP := 18.0
 
@@ -148,8 +148,8 @@ static func world_speed(level: int) -> float:
 
 ## How fast a bullet flies: slow enough to watch at level 1, a streak by
 ## level 10.
-const BULLET_SPEED_START := 26.0
-const BULLET_SPEED_PER_LEVEL := 2.0
+const BULLET_SPEED_START := 22.0
+const BULLET_SPEED_PER_LEVEL := 2.2
 const BULLET_SPEED_MAX := 44.0
 
 
@@ -161,11 +161,16 @@ static func bullet_speed(level: int) -> float:
 ## each soldier fires. Both climb with the level; damage per bullet makes
 ## up the difference, so the squad hits exactly as hard either way. What
 ## changes is what you see: a few fat rounds, then a stream.
-const SHOTS_START := 12.0
+const SHOTS_START := 10.0
 const SHOTS_PER_LEVEL := 3.0
 const SHOTS_MAX := 42.0
-const FIRE_TEMPO_START := 0.7
+const FIRE_TEMPO_START := 0.6
 const FIRE_TEMPO_PER_LEVEL := 0.06
+## On the first levels a walker falls to one bullet: you see the round
+## leave, you see what it did. Health is held at or under this until
+## ONE_SHOT_LEVELS is passed (a base rifle round is 1.2 or more there).
+const ONE_SHOT_LEVELS := 3
+const ONE_SHOT_HP := 1.0
 
 
 static func max_shots(level: int) -> float:
@@ -185,9 +190,9 @@ static func crowd_scale(level: int) -> float:
 	return float(EARLY_CROWD[level - 1]) if level >= 1 and level <= EARLY_CROWD.size() else 1.0
 
 
-## A gate that asks for thought (a sum, a deal, a bet, a vehicle, the
-## fork) slows the road to this fraction while it comes up, then the
-## road picks up again.
+## A gate that asks for thought (a multiplier, a power-up, a vehicle)
+## slows the road to this fraction while it comes up, then the road
+## picks up again.
 const THINK_SLOW := 0.6
 ## The stretch before such a gate where the road is slow, in metres.
 const THINK_FROM := 30.0
@@ -270,7 +275,7 @@ static func is_elite(endless: bool, index: int) -> bool:
 
 ## From this level the horde behind creeps up whenever no hand is on the
 ## road (World.hands_on); level 1 is left alone for reading.
-const HANDS_OFF_HORDE_LEVEL := 2
+const HANDS_OFF_HORDE_LEVEL := 4
 
 
 ## A latcher's bite on a squad of [param squad_count].
@@ -311,17 +316,17 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 	var ix := float(index)
 	# Brutes from the fourth gate of level 1, more with level and depth.
 	var brutes := 0
-	if index >= 3:
+	if level >= Progression.BRUTE_LEVEL and index >= 3:
 		brutes = 1 + int(lv / 2.0) + int(ix / 4.0) + int(squad_count / 60.0)
 	# Thieves run for the next gate and knock its value down: from level 2,
 	# on gates that are not the opener, one or two of them.
 	var thieves := 0
-	if level >= 2 and index >= 1 and index % 2 == 1:
+	if level >= Progression.THIEF_LEVEL and index >= 1 and index % 2 == 1:
 		thieves = 1 + int(lv / 4.0)
 	# Tanks are bullet sponges that shield the gate behind them: from level
 	# 3, every third gate.
 	var tanks := 0
-	if level >= 3 and index >= 2 and index % 3 == 2:
+	if level >= Progression.TANK_LEVEL and index >= 2 and index % 3 == 2:
 		tanks = 1
 	# Latchers grab the front of the squad and keep eating until shot off.
 	# From level 3, a couple per wave, more with level.
@@ -345,6 +350,9 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 	count = maxi(2, int(round(float(count) * crowd_scale(level))))
 	# The crowd keeps pace with the squad's guns and the late levels.
 	hp *= fire_scale(squad_count) * late_growth(level)
+	# One bullet, one walker, while the game is being learned.
+	if level <= ONE_SHOT_LEVELS:
+		hp = minf(hp, ONE_SHOT_HP)
 	if elite:
 		brutes = maxi(brutes * 2, 3)
 		tanks += 1
@@ -370,7 +378,7 @@ static func wave_for(level: int, index: int, squad_count: int = 1, elite: bool =
 		"splitters": mini(splitters, MAX_SPLITTERS),
 		"splitter_hp": hp * SPLITTER_HP_MULT,
 		# Runners: fast, thin, and they find you. The near-miss engine.
-		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS),
+		"runners": mini(runners + int(squad_count / 40.0), MAX_RUNNERS) if level >= Progression.RUNNER_LEVEL else 0,
 		# Flankers: runners that come over the curbs beside you. The world
 		# only spawns them on a road wide enough to have curbs worth hopping.
 		"flankers": mini(1 + int(lv / 3.0), MAX_FLANKERS) if level >= FLANKER_LEVEL and index >= 1 else 0,
@@ -469,15 +477,15 @@ const STRIKE_WARNING := 1.3
 ## two from BARRICADE_TWO_LEVEL, each a little after a gate. It carries
 ## about a second of the squad's fire in health; running into it takes a
 ## slice like a brute, and shatters it.
-const BARRICADE_LEVEL := 3
-const BARRICADE_TWO_LEVEL := 6
+const BARRICADE_LEVEL := Progression.BARRICADE_LEVEL
+const BARRICADE_TWO_LEVEL := 11
 const BARRICADE_OFFSET := 14.0
 const BARRICADE_HP_SECONDS := 1.0
 const BARRICADE_HP_MIN := 12.0
 const BARRICADE_BITE_FRACTION := 0.06
 ## Splitters: bloated walkers from this level that burst into SPLIT_INTO
 ## runners when they die, each with SPLIT_HP_MULT of the splitter's health.
-const SPLITTER_LEVEL := 4
+const SPLITTER_LEVEL := Progression.SPLITTER_LEVEL
 const SPLITTER_HP_MULT := 2.2
 const SPLIT_INTO := 3
 const SPLIT_HP_MULT := 0.5
@@ -491,12 +499,14 @@ const TURRET_SHOTS_PER_SECOND := 4.0
 const MAX_TURRETS := 2
 ## Boss rush starts every run with this many soldiers over the shop's.
 const RUSH_START_SQUAD := 30
-const SAW_LEVEL := 2
-const SAW_TWO_LEVEL := 5
+const SAW_LEVEL := Progression.SAW_LEVEL
+const SAW_TWO_LEVEL := 9
 const SAW_OFFSET := 8.0
 const SAW_BITE_FRACTION := 0.12
-const STRIKE_INTERVAL := 3.2
-const STRIKE_INTERVAL_ENRAGED := 2.0
+## Lightning lands a quarter less often than it did (3.2 and 2.0 s):
+## the bosses throw things you can watch and step round instead (LOB).
+const STRIKE_INTERVAL := 4.3
+const STRIKE_INTERVAL_ENRAGED := 2.7
 const STRIKE_BITE_FRACTION := 0.15
 const STRIKE_RADIUS := 1.1
 ## How many rings a volley puts down.
@@ -512,7 +522,68 @@ static func strike_bite(squad_count: int) -> int:
 ## Runners the boss calls every BOSS_ADDS_INTERVAL seconds.
 const BOSS_ADDS_INTERVAL := 6.0
 static func boss_adds(level: int) -> int:
+	if level < Progression.RUNNER_LEVEL:
+		return 0
 	return clampi(1 + level / 2, 1, 4)
+
+
+# --- things the boss throws ---------------------------------------------------
+# Lightning is a ring and a wait: you cannot see it coming, only where it
+# will be. A thing in the air is better to play against: you watch it
+# leave the boss, you watch its shadow cross the road, you step aside.
+# So every boss that fights from range lobs, and lightning is the
+# seasoning.
+
+## Seconds between lobs, calm and enraged, and before the first.
+const LOB_INTERVAL := 3.4
+const LOB_INTERVAL_ENRAGED := 2.3
+const LOB_FIRST := 2.0
+## What comes out, in order, round and round: green globs, a purple
+## one, and every fourth an orange bomb that bursts wide.
+const LOB_CYCLE := ["glob", "glob", "purple", "bomb"]
+## An enraged boss swaps this one of the cycle for a saw down your lane.
+const LOB_SAW_AT := 1
+## How far a landing reaches, by kind, and how much of spit_bite it takes.
+const LOB_SPLASH := {"glob": 0.5, "purple": 0.5, "bomb": 1.5}
+const LOB_BITE_MULT := {"glob": 1.0, "purple": 1.0, "bomb": 1.6}
+
+
+## The [param n]th thing a boss lobs (0-based).
+static func lob_kind(n: int) -> String:
+	return str(LOB_CYCLE[posmod(n, LOB_CYCLE.size())])
+
+
+## Whether the [param n]th lob of an enraged boss is a saw instead.
+static func lob_is_saw(n: int, enraged: bool, level: int) -> bool:
+	return enraged and level >= Progression.SAW_LEVEL and posmod(n, LOB_CYCLE.size()) == LOB_SAW_AT
+
+
+## Whether the boss of [param level] attacks from range at all. The
+## first one only walks: a big zombie with a soft spot.
+static func boss_attacks(level: int) -> bool:
+	return level >= Progression.BOSS_ATTACK_LEVEL
+
+
+# --- no walking past them -----------------------------------------------------
+# A walker drifted toward the squad at a metre a second, and a sidestep
+# at the last moment let the whole wave shamble by: "too easy to just
+# run past the zombies". Now the last few metres are a lunge, and one
+# that is passed anyway turns and runs the squad down. What you do not
+# shoot, bites. Brutes and tanks are the exception: big, slow, and
+# stepping round them is the right answer.
+
+## Within this many metres of the squad a zombie lunges sideways.
+const LUNGE_RANGE := 7.0
+const LUNGE_MULT := 4.0
+## A passed zombie keeps pace this far behind the squad's front and
+## closes sideways at this speed, for at most CHASE_SECONDS.
+const CHASE_BEHIND := 0.9
+const CHASE_SPEED := 7.0
+const CHASE_SECONDS := 2.5
+
+
+static func lunge_mult(metres_ahead: float) -> float:
+	return LUNGE_MULT if metres_ahead <= LUNGE_RANGE else 1.0
 
 
 ## Below this fraction of health the boss attacks faster and harder.
@@ -531,6 +602,9 @@ static func spit_bite(squad_count: int) -> int:
 ## Bosses alternate: odd levels get the walker, even levels the spitter.
 ## Walker, spitter, storm, round and round.
 ## Walker, spitter, storm, and every fourth level the foreman.
+const STORM_BOSS_LEVEL := 6
+
+
 static func boss_kind(level: int) -> int:
 	if level % 4 == 0:
 		return Boss.Kind.FOREMAN
@@ -538,15 +612,16 @@ static func boss_kind(level: int) -> int:
 		2:
 			return Boss.Kind.SPITTER
 		0:
-			return Boss.Kind.STORM
+			# The storm's lines across the whole road wait for level 6.
+			return Boss.Kind.STORM if level >= STORM_BOSS_LEVEL else Boss.Kind.WALKER
 	return Boss.Kind.WALKER
 
 
 ## The storm's lightning lines: a bolt every STORM_SPACING across the
 ## road, with one gap of STORM_GAP, every STORM_INTERVAL seconds. Enraged,
 ## a second line follows with a different gap.
-const STORM_INTERVAL := 3.4
-const STORM_INTERVAL_ENRAGED := 2.4
+const STORM_INTERVAL := 4.5
+const STORM_INTERVAL_ENRAGED := 3.2
 const STORM_SPACING := 2.0
 const STORM_GAP := 4.2
 const STORM_SECOND_LINE_DELAY := 0.9
@@ -613,7 +688,7 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 	match t:
 		0:
 			good = GateMath.add(rng.randi_range(2, 5))
-			if not is_opener and roll < MUL2_CHANCE:
+			if not is_opener and level >= Progression.MUL_LEVEL and roll < MUL2_CHANCE:
 				good = GateMath.mul(2.0)
 			bad = GateMath.add(rng.randi_range(-4, 1))
 		1:
@@ -646,20 +721,21 @@ func make_gate_pair(level: int, index: int, squad_count: int = 1) -> Array:
 	if index == 0:
 		good = GateMath.add(rng.randi_range(3, 5))
 		bad = GateMath.add(rng.randi_range(-2, 1))
-	elif rng.randf() < (0.4 if big else DILEMMA_CHANCE[t]):
+	elif level >= Progression.DILEMMA_LEVEL and rng.randf() < (0.4 if big else DILEMMA_CHANCE[t]):
 		# Both options hurt. Which one can you shoot back into the black?
 		good = GateMath.add(rng.randi_range(-3, -1))
 		bad = GateMath.add(rng.randi_range(-12, -6)) if rng.randf() < 0.5 else GateMath.mul(0.5)
 
-	if index > 0 and rng.randf() < HIDDEN_CHANCE[t]:
+	if index > 0 and level >= Progression.HIDDEN_LEVEL and rng.randf() < HIDDEN_CHANCE[t]:
 		if rng.randf() < 0.5:
 			good.revealed = false
 		else:
 			bad.revealed = false
 
 	# Sometimes the choice is soldiers now or a tool for later.
-	if index > 0 and rng.randf() < POWER_GATE_CHANCE:
-		var id: String = Powerups.MYSTERY if rng.randf() < MYSTERY_CHANCE else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]
+	# A panel names what it gives: the mystery box is for crates.
+	if index > 0 and level >= Progression.POWER_PANEL_LEVEL and rng.randf() < POWER_GATE_CHANCE:
+		var id: String = Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]
 		bad = GateMath.power(id)
 		if good.kind == GateMath.Kind.ADD and good.value <= 0.0:
 			good = GateMath.add(rng.randi_range(2, 5))
@@ -759,6 +835,14 @@ func _route(level: int, threat: int, count: int = 0) -> Dictionary:
 	return route
 
 
+## The fork the road actually gets on [param level]: none, while the
+## fork is off the ladder (Progression.FORK_LEVEL).
+func fork_for_level(level: int, count: int = 0) -> Dictionary:
+	if level < Progression.FORK_LEVEL:
+		return {}
+	return make_fork(level, count)
+
+
 func make_fork(level: int, count: int = 0) -> Dictionary:
 	var t := tier_for_level(level)
 	var heavy := 3 if t >= 2 else 2
@@ -779,16 +863,16 @@ func make_fork(level: int, count: int = 0) -> Dictionary:
 const EXPR_CHANCE := [0.0, 0.35, 0.4, 0.45]
 ## Deals in the extra lanes: a trade (soldiers for a power-up) from
 ## TRADE_LEVEL, a bet (double or half on the next wave) from BET_LEVEL.
-const TRADE_LEVEL := 3
-const BET_LEVEL := 4
+const TRADE_LEVEL := Progression.DEAL_LEVEL
+const BET_LEVEL := Progression.DEAL_LEVEL
 const TRADE_CHANCE := 0.14
 ## Scouts: cheap, from the first level with hidden panels, three lanes up.
-const SCOUT_LEVEL := 2
+const SCOUT_LEVEL := Progression.DEAL_LEVEL
 const SCOUT_CHANCE := 0.12
 const BET_CHANCE := 0.1
 const TRADE_POWERS := ["shield", "bomb", "frenzy", "slow"]
 ## Supply panels: the bounty spent on the road instead of in the shop.
-const SUPPLY_LEVEL := 2
+const SUPPLY_LEVEL := Progression.SUPPLY_LEVEL
 const SUPPLY_CHANCE := 0.2
 ## "turret" is not a power-up: the world raises a gold turret for it.
 const SUPPLY_POWER_COST := {"shield": 40, "bomb": 30, "frenzy": 40, "slow": 35, "turret": 150}
@@ -805,7 +889,7 @@ const VEHICLE_HIT_BRUTE := 15.0
 const VEHICLE_HIT_BOSS := 12.0
 const VEHICLE_HIT_STRIKE := 25.0
 ## Flankers come over the curbs on wide roads from this level.
-const FLANKER_LEVEL := 4
+const FLANKER_LEVEL := Progression.FLANKER_LEVEL
 const MAX_FLANKERS := 4
 ## How close a sum's result sits to the plain panel it competes with, so
 ## the comparison takes thought rather than a glance.
@@ -896,8 +980,8 @@ func make_gate(level: int, index: int, count: int, lanes: int, owned: Dictionary
 			panels.append(make_rival_expr(level, panels[best_i], count))
 		elif i == 0 and rng.randf() < 0.6:
 			panels.append(GateMath.add(rng.randi_range(1, 3) + lv / 2))
-		elif rng.randf() < 0.15:
-			panels.append(GateMath.power(Powerups.MYSTERY if rng.randf() < MYSTERY_CHANCE else Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]))
+		elif level >= Progression.POWER_PANEL_LEVEL and rng.randf() < 0.15:
+			panels.append(GateMath.power(Powerups.ORDER[rng.randi_range(0, Powerups.ORDER.size() - 1)]))
 		elif rng.randf() < 0.3 and level >= Progression.EXPR_LEVEL:
 			# A sum that reads tempting and isn't.
 			var trap := make_expr(level, count)
@@ -910,7 +994,7 @@ func make_gate(level: int, index: int, count: int, lanes: int, owned: Dictionary
 			panels.append(GateMath.add(-rng.randi_range(3, 8) - lv))
 	# The convoy: once the squad can afford a vehicle, a gate offers one in
 	# place of its worst panel. Not the opener, never both sides.
-	var vehicle := Convoy.offer(count, owned, level) if index > 0 else ""
+	var vehicle := Convoy.offer(count, owned, level) if (index > 0 and level >= Progression.VEHICLE_LEVEL) else ""
 	if vehicle != "" and rng.randf() < VEHICLE_OFFER_CHANCE:
 		var worst := 1
 		var worst_value := GateMath.worth(panels[1], count)
@@ -932,6 +1016,8 @@ func make_gate(level: int, index: int, count: int, lanes: int, owned: Dictionary
 ## is in each. Returns [{index, id}].
 func crates_for_level(level: int) -> Array:
 	var out := []
+	if level < Progression.CRATE_LEVEL:
+		return out
 	var used := {}
 	for i in range(CRATES_PER_LEVEL):
 		var index := rng.randi_range(0, GATES_PER_LEVEL - 2)

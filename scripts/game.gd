@@ -139,6 +139,12 @@ var _tele_sent := 0
 var _tele_freezes_run := 0
 ## Shake to report: the detector, and whether the card paused the run.
 var _shaker := Shake.new()
+## The lighter shake that throws clingers off in a run.
+var _run_shaker := Shake.quick()
+var _shakes_off := 0
+## The second line of a first run: how to aim, said once the player has
+## had a few seconds of steering.
+var _aim_hint_due := false
 var _problem_paused := false
 var _fps_shown := false
 ## The safe renderer was switched back off at launch: say so on the title.
@@ -505,6 +511,7 @@ func _build_scene() -> void:
 	world.gate_passed.connect(_on_gate_passed)
 	world.gate_robbed.connect(_on_gate_robbed)
 	world.spit_landed.connect(_on_spit_landed)
+	world.lob_landed.connect(_on_lob_landed)
 	world.gate_stepped.connect(_on_gate_stepped)
 	world.zombie_killed.connect(_on_zombie_killed)
 	world.squad_bitten.connect(_on_squad_bitten)
@@ -568,10 +575,10 @@ func _build_scene() -> void:
 	world.pit_stop_reached.connect(_on_pit_stop)
 	world.pit_lane_opened.connect(func() -> void:
 		if not smoke:
-			hud.show_banner("PIT LANE AHEAD\nSTEER RIGHT TO PULL IN", 1.5))
+			hud.show_banner("PIT STOP AHEAD\nSTEER RIGHT", 1.8, Notices.MUST))
 	world.supply_bought.connect(_on_supply_bought)
 	world.supply_refused.connect(func(cost: int) -> void:
-		hud.show_float("NEED %d COINS" % cost, false)
+		hud.show_float("NEED %d COINS" % cost, false, Notices.NICE)
 		sfx.play("gate_bad", -4.0))
 	world.horde_bit.connect(_on_horde_bit)
 	world.boss_engaged.connect(func() -> void: _boss_start = _run_time)
@@ -729,6 +736,10 @@ func start_learning_round() -> void:
 func _teach(id: String, body_override: String = "") -> bool:
 	if smoke or _lesson_open or state != State.RUNNING or get_tree().paused:
 		return false
+	# Lessons stop the game to be read, so they only come when asked
+	# for: the LEARN button's round. On the road the coach has one line.
+	if not _learning:
+		return false
 	var since := Time.get_ticks_msec() * 0.001 - _lesson_last
 	if not Lessons.due(id, lessons_seen, lessons_on, _learning, since):
 		return false
@@ -884,7 +895,7 @@ func _warm_up() -> void:
 	var st := Strike.new()
 	st.setup(-3.0)
 	warm.add_child(st)
-	var sp := Spit.new()
+	var sp := Spit.new("bomb")
 	warm.add_child(sp)
 	sp.launch(Vector3(0.0, 3.0, -8.0), 1.0, warm)
 	var sh := Shell.new()
@@ -1002,7 +1013,7 @@ func _send_report(note: String) -> void:
 	sfx.play("click")
 	var sent := _telemetry("manual", note, func(ok: bool, id: String) -> void:
 		if ok:
-			hud.show_banner("REPORT SENT\nTHANK YOU  (%s)" % id.right(6), 2.2)
+			hud.show_banner("REPORT SENT\nTHANK YOU  (%s)" % id.right(6), 2.2, Notices.MUST)
 		else:
 			_send_report_by_mail(note))
 	if not sent:
@@ -1011,7 +1022,7 @@ func _send_report(note: String) -> void:
 
 func _send_report_by_mail(note: String) -> void:
 	var ok := Diag.send(_save_summary(), note)
-	hud.show_banner("REPORT COPIED\nOPENING MAIL..." if ok else "REPORT COPIED TO CLIPBOARD\nNO MAIL APP FOUND", 2.2)
+	hud.show_banner("REPORT COPIED\nOPENING MAIL..." if ok else "REPORT COPIED\nNO MAIL APP FOUND", 2.2, Notices.MUST)
 
 
 ## Builds and sends a report of [param kind] if the rules allow; true
@@ -1241,8 +1252,27 @@ func _feed_shake() -> void:
 	var a := Input.get_accelerometer()
 	if not Shake.has_sensor(a):
 		return
-	if _shaker.feed(a, Time.get_ticks_msec() * 0.001):
+	var now := Time.get_ticks_msec() * 0.001
+	# In a run a shake is a move: it throws every clinger off. The report
+	# card is for the home screen and the pause menu, where a shake can
+	# mean nothing else.
+	if state == State.RUNNING and not get_tree().paused:
+		if _run_shaker.feed(a, now):
+			shake_clingers()
+		return
+	if _shaker.feed(a, now):
 		open_problem_card(true)
+
+
+## The phone was shaken in a run (or K on a desktop): clingers fly off.
+func shake_clingers() -> void:
+	if state != State.RUNNING or world.latched_count() <= 0:
+		return
+	Diag.note("shake_off", {"clingers": world.latched_count(), "level": world.level})
+	_shakes_off += 1
+	world.shake_off(Progression.MAX_LATCHED)
+	_buzz("gate_good")
+	_punch(3.0)
 
 
 func open_problem_card(shaken: bool) -> void:
@@ -1303,7 +1333,9 @@ func show_title() -> void:
 	elif modifier == "hard" and not _feature_open("nightmare"):
 		hint = "Nightmare opens at %d trophies" % int(Road.UNLOCKS["nightmare"])
 	var runs := int(stats.get("runs", 0))
-	var goal := Goals.next(_goal_context())
+	# The home screen says one thing under the squad, and only when it
+	# has something to say: the next-step tips read as noise.
+	var goal := ""
 	if Diag.had_bad_exit() and runs > 0:
 		goal = ("The game stopped suddenly last time. A report went to the developer on its own." if _tele_crash_sent
 			else "The game stopped suddenly last time. SETTINGS has a SEND A BUG REPORT button.")
@@ -1660,7 +1692,7 @@ func _tick_rivals() -> void:
 			print("SMOKE_RIVAL ", JSON.stringify({"name": str(t.name), "score": int(t.score), "at": score, "shout": text, "frame": _frames}))
 			continue
 		Diag.note("rival", {"name": str(t.name), "self": bool(t.get("self", false))})
-		hud.show_float(text, true)
+		hud.show_float(text, true, Notices.NICE)
 		sfx.play("step", -2.0, 1.5)
 		_buzz("gate_good")
 	hud.set_rival(rivals.chip(score))
@@ -1894,12 +1926,8 @@ func start_run(p_mode: String = "levels") -> void:
 	hud.set_bounty(0)
 	world.supply_funds = 0
 	_refresh_pause_perks()
-	hud.show_hint(Progression.hint_for(1), 4.0)
-	if run_hero != "":
-		# Who is leading and what that changes, every run.
-		hud.toast("%s: %s" % [wardrobe.hero_name(), Heroes.short(run_hero)])
-	elif character_mode:
-		hud.toast("%s: %s" % [wardrobe.hero_name(), Wardrobe.hero_line(wardrobe.equipped.get("hero", "max"))])
+	_coach(1)
+	_aim_hint_due = Progression.coach_due(1, SaveData.load_best_level("normal"), int(stats.get("runs", 0)))
 	_touches.clear()
 	_cling_touch.clear()
 	squad.clear_focus()
@@ -2302,6 +2330,10 @@ func throw_bomb() -> void:
 
 
 func _tick_run(delta: float) -> void:
+	if _aim_hint_due and _run_time > 8.0:
+		_aim_hint_due = false
+		if world.level == 1:
+			hud.show_hint(Progression.AIM_HINT, 4.5)
 	_run_time += delta
 	squad.now = _run_time
 	world.now = _run_time
@@ -2341,7 +2373,7 @@ func _tick_run(delta: float) -> void:
 		_tick_rivals()
 	if world.horde_z < World.HORDE_REST_Z - 0.5 and not _horde_warned:
 		_horde_warned = true
-		hud.show_banner("THE HORDE IS COMING\nKILL IT FAST", 1.6)
+		hud.show_banner("ZOMBIES BEHIND YOU\nKEEP MOVING", 1.6, Notices.MUST)
 		_teach("horde")
 		sfx.play("boss_roar", -6.0, 0.8)
 	hud.update_stats(squad.count, world.level, total_distance, score)
@@ -2454,6 +2486,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			cycle_formation()
 		elif event.keycode == KEY_B:
 			throw_bomb()
+		elif event.keycode == KEY_K:
+			# A desktop has nothing to shake.
+			shake_clingers()
 		elif event.keycode == KEY_Q or event.keycode == KEY_E:
 			if state == State.RUNNING and Progression.dash_enabled(world.level) and squad.dash(-1.0 if event.keycode == KEY_Q else 1.0):
 				_on_dash()
@@ -2535,7 +2570,7 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 	var text := GateMath.label(panel)
 	if after > before:
 		text += "   %d > %d" % [before, after]
-	hud.show_float(text, after >= before)
+	hud.show_float(text, after >= before, Notices.MUST)
 	if GateMath.is_power(panel):
 		return
 	if after >= before + 3 or (before > 0 and after >= before * 1.3 and after > before):
@@ -2559,16 +2594,27 @@ func _on_gate_passed(panel: GateMath.GatePanel, before: int, after: int) -> void
 
 func _on_gate_robbed(gate: Gate, index: int) -> void:
 	sfx.play("gate_bad", -2.0, 1.3)
-	hud.show_float("ROBBED!", false)
+	hud.show_float("ROBBED!", false, Notices.NICE)
 	Burst.spawn(world, gate.panel_position(index) + Vector3(0.0, 0.0, 0.3), Zombie.THIEF_SKIN, 8, 0.12, 4.0, 0.4)
 
 
 func _on_spit_landed(hit: bool) -> void:
 	sfx.play("hit", -2.0, 0.6)
-	var at := squad.position + Vector3(0.0, 0.3, 0.0) if hit else squad.position + Vector3(2.0, 0.3, 0.0)
-	Burst.spawn(world, at, Spit.COLOR, 10, 0.14, 4.0, 0.5)
 	if hit:
 		_shake = minf(1.0, _shake + 0.5)
+
+
+## A glob splashes in its own colour where it lands; a bomb bursts.
+func _on_lob_landed(kind: String, at: Vector3, hit: bool) -> void:
+	var color: Color = Spit.COLORS.get(kind, Spit.COLOR)
+	if kind == "bomb":
+		sfx.play("explosion", -3.0 if hit else -7.0, 1.2)
+		Burst.spawn(world, at, color, 22, 0.18, 7.0, 0.6)
+		Fx.smoke(world, at, 5)
+		_shake = minf(1.0, _shake + (0.7 if hit else 0.3))
+		hud.flash(0.18 if hit else 0.06)
+		return
+	Burst.spawn(world, at, color, 10, 0.14, 4.0, 0.5)
 
 
 func _on_gate_stepped(gate: Gate, index: int) -> void:
@@ -2593,7 +2639,7 @@ func _on_zombie_killed(zombie: Zombie) -> void:
 	sfx.play_combo(chain)
 	if chain > 0 and chain % Combo.STEP == 0:
 		sfx.play("step", -6.0, 1.0 + 0.08 * float(chain / Combo.STEP))
-		hud.show_float("%d COMBO" % chain, true)
+		hud.show_float("%d COMBO" % chain, true, Notices.NICE)
 	var color := Zombie.BRUTE_SKIN if zombie.brute else Zombie.SKIN
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.8, 0.0), color, 6 if zombie.brute else 3, 0.16 if zombie.brute else 0.12)
 	# A heavy going down lands: a blink of hit-stop and a buzz, not for
@@ -2613,7 +2659,7 @@ func _on_squad_bitten(bite: int, heavy: bool) -> void:
 	_buzz("heavy" if heavy else "bite")
 	sfx.play("bite", 0.0 if heavy else -6.0)
 	Burst.spawn(world, squad.position + Vector3(0.0, 0.9, -0.5), Soldier.BODY, mini(bite * 3, 24), 0.12, 4.5)
-	hud.show_float("-%d" % bite, false)
+	hud.show_float("-%d" % bite, false, Notices.MUST)
 	if smoke:
 		print("SMOKE_BITE ", JSON.stringify({"level": world.level, "bite": bite, "left": squad.count, "frame": _frames}))
 	# LAST STAND: the soldiers who went take the front row with them.
@@ -2643,7 +2689,7 @@ func _on_boss_spawned(boss: Boss) -> void:
 	if smoke:
 		print("SMOKE_BOSS ", JSON.stringify({"level": world.level, "kind": boss.kind_name(), "squad": squad.count, "boss_hp": boss.max_hp, "frame": _frames}))
 	hud.show_boss(true)
-	hud.show_banner("BOSS", 1.2)
+	hud.show_banner("BOSS", 1.2, Notices.MUST)
 	_count_at_boss = squad.count
 	_teach(Lessons.boss_lesson(boss.kind_name()))
 	sfx.play("boss_roar")
@@ -2674,7 +2720,7 @@ func _on_boss_killed(level: int, squad_left: int) -> void:
 	if smoke:
 		print("SMOKE_GRADE ", JSON.stringify({"level": level, "grade": letter, "boss_seconds": snappedf(_run_time - _boss_start, 0.1)}))
 	hud.show_boss(false)
-	hud.show_banner("LEVEL %d CLEAR   GRADE %s\n+%d" % [level, letter, b], 1.8)
+	hud.show_banner("LEVEL %d CLEAR\nGRADE %s" % [level, letter], 1.6, Notices.MUST)
 	if Heroes.level_soldiers(run_hero) > 0 and squad_left > 0:
 		squad.add(Heroes.level_soldiers(run_hero))
 		_hero_note("level_soldiers")
@@ -2798,12 +2844,12 @@ func _take_card(id: String) -> void:
 	if id == "sentry" and world.add_turret():
 		Diag.note("turret", {"from": "card", "count": world.turrets.size(), "level": world.level})
 	if made != "":
-		hud.show_banner("COMBO: %s\n%s" % [Cards.combo_title(made), Cards.combo_description(made)], 2.4)
+		hud.show_banner("COMBO\n%s" % Cards.combo_title(made), 1.6, Notices.MUST)
 		sfx.play("level_clear", -4.0, 1.3)
 		hud.flash(0.25)
 		_buzz("boss_down")
 	else:
-		hud.show_banner("%s%s\n%s" % [Cards.title(id), "  x%d" % cards.stack(id) if cards.stack(id) > 1 else "", Cards.description(id, cards.stack(id))], 2.0)
+		hud.show_banner("%s%s" % [Cards.title(id), "  x%d" % cards.stack(id) if cards.stack(id) > 1 else ""], 1.0, Notices.NICE)
 		sfx.play("gate_good", -2.0, 1.2)
 		_buzz("gate_good")
 	_refresh_pause_perks()
@@ -2939,6 +2985,15 @@ func _set_headlight(on: bool) -> void:
 
 ## The road slowed for a gate that needs reading. Said in words the
 ## first couple of times in a run, and taught once.
+## The coach's one line for [param level], while the level is still new
+## to this player.
+func _coach(level: int) -> void:
+	if smoke or not Progression.coach_due(level, SaveData.load_best_level("normal"), int(stats.get("runs", 0))):
+		return
+	hud.show_hint(Progression.hint_for(level), 4.0)
+	Diag.note("coach", {"level": level})
+
+
 func _on_think_zone(on: bool) -> void:
 	if smoke:
 		if on:
@@ -2971,14 +3026,14 @@ func _on_level_started(level: int) -> void:
 		print("SMOKE_THEME ", JSON.stringify({"level": level, "id": world.theme, "frame": _frames}))
 	if level == 1 and not _events.is_empty() and not smoke:
 		var id := str(_events[0])
-		hud.show_banner("%s\n%s" % [Events.title(id), Events.body(id)], 2.6)
+		hud.show_banner(Events.title(id), 1.6, Notices.NICE)
 	if level == 1 and mode == "rush" and not smoke:
-		hud.show_banner("BOSS RUSH\nONE GATE, THEN THE BOSS. AGAIN.", 2.2)
+		hud.show_banner("BOSS RUSH", 1.6, Notices.MUST)
 	if level <= 1:
 		return
 	# The banner names the place and its rule; daybreak is just the level.
-	hud.show_banner(Themes.banner(level, world.theme), 2.8 if (Themes.rule(world.theme) != "" or Difficulty.danger(level) > 1.001) else 1.0)
-	hud.show_hint(Progression.hint_for(level), 3.6)
+	hud.show_banner(Themes.banner(level, world.theme), 1.2, Notices.MUST)
+	_coach(level)
 	_refresh_pause_perks()
 	for id in Lessons.for_level(level):
 		if _teach(id):
@@ -3007,7 +3062,7 @@ func _on_level_started(level: int) -> void:
 func _on_perk_chosen(id: String) -> void:
 	perks.take(id)
 	world.perk_count = perks.total() + cards.total()
-	hud.show_banner(Perks.title(id) + ("  x%d" % perks.stack(id) if perks.stack(id) > 1 else ""), 1.0)
+	hud.show_banner(Perks.title(id) + ("  x%d" % perks.stack(id) if perks.stack(id) > 1 else ""), 1.0, Notices.NICE)
 	_refresh_pause_perks()
 	sfx.play("gate_good")
 	_punch(3.0)
@@ -3150,7 +3205,7 @@ func _retry_level() -> void:
 	hud.set_bounty(int(round(float(bounty) * perks.coin_mult())))
 	_refresh_pause_perks()
 	world.restart_level(world.level)
-	hud.show_banner("LEVEL %d, AGAIN" % world.level, 1.4)
+	hud.show_banner("LEVEL %d, AGAIN" % world.level, 1.4, Notices.MUST)
 	sfx.play("rally")
 	sfx.set_music("calm")
 
@@ -3375,9 +3430,9 @@ func _on_powerup_granted(id: String, from_crate: bool) -> void:
 	if smoke:
 		print("SMOKE_POWER ", JSON.stringify({"id": id, "crate": from_crate, "frame": _frames}))
 	if id == "bomb":
-		hud.show_float("+BOMB" if changed else "BOMBS FULL", changed)
+		hud.show_float("+BOMB" if changed else "BOMBS FULL", changed, Notices.NICE)
 	else:
-		hud.show_float("%s!" % Powerups.title(id), true)
+		hud.show_float("%s!" % Powerups.title(id), true, Notices.MUST)
 	sfx.play("crate" if from_crate else "powerup")
 	if id != "bomb":
 		sfx.play("powerup", -3.0, 0.9)
@@ -3451,7 +3506,7 @@ func _on_vehicle_formed(id: String) -> void:
 	_hitstop(0.08)
 	if smoke:
 		print("SMOKE_VEHICLE ", JSON.stringify({"id": id, "level": world.level, "squad": squad.count, "frame": _frames}))
-	hud.show_banner("%s JOINS THE CONVOY" % Convoy.title(id), 1.4)
+	hud.show_banner("%s JOINED" % Convoy.title(id), 1.2, Notices.NICE)
 	sfx.play("rally")
 	squad.rally()
 	_punch(5.0)
@@ -3459,7 +3514,7 @@ func _on_vehicle_formed(id: String) -> void:
 
 
 func _on_vehicle_lost(id: String) -> void:
-	hud.show_float("%s LOST" % Convoy.title(id), false)
+	hud.show_float("%s LOST" % Convoy.title(id), false, Notices.NICE)
 	if not smoke:
 		Fx.smoke(world, squad.position + Vector3(0.0, 0.8, -0.5), 10)
 		Fx.sparks(world, squad.position + Vector3(0.0, 0.8, -0.5), 14)
@@ -3605,13 +3660,13 @@ func _on_dodged() -> void:
 
 func _on_latched(zombie: Zombie) -> void:
 	sfx.play("bite", -8.0, 1.4)
-	hud.show_float("CLINGER! TAP IT", false)
+	hud.show_float("TAP IT OR SHAKE!", false, Notices.MUST)
 	Burst.spawn(world, zombie.position + Vector3(0.0, 0.9, 0.0), Zombie.LATCHER_SKIN, 6, 0.1, 3.0, 0.3)
 	_shake = minf(1.0, _shake + 0.3)
 
 
 func _on_shaken_off(n: int) -> void:
-	hud.show_float("SHOOK OFF %d" % n, true)
+	hud.show_float("SHOOK OFF %d" % n, true, Notices.MUST)
 	sfx.play("block", -4.0, 0.8)
 
 
@@ -3634,7 +3689,7 @@ func _on_gate_perfect(_gate, _index: int) -> void:
 	perfect_gates += 1
 	_level_perfect += 1
 	bonus += Difficulty.PERFECT_BONUS
-	hud.show_banner("PERFECT  +%d" % Difficulty.PERFECT_BONUS, 0.7)
+	hud.show_float("PERFECT", true, Notices.NICE)
 	if Heroes.perfect_soldiers(run_hero) > 0 and squad.count > 0:
 		squad.add(Heroes.perfect_soldiers(run_hero))
 		_hero_note("perfect_soldiers")
@@ -3714,7 +3769,7 @@ func _on_revive_accepted() -> void:
 	squad.set_count(Revive.SOLDIERS)
 	powerups.grant("agro", _run_time)
 	world.shake_off()
-	hud.show_banner("RALLY!\n%d SOLDIERS BACK   ·   AGRO!" % Revive.SOLDIERS, 1.8)
+	hud.show_banner("RALLY!\n+%d SOLDIERS" % Revive.SOLDIERS, 1.6, Notices.MUST)
 	hud.flash(0.6)
 	sfx.play("rally")
 	squad.rally()
@@ -3741,7 +3796,7 @@ func _second_wind() -> void:
 	squad.set_count(Meta.SECOND_WIND_SOLDIERS)
 	powerups.grant("agro", _run_time)
 	world.shake_off()
-	hud.show_banner("SECOND WIND!\n%d SOLDIERS BACK   ·   AGRO!" % Meta.SECOND_WIND_SOLDIERS, 1.8)
+	hud.show_banner("SECOND WIND!\n+%d SOLDIERS" % Meta.SECOND_WIND_SOLDIERS, 1.6, Notices.MUST)
 	hud.flash(0.6)
 	sfx.play("rally")
 	squad.rally()
@@ -3790,6 +3845,9 @@ func _smoke_tick() -> void:
 			print("SMOKE_IDLE ", JSON.stringify({"frame": _frames, "level": world.level, "squad": squad.count}))
 		if not _smoke_idle:
 			_bot_steer()
+			# The bot's phone: two on the flanks and it shakes them off.
+			if world.latched_count() >= 2 and _frames % 20 == 0:
+				shake_clingers()
 		if _frames % 30 == 0:
 			_smoke_peak.nodes = maxi(_smoke_peak.nodes, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
 			_smoke_peak.zombies = maxi(_smoke_peak.zombies, world.zombies.size())
@@ -3840,7 +3898,7 @@ func _smoke_tick() -> void:
 		}
 		print("SMOKE_PERF ", JSON.stringify(_smoke_peak))
 		print("SMOKE_THEMES ", JSON.stringify({"seen": _themes_seen.keys(), "strikes": world.theme_strikes, "now": world.theme}))
-		print("SMOKE_PACE ", JSON.stringify({"level": world.level, "road": snappedf(Difficulty.world_speed(world.level), 0.1), "bullet": snappedf(Bullet.speed, 0.1), "shots": snappedf(squad.shots_per_second(), 0.1), "max_shots": Difficulty.max_shots(world.level), "think_zones": _think_zones, "danger": snappedf(Difficulty.danger(world.level), 0.01)}))
+		print("SMOKE_PACE ", JSON.stringify({"level": world.level, "road": snappedf(Difficulty.world_speed(world.level), 0.1), "bullet": snappedf(Bullet.speed, 0.1), "shots": snappedf(squad.shots_per_second(), 0.1), "max_shots": Difficulty.max_shots(world.level), "think_zones": _think_zones, "danger": snappedf(Difficulty.danger(world.level), 0.01), "lobs": world.lobs, "chased": world.chased, "shakes": _shakes_off}))
 		if _smoke_rivals:
 			print("SMOKE_RIVALS ", JSON.stringify({"passed": rivals.passed, "left": rivals.targets.size(), "chip": rivals.chip(score)}))
 		if run_hero != "":
@@ -4118,11 +4176,11 @@ func _shots_walkthrough() -> void:
 		for id in Themes.ORDER:
 			world.theme = id
 			_apply_theme(id, true)
-			hud.show_banner(Themes.banner(12, id), 5.0)
+			hud.show_banner(Themes.banner(12, id), 5.0, Notices.MUST)
 			await _capture("t_%s.png" % id, 12)
 		world.theme = "day"
 		_apply_theme("day", true)
-		hud.show_banner("", 0.01)
+		hud.show_banner("", 0.01, Notices.MUST)
 		var shown := Cards.new()
 		shown.take("burn")
 		var hand := []

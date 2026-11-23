@@ -28,7 +28,15 @@ func test_tempo() -> void:
 	check(Difficulty.world_speed(2) > Difficulty.world_speed(1), "level 2 is already a little faster")
 	check(Difficulty.bullet_speed(1) < Difficulty.bullet_speed(10) * 0.65, "a level 1 bullet can be watched (%.0f against %.0f)" % [Difficulty.bullet_speed(1), Difficulty.bullet_speed(10)])
 	check_near(Difficulty.bullet_speed(100), Difficulty.BULLET_SPEED_MAX, 0.001, "bullets top out")
-	check(Difficulty.max_shots(1) <= 12.0 and Difficulty.max_shots(12) >= 40.0, "a few fat rounds early, a stream late")
+	check(Difficulty.max_shots(1) <= 10.0 and Difficulty.max_shots(12) >= 40.0, "a few fat rounds early, a stream late")
+	# One bullet, one walker: a base rifle round against the health of a
+	# walker on every gate of the first levels.
+	for level in range(1, Difficulty.ONE_SHOT_LEVELS + 1):
+		var round_damage := 1.0 / Difficulty.fire_tempo(level)
+		for index in range(Difficulty.GATES_PER_LEVEL):
+			for count in [1, 20, 80, 300]:
+				check(float(Difficulty.wave_for(level, index, count).hp) <= Difficulty.ONE_SHOT_HP + 0.0001 and round_damage > Difficulty.ONE_SHOT_HP, "one bullet kills a walker on level %d gate %d" % [level, index + 1])
+	check(float(Difficulty.wave_for(Difficulty.ONE_SHOT_LEVELS + 2, 6).hp) > Difficulty.ONE_SHOT_HP, "and after that they take more")
 	check_near(Difficulty.max_shots(100), Difficulty.SHOTS_MAX, 0.001, "the stream tops out, for the phone's sake")
 	check_near(Difficulty.fire_tempo(1), Difficulty.FIRE_TEMPO_START, 0.001, "soldiers fire slower at first")
 	check_near(Difficulty.fire_tempo(20), 1.0, 0.001, "and at full rate later")
@@ -95,18 +103,21 @@ func test_curves_are_bounded_and_increasing() -> void:
 	check(Difficulty.wave_for(6, 0).count <= 12, "a late level still opens gently (got %d)" % Difficulty.wave_for(6, 0).count)
 	check_eq(Difficulty.wave_for(1, 0).brutes, 0, "no brutes at the very start")
 	check_eq(Difficulty.wave_for(5, 0).brutes, 0, "no brutes on any level's opener")
-	check(Difficulty.wave_for(1, 3).brutes >= 1, "brutes from the fourth gate of level 1")
-	check(Difficulty.wave_for(1, 0).runners >= 1, "runners from the first gate")
-	check(Difficulty.wave_for(1, 6).runners > Difficulty.wave_for(1, 0).runners, "more runners deeper in")
+	check_eq(Difficulty.wave_for(1, 3).brutes, 0, "level 1 is walkers and nothing else")
+	check(Difficulty.wave_for(Progression.BRUTE_LEVEL, 3).brutes >= 1, "brutes from the fourth gate of BRUTE_LEVEL")
+	check_eq(Difficulty.wave_for(1, 6).runners + Difficulty.wave_for(Progression.RUNNER_LEVEL - 1, 6).runners, 0, "no runners while the game is being learned")
+	check(Difficulty.wave_for(Progression.RUNNER_LEVEL, 6).runners > Difficulty.wave_for(Progression.RUNNER_LEVEL, 0).runners, "then more of them deeper in")
 	check_eq(Difficulty.wave_for(6, 0).runners, 1, "one runner on any opener")
 	check(Difficulty.wave_for(6, 0).hp < Difficulty.wave_for(6, 1).hp, "opener zombies are softer")
 	check(Difficulty.wave_for(1, 0).runner_hp < Difficulty.wave_for(1, 0).hp, "runners are thin")
 	check(Difficulty.wave_clear_bonus(2) > Difficulty.wave_clear_bonus(1), "wave bonus grows")
 	check_eq(Difficulty.wave_for(1, 3).thieves, 0, "no thieves on level 1")
-	check(Difficulty.wave_for(2, 1).thieves >= 1, "thieves from level 2 on odd gates")
+	check_eq(Difficulty.wave_for(Progression.THIEF_LEVEL - 1, 1).thieves, 0, "no thieves before THIEF_LEVEL")
+	check(Difficulty.wave_for(Progression.THIEF_LEVEL, 1).thieves >= 1, "thieves from THIEF_LEVEL on odd gates")
 	check_eq(Difficulty.wave_for(2, 0).thieves, 0, "no thieves on the opener")
 	check_eq(Difficulty.wave_for(2, 2).tanks, 0, "no tanks on level 2")
-	check_eq(Difficulty.wave_for(3, 2).tanks, 1, "a tank on level 3 gate 3")
+	check_eq(Difficulty.wave_for(Progression.TANK_LEVEL - 1, 2).tanks, 0, "no tanks before TANK_LEVEL")
+	check_eq(Difficulty.wave_for(Progression.TANK_LEVEL, 2).tanks, 1, "a tank on its third gate from TANK_LEVEL")
 	check(Difficulty.wave_for(3, 2, 300).tank_hp > Difficulty.wave_for(3, 2, 1).tank_hp * 5.0, "tanks soak a big squad")
 	check(Difficulty.wave_for(1, 2, 200).count > Difficulty.wave_for(1, 2, 1).count, "big squads draw crowds")
 	check(Difficulty.wave_for(1, 2, 100000).count <= Difficulty.MAX_WAVE, "wave capped")
@@ -119,7 +130,8 @@ func test_boss_curve() -> void:
 	# Four kinds cycle by level; each kind's health grows with the level.
 	check_eq(Difficulty.boss_kind(4), Boss.Kind.FOREMAN, "the foreman on level four")
 	check_eq(Difficulty.boss_kind(8), Boss.Kind.FOREMAN, "and every fourth after")
-	check_eq(Difficulty.boss_kind(3), Boss.Kind.STORM, "the storm keeps level three")
+	check_eq(Difficulty.boss_kind(3), Boss.Kind.WALKER, "the storm's lines across the road wait")
+	check_eq(Difficulty.boss_kind(Difficulty.STORM_BOSS_LEVEL), Boss.Kind.STORM, "for level six")
 	check_eq(Difficulty.boss_kind(2), Boss.Kind.SPITTER, "the spitter keeps level two")
 	check(Difficulty.FOREMAN_SAW_INTERVAL_ENRAGED < Difficulty.FOREMAN_SAW_INTERVAL, "angry means faster saws")
 	for kind in [Boss.Kind.WALKER, Boss.Kind.SPITTER, Boss.Kind.STORM, Boss.Kind.FOREMAN]:
@@ -148,7 +160,7 @@ func test_boss_curve() -> void:
 	check(Progression.firing_count(500) > Progression.firing_count(200), "a bigger squad still shoots more")
 	check(Progression.firing_count(500) < 80, "but not much more (%d)" % Progression.firing_count(500))
 	check_near(Difficulty.fire_scale(30), 1.0, 0.001, "a small squad's crowd is unscaled")
-	check(Difficulty.wave_for(3, 2, 500).hp > Difficulty.wave_for(3, 2, 30).hp * 1.5, "a big squad's crowd has the health to match its guns")
+	check(Difficulty.wave_for(5, 2, 500).hp > Difficulty.wave_for(5, 2, 30).hp * 1.5, "a big squad's crowd has the health to match its guns")
 	check_eq(Difficulty.latch_bite(50), 1, "latch bite floor")
 	check_eq(Difficulty.latch_bite(500), 3, "a latcher on 500 takes three")
 	check(Difficulty.wave_for(12, 3).hp > Difficulty.wave_for(11, 3).hp * 1.04, "late levels grow by more than the old step")
@@ -161,12 +173,13 @@ func test_boss_curve() -> void:
 	check(elite.latchers > plain.latchers, "and latchers")
 	check(Difficulty.is_elite(true, 7) and not Difficulty.is_elite(false, 7) and not Difficulty.is_elite(true, 3), "elite is endless's last gate")
 	var gen := Difficulty.new(5)
-	var plans := gen.saws_for_level(5)
-	check_eq(plans.size(), 2, "two saws from level five")
+	check_eq(gen.saws_for_level(Difficulty.SAW_LEVEL - 1).size(), 0, "no saws before SAW_LEVEL")
+	var plans := gen.saws_for_level(Difficulty.SAW_TWO_LEVEL)
+	check_eq(plans.size(), 2, "two saws from SAW_TWO_LEVEL")
 	check(bool(plans[0].aim) and not bool(plans[1].aim), "the first saw of a level is aimed")
 	# Walls, splitters, turrets.
 	check_eq(gen.barricades_for_level(2).size(), 0, "no walls before BARRICADE_LEVEL")
-	var walls := gen.barricades_for_level(6, plans)
+	var walls := gen.barricades_for_level(Difficulty.BARRICADE_TWO_LEVEL, plans)
 	check_eq(walls.size(), 2, "two walls from BARRICADE_TWO_LEVEL")
 	for w in walls:
 		check(int(w.index) >= 1 and not Difficulty.is_fork_gate(int(w.index)), "a wall is never on the opener or a fork gate")
@@ -178,10 +191,11 @@ func test_boss_curve() -> void:
 	check_near(Difficulty.barricade_hp(100.0), 100.0, 0.001, "a wall is a second of fire")
 	check_near(Difficulty.barricade_hp(5.0), Difficulty.BARRICADE_HP_MIN, 0.001, "never trivial")
 	check(Difficulty.barricade_distance(2) > Difficulty.gate_distance(2) and Difficulty.barricade_distance(2) < Difficulty.wave_distance(2), "a wall stands between its gate and the wave")
-	check_eq(Difficulty.wave_for(3, 2).splitters, 0, "no splitters before SPLITTER_LEVEL")
-	check(Difficulty.wave_for(4, 2).splitters >= 1, "splitters from level four on even gates")
-	check_eq(Difficulty.wave_for(4, 3).splitters, 0, "not on odd gates")
-	check_near(Difficulty.wave_for(4, 2).splitter_hp, Difficulty.wave_for(4, 2).hp * Difficulty.SPLITTER_HP_MULT, 0.001, "a splitter carries more health")
+	var sl := Difficulty.SPLITTER_LEVEL
+	check_eq(Difficulty.wave_for(sl - 1, 2).splitters, 0, "no splitters before SPLITTER_LEVEL")
+	check(Difficulty.wave_for(sl, 2).splitters >= 1, "splitters from SPLITTER_LEVEL on even gates")
+	check_eq(Difficulty.wave_for(sl, 3).splitters, 0, "not on odd gates")
+	check_near(Difficulty.wave_for(sl, 2).splitter_hp, Difficulty.wave_for(sl, 2).hp * Difficulty.SPLITTER_HP_MULT, 0.001, "a splitter carries more health")
 	check(Difficulty.turret_dps(5) > Difficulty.turret_dps(1), "turrets grow with the level")
 	check_near(Difficulty.turret_dps(1), Difficulty.TURRET_DPS_BASE, 0.001, "base turret fire")
 	check_eq(Difficulty.boss_bite(10), 2, "boss bite floor")
@@ -254,7 +268,7 @@ func test_values_stay_in_sane_ranges() -> void:
 					check(p.value >= -25.0 and p.value <= 12.0, "add in range at %d/%d" % [level, i])
 				if not p.revealed:
 					hidden_seen = true
-	check(hidden_seen, "hidden panels appear over a long run")
+	check(not hidden_seen, "no panel is ever hidden: a gate says what it is")
 
 
 func test_power_gates_and_crates() -> void:
@@ -278,8 +292,9 @@ func test_power_gates_and_crates() -> void:
 					if not GateMath.is_power(p):
 						check(GateMath.is_good(p) and p.revealed, "a power gate's other side is a visible gain")
 	check(powers > 0 and float(powers) / float(total) < 0.15, "power panels are a minority (%d of %d)" % [powers, total])
-	var crates := gen.crates_for_level(1)
-	check_eq(crates.size(), Difficulty.CRATES_PER_LEVEL, "two crates")
+	check(gen.crates_for_level(1).is_empty(), "no crates on level 1")
+	var crates := gen.crates_for_level(Progression.CRATE_LEVEL)
+	check_eq(crates.size(), Difficulty.CRATES_PER_LEVEL, "two crates from CRATE_LEVEL")
 	check(crates[0].index != crates[1].index, "distinct gates")
 	for c in crates:
 		check(Powerups.is_valid(c.id), "crate content valid")
@@ -344,9 +359,20 @@ func test_level_one_is_simple() -> void:
 		for side in ["left", "right"]:
 			for p in f[side].panels:
 				check(p.revealed, "level 1 fork is fully visible")
-	check_eq(Difficulty.wave_for(2, 3).latchers, 0, "no latchers before level 3")
-	check(Difficulty.wave_for(3, 3).latchers >= 1, "latchers from level 3")
-	check(Difficulty.wave_for(3, 3).latcher_hp > Difficulty.wave_for(3, 3).hp, "latchers are sturdier than walkers")
+	var ll := Progression.LATCHER_LEVEL
+	check_eq(Difficulty.wave_for(ll - 1, 3).latchers, 0, "no latchers before LATCHER_LEVEL")
+	check(Difficulty.wave_for(ll, 3).latchers >= 1, "latchers from LATCHER_LEVEL")
+	check(Difficulty.wave_for(ll, 3).latcher_hp > Difficulty.wave_for(ll, 3).hp, "latchers are sturdier than walkers")
+	# Level 1, whole: two lanes, plain numbers, walkers, nothing else.
+	for seed in range(20):
+		var g1 := Difficulty.new(seed)
+		check(g1.fork_for_level(1).is_empty() and g1.crates_for_level(1).is_empty() and g1.saws_for_level(1).is_empty() and g1.barricades_for_level(1).is_empty(), "nothing on the level 1 road but gates and walkers")
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			for p in g1.make_gate(1, i, 10, Progression.lanes_for(1, i)):
+				check(p.kind == GateMath.Kind.ADD, "every level 1 panel is a plain number (seed %d gate %d: %s)" % [seed, i, GateMath.label(p)])
+			var w := Difficulty.wave_for(1, i, 10)
+			check_eq(int(w.brutes) + int(w.thieves) + int(w.tanks) + int(w.latchers) + int(w.splitters) + int(w.runners) + int(w.flankers), 0, "only walkers on level 1 gate %d" % (i + 1))
+	check(not Difficulty.boss_attacks(1) and Difficulty.boss_attacks(2), "the first boss only walks")
 
 
 func test_boss_attacks_scale() -> void:
@@ -355,18 +381,19 @@ func test_boss_attacks_scale() -> void:
 	check(Difficulty.strikes_per_volley(40) <= 3, "rings capped")
 	check_eq(Difficulty.strike_bite(10), 3, "strike floor")
 	check_eq(Difficulty.strike_bite(100), 15, "strike scales")
-	check(Difficulty.boss_adds(1) >= 1 and Difficulty.boss_adds(20) <= 4, "adds bounded")
+	check(Difficulty.boss_adds(1) == 0 and Difficulty.boss_adds(Progression.RUNNER_LEVEL) >= 1 and Difficulty.boss_adds(20) <= 4, "adds wait for runners, then stay bounded")
 	check(Difficulty.STRIKE_INTERVAL_ENRAGED < Difficulty.STRIKE_INTERVAL, "enrage is faster")
 
 
 func test_lanes_progress() -> void:
 	check_eq(Progression.lanes_for(1, 7), 2, "level 1 is two lanes")
-	check_eq(Progression.lanes_for(2, 0), 2, "level 2 opens with two")
-	check_eq(Progression.lanes_for(2, 4), 3, "level 2 widens to three")
-	check_eq(Progression.lanes_for(4, 7), 4, "level 4 ends on four")
-	check_eq(Progression.lanes_for(9, 0), Progression.MAX_LANES, "capped")
+	check_eq(Progression.lanes_for(3, 7), 2, "and so is level 3")
+	check_eq(Progression.lanes_for(4, 0), 3, "three from level 4")
+	check_eq(Progression.lanes_for(9, 0), 4, "four from level 9")
+	check_eq(Progression.lanes_for(15, 0), Progression.MAX_LANES, "five from level 15, and no more")
+	check_eq(Progression.lanes_for(60, 0), Progression.MAX_LANES, "capped")
 	var last := 0
-	for level in range(1, 12):
+	for level in range(1, 20):
 		for i in range(Difficulty.GATES_PER_LEVEL):
 			var n := Progression.lanes_for(level, i)
 			check(n >= last, "lanes never shrink (%d/%d)" % [level, i])
@@ -399,7 +426,7 @@ func test_multi_lane_gates() -> void:
 				check(any_good, "openers always offer a gain")
 				for p in panels:
 					check(not GateMath.is_expr(p) and p.revealed, "openers stay plain")
-	check(sums > 10, "sums appear (%d)" % sums)
+	check_eq(sums, 0, "no sums on the road: a gate is a number")
 	# Dilemma gates (both sides hurt) are deliberate; everything else offers a gain.
 	check(with_good * 10 >= gates * 8, "most gates offer something (%d of %d)" % [with_good, gates])
 	var rival := GateMath.add(6)
@@ -410,9 +437,10 @@ func test_multi_lane_gates() -> void:
 func test_saws() -> void:
 	var d := Difficulty.new(7)
 	check(d.saws_for_level(1).is_empty(), "no saws on level one")
-	var one := d.saws_for_level(3)
+	check(d.saws_for_level(Difficulty.SAW_LEVEL - 1).is_empty(), "nor before SAW_LEVEL")
+	var one := d.saws_for_level(Difficulty.SAW_LEVEL)
 	check_eq(one.size(), 1, "one saw a level at first")
-	check_eq(d.saws_for_level(6).size(), 2, "two later")
+	check_eq(d.saws_for_level(Difficulty.SAW_TWO_LEVEL).size(), 2, "two later")
 	for plan in one:
 		check(int(plan.index) >= 1 and int(plan.index) <= Difficulty.GATES_PER_LEVEL - 2, "never the opener or the last gate")
 		check(not Difficulty.is_fork_gate(int(plan.index)), "never inside the fork")

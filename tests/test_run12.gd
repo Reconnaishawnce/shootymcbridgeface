@@ -35,7 +35,7 @@ func test_scout() -> void:
 				if GateMath.is_scout(q):
 					scouts += 1
 					check(level >= Difficulty.SCOUT_LEVEL and lanes >= 3, "scouts need hidden panels and a third lane")
-	check(scouts > 2, "scouts appear (%d)" % scouts)
+	check_eq(scouts, 0, "no scout panels on the road: nothing is hidden to scout for")
 
 
 func test_cheer_lines() -> void:

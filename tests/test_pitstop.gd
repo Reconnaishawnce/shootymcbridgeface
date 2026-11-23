@@ -16,7 +16,11 @@ func test_prices_and_effects() -> void:
 	pit.buy("turret", 1000)
 	pit.buy("turret", 1000)
 	check(pit.is_maxed("turret"), "two turrets at most")
-	check(PitStop.effect_text("turret", 1).contains("turret"), "the turret tile says what it is")
+	check(PitStop.effect_text("turret", 1).contains("gun"), "the turret tile says what it is")
+	# A tile is a name and one short line: nobody reads a shop at a run.
+	for id in PitStop.ORDER:
+		check(Notices.words(PitStop.title(id)) <= 2, "%s has a one or two word name" % id)
+		check(Notices.words(PitStop.effect_text(id, 1, 50)) <= 6, "and a line of six words or fewer: %s" % PitStop.effect_text(id, 1, 50))
 	check_eq(pit.buy("rounds", 100000), 100000, "maxed: nothing spent")
 	check_eq(pit.cost("bomb"), 25, "bombs stay cheap")
 	pit.buy("bomb", 100)
@@ -25,7 +29,7 @@ func test_prices_and_effects() -> void:
 	check_eq(PitStop.dressing_for(200), 20, "a tenth of a big squad")
 	check(PitStop.effect_text("armor", 2, 0).contains("20%"), "effect text adds up")
 	check(PitStop.bay_distance(2) > Difficulty.gate_distance(PitStop.BAY_GATE_INDEX) and PitStop.bay_distance(2) < Difficulty.wave_distance(PitStop.BAY_GATE_INDEX), "the bay sits between a gate and its wave")
-	check(not PitStop.has_bay(1) and PitStop.has_bay(2), "from level two")
+	check(not PitStop.has_bay(1) and not PitStop.has_bay(Progression.PIT_LEVEL - 1) and PitStop.has_bay(Progression.PIT_LEVEL), "from PIT_LEVEL")
 	for id in PitStop.ORDER:
 		check(PitStop.title(id) != "" and PitStop.description(id) != "", "every item explains itself: %s" % id)
 

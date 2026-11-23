@@ -6,15 +6,17 @@ extends RefCounted
 ## shop on the title is where coins buy what lasts. Pure.
 
 const ITEMS := {
-	"rounds": {"name": "SHARPER ROUNDS", "desc": "Every bullet hits harder", "base": 60, "growth": 1.5, "max": 5, "unit": "damage"},
-	"rifles": {"name": "FASTER RIFLES", "desc": "The whole squad fires faster", "base": 60, "growth": 1.5, "max": 5, "unit": "fire rate"},
-	"armor": {"name": "FLAK JACKETS", "desc": "Every heavy bite takes less", "base": 80, "growth": 1.5, "max": 3, "unit": "bites"},
+	# Names that say what you get. "FLAK JACKETS" and "FIELD DRESSING"
+	# had to be explained; ARMOR and SOLDIERS do not.
+	"rounds": {"name": "DAMAGE", "desc": "Every bullet hits harder", "base": 60, "growth": 1.5, "max": 5, "unit": "damage"},
+	"rifles": {"name": "FIRE RATE", "desc": "The whole squad fires faster", "base": 60, "growth": 1.5, "max": 5, "unit": "fire rate"},
+	"armor": {"name": "ARMOR", "desc": "Every heavy bite takes less", "base": 80, "growth": 1.5, "max": 3, "unit": "bites"},
 	"bomb": {"name": "BOMB", "desc": "One more in the belt", "base": 25, "growth": 1.0, "max": 99, "unit": "bomb"},
-	"dressing": {"name": "FIELD DRESSING", "desc": "Soldiers back on their feet, now", "base": 45, "growth": 1.3, "max": 99, "unit": "soldiers"},
-	"turret": {"name": "GOLD TURRET", "desc": "A gun on the curb that fires on its own", "base": 120, "growth": 1.6, "max": 2, "unit": "turrets"},
+	"dressing": {"name": "SOLDIERS", "desc": "Soldiers back on their feet, now", "base": 45, "growth": 1.3, "max": 99, "unit": "soldiers"},
+	"turret": {"name": "TURRET", "desc": "A gun on the curb that fires on its own", "base": 120, "growth": 1.6, "max": 2, "unit": "turrets"},
 }
 const ORDER := ["turret", "rounds", "rifles", "armor", "bomb", "dressing"]
-const PIT_LEVEL := 2
+const PIT_LEVEL := Progression.PIT_LEVEL
 ## The bay sits this far past the gate at BAY_GATE_INDEX.
 const BAY_GATE_INDEX := 5
 const BAY_OFFSET := 16.0
@@ -85,13 +87,13 @@ static func effect_text(id: String, n: int, count: int = 0) -> String:
 		"rifles":
 			return "+%d%% fire rate" % int(round(FIRE_PER * 100.0 * n))
 		"armor":
-			return "-%d%% on heavy bites" % int(round(BITE_PER * 100.0 * n))
+			return "-%d%% from big bites" % int(round(BITE_PER * 100.0 * n))
 		"bomb":
 			return "+1 bomb"
 		"dressing":
 			return "+%d soldiers" % dressing_for(count)
 		"turret":
-			return "+1 turret, its own fire"
+			return "A gun that fights for you"
 	return ""
 
 

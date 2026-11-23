@@ -98,26 +98,28 @@ static func max_stack(id: String) -> int:
 static func description(id: String, n: int = 1) -> String:
 	n = clampi(n, 1, max_stack(id))
 	match id:
+		# Six words or fewer: a card is read in the second before a
+		# thumb lands on it. The exact numbers are in HOW TO PLAY.
 		"ricochet":
-			return "A kill bounces to the next zombie for %d%% damage%s" % [int(RICOCHET_MULT * 100.0), "" if n == 1 else ", %d times" % n]
+			return "Kills bounce to the next zombie" if n == 1 else "Kills bounce %d times" % n
 		"burn":
-			return "Hits burn for %d%% of the shot every second, for %d seconds" % [int(BURN_FRACTION * 100.0) * n, int(BURN_SECONDS)]
+			return "Bullets set zombies on fire"
 		"frost":
-			return "Hits slow zombies by %d%% for %d seconds" % [int(round((1.0 - float(SLOW[n])) * 100.0)), int(SLOW_SECONDS)]
+			return "Bullets slow zombies down"
 		"medic":
-			return "One soldier back for every %d kills" % int(MEDIC_EVERY[n])
+			return "+1 soldier every %d kills" % int(MEDIC_EVERY[n])
 		"charge":
-			return "The hero move recharges %d%% faster" % int(round((1.0 - pow(CHARGE_MULT, n)) * 100.0))
+			return "Hero move charges faster"
 		"blast":
-			return "Every %dth bullet kill explodes" % int(BLAST_EVERY[n])
+			return "Every %dth kill explodes" % int(BLAST_EVERY[n])
 		"martyr":
-			return "A soldier lost to a bite goes out with a %s bang" % ("big" if n == 1 else "huge")
+			return "Lost soldiers explode" if n == 1 else "Lost soldiers explode, bigger"
 		"crit":
-			return "Every %dth bullet hits for triple" % int(CRIT_EVERY[n])
+			return "Every %dth bullet hits x3" % int(CRIT_EVERY[n])
 		"sentry":
-			return "A gold turret rides beside you for the rest of the run"
+			return "A turret fights beside you"
 		"execute":
-			return "Bullets finish any zombie under a quarter health"
+			return "Bullets finish weak zombies"
 	return ""
 
 
@@ -155,19 +157,16 @@ static func partner(combo: String, id: String) -> String:
 	return str(needs[1]) if str(needs[0]) == id else str(needs[0])
 
 
-## What taking [param id] would do for combos: the line under the card.
-## Completing one beats starting one; nothing new says nothing.
+## What taking [param id] would do for combos, right now: the line
+## under the card. Only a combo this pick completes is worth saying.
 func combo_hint(id: String) -> String:
 	if stack(id) > 0:
 		return ""
 	for combo in COMBO_ORDER:
 		var other := partner(combo, id)
 		if other != "" and stack(other) > 0:
-			return "COMBO: %s with your %s" % [combo_title(combo), title(other)]
-	for combo in COMBO_ORDER:
-		var other := partner(combo, id)
-		if other != "":
-			return "Pairs with %s for %s" % [title(other), combo_title(combo)]
+			return "COMBO: %s" % combo_title(combo)
+	# What it might pair with one day is not worth a line today.
 	return ""
 
 
@@ -216,7 +215,10 @@ func offer(rng: RandomNumberGenerator, blocked: Array = []) -> Array:
 static func drafts_after_boss(mode: String, bosses_killed: int) -> bool:
 	if bosses_killed <= 0:
 		return false
-	return bosses_killed % 2 == 1 if mode == "rush" else true
+	if mode == "rush":
+		return bosses_killed % 2 == 1
+	# The first level ends on the win, not on three things to read.
+	return bosses_killed >= Progression.DRAFT_LEVEL
 
 
 ## The line on the pause menu and the results card.

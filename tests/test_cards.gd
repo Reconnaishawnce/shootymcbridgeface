@@ -9,6 +9,7 @@ func test_catalog() -> void:
 		check(Cards.title(id) != "" and Cards.icon(id) != "", "name and icon: %s" % id)
 		for n in range(1, Cards.max_stack(id) + 1):
 			check(Cards.description(id, n).length() > 10, "description for %s x%d" % [id, n])
+			check(Notices.words(Cards.description(id, n)) <= 6, "and it is six words or fewer: %s" % Cards.description(id, n))
 	check(Cards.description("blast", 1).contains("8th") and Cards.description("blast", 3).contains("4th"), "the description reads the real number")
 	for combo in Cards.COMBO_ORDER:
 		var needs: Array = Cards.COMBOS[combo]["needs"]
@@ -52,9 +53,9 @@ func test_offer() -> void:
 func test_combos() -> void:
 	var c := Cards.new()
 	check(c.combos().is_empty(), "no cards, no combos")
-	check_eq(c.combo_hint("burn"), "Pairs with BLAST ROUNDS for FIRESTORM", "a hint for what it could become")
+	check_eq(c.combo_hint("burn"), "", "what a card might pair with one day is not worth a line")
 	c.take("burn")
-	check_eq(c.combo_hint("blast"), "COMBO: FIRESTORM with your BURNING ROUNDS", "completing a combo says so")
+	check_eq(c.combo_hint("blast"), "COMBO: FIRESTORM", "completing a combo says so, in two words")
 	check_eq(c.combo_hint("burn"), "", "a second stack makes no new combo")
 	c.take("blast")
 	check(c.has_combo("firestorm") and not c.has_combo("chain"), "burn and blast are a firestorm")
@@ -124,7 +125,8 @@ func test_effects_and_counters() -> void:
 
 func test_draft_schedule() -> void:
 	check(not Cards.drafts_after_boss("levels", 0), "no boss, no draft")
-	check(Cards.drafts_after_boss("levels", 1) and Cards.drafts_after_boss("endless", 2) and Cards.drafts_after_boss("daily", 3), "every boss pays a draft")
+	check(not Cards.drafts_after_boss("levels", 1), "the first level ends on the win, not on three things to read")
+	check(Cards.drafts_after_boss("levels", Progression.DRAFT_LEVEL) and Cards.drafts_after_boss("endless", 2) and Cards.drafts_after_boss("daily", 3), "every boss after that pays a draft")
 	check(Cards.drafts_after_boss("rush", 1) and not Cards.drafts_after_boss("rush", 2) and Cards.drafts_after_boss("rush", 3), "every other boss in the rush")
 
 

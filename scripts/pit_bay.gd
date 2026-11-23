@@ -35,6 +35,10 @@ const LENGTH := 22.0
 const WIDTH := 3.6
 ## Each ramp runs this far along the road.
 const RAMP_LENGTH := 7.0
+## The sign over the road stands this far before the entry ramp, this
+## high: far enough to read and steer, high enough to walk under.
+const GANTRY_LEAD := 13.0
+const GANTRY_HEIGHT := 5.6
 
 var passed := false
 ## The road's half-width when the bay was laid; the lane starts there.
@@ -97,6 +101,7 @@ func setup(p_road_half: float) -> void:
 	paint.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	paint.position = Vector3(road_edge * 0.5, 0.04, -LENGTH * 0.5 - RAMP_LENGTH - LEAD_LENGTH - 3.0)
 	add_child(paint)
+	_build_gantry()
 	# A glow strip where the lane leaves the road.
 	var edge := Mats.box(Vector3(0.12, 0.03, LENGTH + RAMP_LENGTH * 2.0), LEAD, true)
 	edge.material_override = Mats.glow(LEAD, 1.6)
@@ -123,8 +128,8 @@ func setup(p_road_half: float) -> void:
 	roof.position = Vector3(gx, 3.5, 0.0)
 	add_child(roof)
 	var sign := Label3D.new()
-	sign.text = "PIT STOP"
-	sign.font_size = 72
+	sign.text = "SHOP"
+	sign.font_size = 96
 	sign.outline_size = 18
 	sign.pixel_size = 0.01
 	sign.modulate = Color(1.0, 0.9, 0.5)
@@ -134,11 +139,11 @@ func setup(p_road_half: float) -> void:
 	sign.position = Vector3(road_edge + WIDTH + 0.9, 4.6, 0.0)
 	add_child(sign)
 	var arrow := Label3D.new()
-	arrow.text = "PULL IN  >"
+	arrow.text = "SHOP HERE"
 	arrow.font_size = 52
 	arrow.outline_size = 14
 	arrow.pixel_size = 0.01
-	arrow.modulate = CHEVRON
+	arrow.modulate = LEAD
 	arrow.outline_modulate = Color(0.05, 0.05, 0.08)
 	arrow.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	arrow.no_depth_test = true
@@ -214,6 +219,63 @@ func setup(p_road_half: float) -> void:
 		var cone := Mats.cone(0.16, 0.5, CONE)
 		cone.position = Vector3(road_edge + 0.5, 0.25, zc)
 		add_child(cone)
+
+
+## The road sign: a gantry over the whole road well before the ramp,
+## a lit board that says what this is and an arrow as tall as a soldier
+## pointing at it. Testers drove past the pit without knowing it was
+## there; nobody drives under this without seeing it.
+func _build_gantry() -> void:
+	var z := -LENGTH * 0.5 - RAMP_LENGTH - GANTRY_LEAD
+	var span := road_edge * 2.0 + 1.6
+	var gantry := Node3D.new()
+	gantry.position = Vector3(0.0, 0.0, z)
+	add_child(gantry)
+	for side in [-1.0, 1.0]:
+		var post := Mats.box(Vector3(0.28, GANTRY_HEIGHT, 0.28), GARAGE_DARK)
+		post.position = Vector3(side * span * 0.5, GANTRY_HEIGHT * 0.5, 0.0)
+		gantry.add_child(post)
+	var beam := Mats.box(Vector3(span + 0.3, 0.3, 0.3), GARAGE_DARK)
+	beam.position = Vector3(0.0, GANTRY_HEIGHT, 0.0)
+	gantry.add_child(beam)
+	var board := Mats.box(Vector3(span - 0.6, 2.2, 0.14), Color(0.05, 0.06, 0.1), true)
+	board.position = Vector3(0.0, GANTRY_HEIGHT - 1.3, 0.0)
+	gantry.add_child(board)
+	var rim := Mats.box(Vector3(span - 0.4, 2.4, 0.08), LEAD, true)
+	rim.material_override = Mats.glow(LEAD, 1.4)
+	rim.position = Vector3(0.0, GANTRY_HEIGHT - 1.3, -0.06)
+	gantry.add_child(rim)
+	# Two words, as big as the board allows on the narrowest road, in
+	# near-white: read from the far end of the screen.
+	var words := Label3D.new()
+	words.text = "PIT STOP"
+	words.font_size = 128
+	words.outline_size = 0
+	words.pixel_size = 0.0088
+	words.modulate = Color(1.0, 0.97, 0.82)
+	words.no_depth_test = false
+	words.render_priority = 2
+	words.position = Vector3(-1.05, GANTRY_HEIGHT - 1.3, 0.2)
+	gantry.add_child(words)
+	# The arrow, built from bars so it lights up and needs no glyph: a
+	# shaft and a head, pointing right, at the right end of the board.
+	var ax := span * 0.5 - 1.5
+	var ay := GANTRY_HEIGHT - 1.3
+	var shaft := Mats.box(Vector3(1.3, 0.24, 0.06), LEAD, true)
+	shaft.material_override = Mats.glow(LEAD, 2.6)
+	shaft.position = Vector3(ax - 0.2, ay, 0.12)
+	gantry.add_child(shaft)
+	_lamps.append(shaft)
+	for leg in [-1.0, 1.0]:
+		var barb := Mats.box(Vector3(0.75, 0.24, 0.06), LEAD, true)
+		barb.material_override = Mats.glow(LEAD, 2.6)
+		barb.position = Vector3(ax + 0.3, ay + leg * 0.24, 0.12)
+		barb.rotation.z = -leg * 0.75
+		gantry.add_child(barb)
+		_lamps.append(barb)
+	for g in gantry.get_children():
+		if g is GeometryInstance3D:
+			(g as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _process(delta: float) -> void:

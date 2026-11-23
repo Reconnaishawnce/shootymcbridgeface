@@ -3,41 +3,77 @@ extends RefCounted
 ## What the game turns on at which level, and the one line it says when it
 ## does. Level 1 is steer and pick. Every level after that adds one tool or
 ## one threat, so the player learns by playing, not by reading.
+##
+## THE LADDER (0.63). By 0.62 everything arrived by level 4 and a new
+## player met thirty-three mechanics in ten minutes: "overwhelming", "no
+## one knows what the things mean". Now level 1 is two gates of plain
+## numbers and zombies one bullet kills; one new thing arrives a level,
+## with one line of six words or so; and the gates that needed a
+## paragraph to read are gone from the road.
 
-const DASH_LEVEL := 2
-const HOT_LEVEL := 3
-## Sturdy purple latchers join the waves from here; ordinary walkers and
-## runners that reach the squad cling on from CLING_LEVEL, the same level
-## the dash arrives, so there is always a way to shake them.
-const LATCHER_LEVEL := 3
-const CLING_LEVEL := 2
-const HIDDEN_LEVEL := 2
-const DILEMMA_LEVEL := 2
+## A thing that is not in the game: its code is still here, nothing
+## makes it.
+const NEVER := 9999
 
-## Hints shown at the start of a level, keyed by level.
-## Sum gates (short equations, applied left to right) appear from here.
-const EXPR_LEVEL := 2
-const EXPR_THREE_TERMS_LEVEL := 5
+## Gates.
+const MUL_LEVEL := 2
+const POWER_PANEL_LEVEL := 3
+const DILEMMA_LEVEL := 6
+const VEHICLE_LEVEL := 12
+## Hidden "?" panels, panels that flash, sums ("+3 x2"), deals (BET,
+## SCOUT, TRADE), coin panels, the three-word perk gate and the fork in
+## the road all needed reading at a run. Gone.
+const HIDDEN_LEVEL := NEVER
+const HOT_LEVEL := NEVER
+const EXPR_LEVEL := NEVER
+const EXPR_THREE_TERMS_LEVEL := NEVER
+const DEAL_LEVEL := NEVER
+const SUPPLY_LEVEL := NEVER
+const PERK_GATE_LEVEL := NEVER
+const FORK_LEVEL := NEVER
+
+## Things on the road.
+const CRATE_LEVEL := 2
+const PIT_LEVEL := 4
+const SAW_LEVEL := 5
+const BARRICADE_LEVEL := 7
+## A build card after the boss. Not after the first one: the first level
+## ends on the win, not on three things to read.
+const DRAFT_LEVEL := 2
+
+## Zombies. Walkers only on level 1.
+const BRUTE_LEVEL := 2
+## Walkers that reach the squad cling on from here, the same level the
+## dash and the shake arrive, so there is always a way to throw them.
+const CLING_LEVEL := 3
+const DASH_LEVEL := 3
+const RUNNER_LEVEL := 4
+## Sturdy purple latchers.
+const LATCHER_LEVEL := 6
+const THIEF_LEVEL := 8
+const TANK_LEVEL := 9
+const SPLITTER_LEVEL := 10
+const FLANKER_LEVEL := 11
+
+## The first boss only walks at you. From here they throw things.
+const BOSS_ATTACK_LEVEL := 2
+## Level themes change the rules (a fast road, lightning) from here; the
+## looks change from level 2.
+const THEME_RULE_LEVEL := 5
+
 const LANE_W := 3.3
 const MAX_LANES := 5
 
 
-## How many lanes the road has at gate [param index] of [param level].
-## Two to start; it widens partway through levels 2, 4 and 7 and stays.
-static func lanes_for(level: int, index: int) -> int:
-	var late := index >= 4
-	if level <= 1:
+## How many lanes the road has on [param level]. Two for three levels,
+## then one more every few: more lanes is more to read at every gate.
+static func lanes_for(level: int, _index: int = 0) -> int:
+	if level <= 3:
 		return 2
-	if level == 2:
-		return 3 if late else 2
-	if level == 3:
+	if level <= 8:
 		return 3
-	if level == 4:
-		return 4 if late else 3
-	if level <= 6:
+	if level <= 14:
 		return 4
-	if level == 7:
-		return 5 if late else 4
 	return MAX_LANES
 
 
@@ -45,13 +81,38 @@ static func road_half(lanes: int) -> float:
 	return float(lanes) * LANE_W * 0.5
 
 
+## The coach: the one line a level says when it brings something new.
+## Two short lines at most. This is all the teaching there is on the
+## road; HOW TO PLAY on the home screen has the rest for who wants it.
 const LEVEL_HINTS := {
-	1: "DRAG LOW TO STEER. HOLD THE ROAD TO AIM.\nBLUE GATES ADD SOLDIERS, RED ONES TAKE THEM",
-	2: "CLINGERS: TAP ONE TO SHOOT, FLICK LOW TO DASH\nTEAL GATES ARE SUMS, WORKED LEFT TO RIGHT",
-	3: "PANELS FLASH: HIT THEM THEN FOR x3\nPURPLE LATCHERS ARE TOUGHER: AIM EARLY",
-	4: "RED ON BOTH SIDES NOW\nPICK THE ONE YOU CAN SHOOT UP",
-	5: "THREE-TERM SUMS FROM HERE\nTHE ROAD KEEPS WIDENING",
+	1: "DRAG TO MOVE\nWALK THROUGH THE BIGGER NUMBER",
+	2: "x2 DOUBLES YOUR SQUAD\nBOXES ON THE ROAD ARE POWER-UPS",
+	3: "A ZOMBIE ON YOU?\nTAP IT, OR SHAKE YOUR PHONE",
+	4: "PIT STOP AHEAD\nSTEER RIGHT TO SHOP",
+	5: "SAW BLADES: STEP ASIDE",
+	6: "PURPLE ONES GRAB ON\nSHOOT THEM FIRST",
+	7: "A WALL: SHOOT IT DOWN\nOR GO ROUND",
+	8: "THIEVES SHRINK THE NEXT GATE\nSHOOT THEM",
+	9: "THE BIG ONE SOAKS BULLETS\nSTEP ROUND IT",
+	10: "YELLOW ONES BURST\nKILL THEM FAR AWAY",
+	12: "OLIVE GATE:\nTRADE SOLDIERS FOR A JEEP",
 }
+## The second line a run's first level says, once the player has moved:
+## aiming is the one thing nobody finds on their own.
+const AIM_HINT := "HOLD A FINGER ON THE ROAD\nTO AIM EVERY GUN THERE"
+## How many runs the level 1 lines keep showing for.
+const BASICS_RUNS := 3
+
+
+## Whether the coach speaks at the start of [param level]: only while
+## the level is new to this player. [param best] is the furthest level
+## they have reached, [param runs] how many runs they have played.
+static func coach_due(level: int, best: int, runs: int) -> bool:
+	if not LEVEL_HINTS.has(level):
+		return false
+	if level == 1:
+		return runs < BASICS_RUNS
+	return level >= best
 
 ## Unfocused fire sprays: each bullet drifts sideways by up to this much
 ## (m/s). At range that means misses. Focus fire has no spray and hits

@@ -199,6 +199,14 @@ static func is_expr(panel: GatePanel) -> bool:
 	return panel.kind == Kind.EXPR
 
 
+## Whether a panel is worth slowing the road for: a multiplier, a
+## power-up or a vehicle is a choice; a plain number is a glance.
+static func asks_thought(panel: GatePanel) -> bool:
+	if panel.kind == Kind.MUL and panel.value > 1.0:
+		return true
+	return is_power(panel) or is_vehicle(panel) or is_expr(panel) or is_deal(panel) or is_bet(panel) or is_supply(panel)
+
+
 ## What the panel prints on its face.
 static func label(panel: GatePanel) -> String:
 	if not panel.revealed:

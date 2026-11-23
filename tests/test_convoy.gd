@@ -29,7 +29,11 @@ func test_gates_offer_vehicles() -> void:
 	var gen := Difficulty.new(11)
 	var offers := 0
 	var openers := 0
-	for level in range(1, 6):
+	for level in range(1, Progression.VEHICLE_LEVEL):
+		for i in range(Difficulty.GATES_PER_LEVEL):
+			for q in gen.make_gate(level, i, 50, Progression.lanes_for(level, i), {}):
+				check(not GateMath.is_vehicle(q), "no vehicle panels before VEHICLE_LEVEL (level %d)" % level)
+	for level in range(Progression.VEHICLE_LEVEL, Progression.VEHICLE_LEVEL + 5):
 		for i in range(Difficulty.GATES_PER_LEVEL):
 			var panels := gen.make_gate(level, i, 50, Progression.lanes_for(level, i), {})
 			var n := 0

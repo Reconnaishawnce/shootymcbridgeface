@@ -6,11 +6,20 @@ extends Node3D
 
 const SPEED := 13.0
 const COLOR := Color(0.55, 0.85, 0.25)
+## What a boss lobs (Difficulty.LOB_CYCLE): green and purple globs, and
+## an orange bomb that flies slower, lands wider and bursts.
+const COLORS := {"glob": Color(0.55, 0.85, 0.25), "purple": Color(0.72, 0.4, 0.95), "bomb": Color(1.0, 0.55, 0.12)}
+const SIZES := {"glob": 0.42, "purple": 0.42, "bomb": 0.62}
+const SPEEDS := {"glob": 13.0, "purple": 13.0, "bomb": 10.0}
 const MARK := Color(1.0, 0.2, 0.15, 0.7)
 const SHADOW := Color(0.05, 0.08, 0.02, 0.55)
 ## How far from the glob's landing spot the splash reaches.
 const SPLASH := 0.5
 
+var kind := "glob"
+var color := COLOR
+var splash := SPLASH
+var speed := SPEED
 var target_x := 0.0
 var start_x := 0.0
 var start_z := 0.0
@@ -20,14 +29,26 @@ var _marker: MeshInstance3D
 var _shadow: MeshInstance3D
 
 
-func _init() -> void:
+func _init(p_kind: String = "glob") -> void:
+	kind = p_kind if COLORS.has(p_kind) else "glob"
+	color = COLORS[kind]
+	splash = float(Difficulty.LOB_SPLASH[kind])
+	speed = float(SPEEDS[kind])
+	var size := float(SIZES[kind])
 	# Big, bright and trailing a tail: you see it leave the boss.
-	var m := Mats.sphere(0.42, COLOR)
-	m.material_override = Mats.glow(COLOR, 1.5)
+	var m := Mats.sphere(size, color)
+	m.material_override = Mats.glow(color, 1.5)
 	add_child(m)
+	if kind == "bomb":
+		# A bomb is a ball with a lit fuse, not a glob with a tail.
+		var fuse := Mats.sphere(0.16, Color(1.0, 0.95, 0.6))
+		fuse.material_override = Mats.glow(Color(1.0, 0.95, 0.6), 3.0)
+		fuse.position = Vector3(0.0, size + 0.1, 0.0)
+		add_child(fuse)
+		return
 	for i in range(3):
-		var bead := Mats.sphere(0.26 - float(i) * 0.06, COLOR)
-		bead.material_override = Mats.glow(Color(COLOR.r, COLOR.g, COLOR.b, 0.7 - float(i) * 0.2), 1.2)
+		var bead := Mats.sphere(0.26 - float(i) * 0.06, color)
+		bead.material_override = Mats.glow(Color(color.r, color.g, color.b, 0.7 - float(i) * 0.2), 1.2)
 		bead.position = Vector3(0.0, 0.25 + float(i) * 0.3, -0.35 - float(i) * 0.4)
 		add_child(bead)
 
@@ -40,7 +61,7 @@ func launch(from: Vector3, to_x: float, marker_parent: Node) -> void:
 	start_z = from.z
 	target_x = to_x
 	_total = maxf(1.0, -from.z)
-	_marker = Mats.torus(0.5, 0.75, MARK, true)
+	_marker = Mats.torus(splash, splash + 0.25, MARK, true)
 	_marker.position = Vector3(to_x, 0.06, -0.4)
 	marker_parent.add_child(_marker)
 	# A shadow on the road under the glob: where it is and how high.
@@ -51,11 +72,11 @@ func launch(from: Vector3, to_x: float, marker_parent: Node) -> void:
 
 
 func flight_time() -> float:
-	return _total / SPEED
+	return _total / speed
 
 
 func _process(delta: float) -> void:
-	_travel += SPEED * delta
+	_travel += speed * delta
 	var u := clampf(_travel / _total, 0.0, 1.0)
 	position.x = lerpf(start_x, target_x, u)
 	position.z = lerpf(start_z, -0.4, u)

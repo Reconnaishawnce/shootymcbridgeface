@@ -3,6 +3,72 @@
 Versions are `MAJOR.MINOR.<CI run number>`. The first two parts come from
 `VERSION`; the build number comes from GitHub Actions.
 
+## 0.63 (quiet: one new thing a level, and far fewer words)
+
+The verdict from the people playing it: too much text, nobody knows
+what the gate words mean, too many options, and "we've lost the
+thread". By 0.62 a new player met thirty-three mechanics in the first
+ten minutes and the road could say eighty different lines. This is
+phase 1 of a revamp (docs/ROADMAP.md, "The revamp"): take things away
+until the game can be read at a run.
+
+- THE LADDER. Level 1 is two lanes of plain numbers and walkers, and
+  nothing else: no multipliers, no boxes, no brutes, no runners, and a
+  boss that only walks at you. One new thing arrives a level
+  (`Progression`): x2 gates and power-up boxes at 2, grabbers and the
+  dash at 3, the pit stop at 4, saws at 5, purple latchers at 6, walls
+  at 7, thieves at 8, tanks at 9, splitters at 10, vehicles at 12. It
+  used to all be there by level 4.
+- GATES ARE NUMBERS. Gone from the road: sums ("+3 x2"), BET, SCOUT,
+  TRADE, coin SUPPLY panels, hidden "?" panels, panels that flash, the
+  three-word perk gate, and the fork. A panel is a number, a named
+  power-up, or (late) a vehicle. FRENZY is now FAST FIRE.
+- HALF THE WORDS, AND THEN HALF AGAIN. Every line the road can say has
+  a rank (`Notices`), and the default is silence. About a quarter of the
+  eighty survive: the gate you took, the bite you took, the boss, the
+  level. The home screen lost its tip, its difficulty blurb and its
+  next-unlock line; the results card went from fourteen lines to four;
+  a pit stop tile is a name and one line (DAMAGE, FIRE RATE, ARMOR,
+  SOLDIERS, BOMB, TURRET); the settings page lost four switches; the
+  fire-mode button is off the screen.
+- CARDS IN SIX WORDS. "A kill bounces to the next zombie for 60%
+  damage" is "Kills bounce to the next zombie". "Pairs with COLD ROUNDS
+  for SHATTER" is gone: a card only mentions a combo it completes.
+- A COACH, NOT A MANUAL. The stop-and-read lessons are off the road.
+  Each level that brings something new says one line of about six words
+  as it starts, while that level is still new to you: "DRAG TO MOVE /
+  WALK THROUGH THE BIGGER NUMBER", then "HOLD A FINGER ON THE ROAD / TO
+  AIM EVERY GUN THERE", and at level 3 "A ZOMBIE ON YOU? / TAP IT, OR
+  SHAKE YOUR PHONE".
+- SHAKE THEM OFF. Shaking the phone in a run throws every clinger off
+  (two jolts; K on a desktop). The shake that opens the report card now
+  only works on the home screen and the pause menu, where it can mean
+  nothing else.
+- A SIGN FOR THE PIT STOP. A lit gantry over the whole road, well
+  before the ramp: "PIT STOP · SHOP" and an arrow as tall as a soldier.
+  The garage sign says SHOP. First pit stop is level 4.
+- YOU CANNOT WALK PAST THEM. A walker's last seven metres are a lunge,
+  and one that is passed anyway turns and runs the squad down. What you
+  do not shoot, bites. Brutes and tanks are the exception: big, slow,
+  and stepping round them is still the answer.
+- BOSSES THROW THINGS. Every ranged boss lobs: green globs, purple
+  globs, and every fourth an orange bomb that flies slower and lands
+  three times as wide. An angry boss rolls a saw down your lane now and
+  then. Lightning lands a quarter less often (4.3 s for 3.2, the
+  storm's lines 4.5 s for 3.4, the storm front 8 s for 6), and the
+  storm boss waits for level 6.
+- SLOWER TO START, AND ONE BULLET KILLS. Level 1's road is 6.5 m/s (was
+  7.5), bullets 22 m/s (was 26), ten rounds a second at most, and a
+  walker falls to one round through level 3. The road still reaches 14
+  m/s at level 10.
+- HOW TO PLAY went from thirty-eight sections to sixteen, each under
+  110 words (the test counts).
+
+Not in this release, and said plainly: the code for the cut gates,
+perks, the fork and the lessons is still in the repo with nothing
+making it; phase 2 deletes it or folds it into cards. The numbers are
+from the bot, not from a person holding a phone.
+
 ## 0.62 (the reports, read: lighter bodies and an honest watchdog)
 
 Fifteen reports came in from two phones. They said two different

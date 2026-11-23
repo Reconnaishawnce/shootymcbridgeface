@@ -1,230 +1,128 @@
 class_name HelpText
 extends RefCounted
-## The in-game HELP page: how the game works, in plain words. Numbers are
-## read from the real constants so the page cannot drift from the rules.
+## The in-game HOW TO PLAY page: how the game works, in plain words.
+## Numbers are read from the real constants so the page cannot drift
+## from the rules.
 ##
 ## RULE: any change to game mechanics updates this file in the same
 ## commit. See CLAUDE.md.
+##
+## 0.63: the page went from thirty-eight sections to sixteen, because the
+## game went from thirty-three mechanics to a ladder of twelve. A section
+## is a few short sentences; tests/test_run13.gd counts the words.
+
+## The longest a section's body may be, in words.
+const MAX_SECTION_WORDS := 110
 
 
 static func sections() -> Array:
-	var hats := Wardrobe.items_in("hat").size()
-	var heroes := Wardrobe.items_in("hero").size()
-	return [
-		{"title": "THE IDEA", "body":
-			"You lead a squad of little soldiers down a road full of zombies. " +
-			"The road scrolls on its own. You steer left and right, pick which gate panel to walk through, and aim your guns. " +
-			"More soldiers means more bullets. Lose them all and the run is over."},
-		{"title": "FEEL", "body":
-			"The phone buzzes with the game (HAPTICS in SETTINGS turns it off): a tap for a bite, a thump for a brute, a long one when the boss goes down. Heavy kills land with a blink of stopped time, the boss falls in slow motion under confetti, the music brightens as your combo climbs, and the score on the results card counts up before it settles."},
-		{"title": "SOUND", "body":
-			"The music is one song that changes with the room: calm on the road, tense when things get hard, and a driving beat for the boss. Every kind of run has its own tune over it: one for a normal run, one for ENDLESS, one for the DAILY and the WEEKLY, one for the BOSS RUSH.\n" +
-			"A combo sings. From the third kill of a chain every kill plays a note, and the note climbs a step every %d kills, two octaves up at the top. Drop the chain and it starts from the bottom again.\n" % Tunes.COMBO_KILLS_PER_STEP +
-			"Two rising beeps mean a boss attack or a lightning line has just been called: look for the red rings and move. SOUND and MUSIC can each be turned off in SETTINGS or the pause menu."},
-		{"title": "IF IT FREEZES OR SLOWS DOWN", "body":
-			"SHAKE the phone hard and a card asks what happened: IT FROZE, IT GOT SLOW, IT GLITCHED or SOMETHING ELSE. Tap one and a report goes to the developer with the last half minute of frame times and what was on screen, never your name. The run pauses while the card is up. REPORT A PROBLEM in the pause menu does the same without the shake. " +
-			"Freezes of a second or more and slow stretches under %d frames a second send a report on their own when SEND REPORTS is on in SETTINGS. SHOW FPS puts a frame counter in the corner if you want to watch it yourself. REPORT A PROBLEM is also under MORE on the home screen.\n" % int(Telemetry.SLOW_FPS) +
-			"The game keeps a FLIGHT RECORDER: once a second it writes down the frame times and what is on screen, on your phone only. If the game stops suddenly, the report sent next time you open it carries the last minute and a half before it stopped.\n" +
-			"LOGGING in SETTINGS goes further, for a phone that keeps having trouble: while it is on, the recorder is sent to the developer every %d minutes as you play, sooner when a second goes badly, and the end of a session that crashed is sent when you next open the game. After a sudden stop LOGGING turns itself on for the next %d launches (the home screen says so, and SETTINGS turns it off). It never sends your name." % [int(Flight.UPLOAD_EVERY / 60.0), Flight.AUTO_SESSIONS]},
-		{"title": "LEARN AS YOU GO", "body":
-			"The first time something new appears on the road (a hidden panel, a sum, a deal, a perk gate, the fork, a saw, each boss...) the road pauses and one short card says how it works. Tap GOT IT and play on. " +
-			"LEARN THE ROAD under MORE starts a learning round where every card shows again. LESSONS in SETTINGS turns them off. This page is the long version."},
-		{"title": "THE HOME SCREEN", "body":
-			"PLAY starts a normal run. MODES holds every other way to play (endless, the daily, the weekly, the boss rush), the difficulty and your squad type. Along the bottom: SHOP for coins, LOCKER for stars, and MORE for the leaderboard, quests, the trophy road, records, the learning round, this page and SETTINGS."},
-		{"title": "CONTROLS", "body":
-			"Low on the screen, near the squad: drag left or right to steer, drag up or down to spread out or bunch up, and flick hard sideways to dash (from level %d). " % Progression.DASH_LEVEL +
-			"Higher up, on the road: hold a finger there and every gun aims at that spot with a red laser. Lift to go back to firing straight ahead. " +
-			"The button at the bottom right cycles TIGHT, NORMAL, WIDE and STRAIGHT. Tight is a focused column: bullets land where you point, the squad fits through gaps and takes fewer lightning hits. " +
-			"Wide is a fan: the outer soldiers cover the sides of the road, so you kill more of a crowd and earn more bounty, but your fire is scattered. " +
-			"STRAIGHT sends every round out of the middle of the squad, dead ahead, %d%% harder and through one more body: the drill for a brute, a tank, a boss core or a panel in front of you, while the sides go unwatched. A drag on the width ends it. " % int(round((Bounty.STRAIGHT_DAMAGE_MULT - 1.0) * 100.0)) +
-			"Tap a zombie that is clinging to your squad to shoot it off."},
-		{"title": "GATES AND PANELS", "body":
-			"Every gate is a row of panels, one per lane. You walk through exactly one.\n" +
-			"BLUE panels add soldiers (+5) or multiply them (x2).\n" +
-			"RED panels take soldiers away (-6) or halve them.\n" +
-			"TEAL panels are sums like +3 x2, worked out left to right. +3 x2 is not the same as x2 +3. Do the maths, then pick.\n" +
-			"PURPLE panels hand you a power-up.\n" +
-			"AMBER panels are deals: a trade (pay soldiers now for a power-up now), a bet (double your squad if you clear the next wave with no bites, half if you do not), or scouts (pay a few soldiers and the next %d gates show every panel).\n" % GateMath.SCOUT_GATES +
-			"OLIVE panels turn soldiers into a vehicle (see THE CONVOY).\n" +
-			"GOLD panels are SUPPLY: pay coins out of this run's bounty, right there at the gate, for a few soldiers or a power-up now. What you spend on the road you do not take home to the shop, so it is a real choice. Not enough bounty and the panel does nothing.\n" +
-			"GREY panels with a ? are hidden until you get close or shoot them."},
-		{"title": "SHOOT THE PANELS", "body":
-			"Your bullets hit the panels too. Every bit of fire steps a panel up: a +2 becomes a +3, a x2 becomes x2.5, a trade gets cheaper. Only while your hand is on the road, though: a few seconds without a touch and panels stop climbing, so a squad left to itself takes what is printed. " +
-			"Shoot a panel up at least %d steps before you walk through it and you get a PERFECT worth %d points. " % [Difficulty.PERFECT_STEPS, Difficulty.PERFECT_BONUS] +
-			"From level %d some panels flash white: hits during the flash count triple. " % Progression.HOT_LEVEL +
-			"But bullets spent on panels are bullets not spent on zombies. That is the whole game."},
-		{"title": "LEVELS", "body":
-			"A level is %d gates and a boss. The road widens as you go, from two lanes up to %d, so later gates have more panels to read. " % [Difficulty.GATES_PER_LEVEL, Progression.MAX_LANES] +
-			"The third and sixth gate of every level is a PERK gate: three purple panels, pick one, it lasts the run. " +
-			"Once per level the road forks. Each side has a sign: red skull marks for how heavy its zombie wave is, and a number for roughly how many soldiers it takes. " +
-			"The heavier side pays better panels. Read both and pick. " +
-			"When you beat the boss, %d%% of your survivors carry over and the rest reset, so every level starts small and grows."
-				% int(Difficulty.CARRY_OVER_FRACTION * 100.0)},
-		{"title": "THE PACE OF A RUN", "body":
-			"A run starts slow on purpose. On level 1 the road moves at %.1f metres a second, your bullets are slow enough to watch fly, each soldier takes his time, and the crowds are thin. Every level turns it all up a notch: the road is at %d by level 10 and keeps climbing to %d, bullets go from %d metres a second to %d, and the stream of fire goes from %d bullets a second at most to %d. Your squad hits just as hard either way; what changes is how fast everything comes at you.\n" % [Difficulty.START_SPEED, int(Difficulty.world_speed(10)), int(Difficulty.LATE_SPEED_CAP), int(Difficulty.BULLET_SPEED_START), int(Difficulty.BULLET_SPEED_MAX), int(Difficulty.SHOTS_START), int(Difficulty.SHOTS_MAX)] +
-			"SLOW ROAD: when a gate needs reading (a sum, a deal, a bet, a vehicle, the fork) the road drops to about %d%% of its speed while it comes up, so you can think, then picks up again." % int(Difficulty.THINK_SLOW * 100.0)},
-		{"title": "DANGER", "body":
-			"Nobody is unbeatable. From level %d the road bites harder every level: every heavy bite (a brute, a tank, a boss, a saw, lightning, a wall) grows by %d%% a level, on top of the level before, and the level banner shows the total as DANGER. A plain zombie that reaches you takes one soldier at first and one more for every %d levels. Late zombies also carry more health every level, so sooner or later a crowd gets through.\n" % [Difficulty.DANGER_FROM + 1, int(round((Difficulty.DANGER_GROWTH - 1.0) * 100.0)), Difficulty.CONTACT_BITE_EVERY] +
-			"Armor has a limit. ARMOR, THICK SKIN, veterans, medics and a hero all soften bites, but together they never take more than %d%% off. And the fork's big panels stop growing after level %d. So the upgrades get you further, they do not make you safe: how far you get before the road wins is the score to beat." % [int(round((1.0 - Difficulty.MITIGATION_FLOOR) * 100.0)), Difficulty.FORK_LEVEL_CAP + 1]},
-		{"title": "LEVEL THEMES", "body":
-			"Every level is a different place with its own weather and its own rule. The banner at the start of the level names it and says the rule, and the pause menu repeats it. Level 1 is always DAYBREAK, the plain road; after that the themes come round in order, with a plain daybreak every seventh level to catch your breath.\n" +
-			_theme_lines() +
-			"In a STORM FRONT a line of lightning crosses the road every %d seconds of the gates with one gap in it: a red ring shows where each bolt lands, so stand where there is none, or dash through. Themes are the same for everyone, so they run in the daily and the weekly too, and a weekend event stacks on top." % int(Themes.STRIKE_INTERVAL)},
-		{"title": "BUILD CARDS", "body":
-			"Every time a boss falls the road stops and deals you three BUILD CARDS. Pick one. It is yours until the run ends, and it changes what your bullets and your squad do, so no two runs play the same. In the BOSS RUSH it is every other boss.\n" +
-			"Cards come in three kinds: COMMON (blue), RARE (purple) and EPIC (gold, and not often). Most can be taken more than once and get stronger each time.\n" +
-			_card_lines() +
-			"Some pairs make a COMBO, which is a third power on top of the two cards. The card tells you when it would make one, and a card that would finish a combo turns up more often:\n" +
-			_combo_lines() +
-			"The pause menu lists your cards, and the results card shows the build you finished with. Bosses are a little tougher for every card you hold."},
-		{"title": "PERKS", "body":
-			"Every perk panel says what it does and how many of it you already hold, the banner on the way through says it again, and the strip under your stats lists everything you carry. " +
-			"When a perk does its job you see it: THICK SKIN tells you how many soldiers it just saved, RECRUITER shows its extra soldier at the gate, GREED shows on the bounty counter as it grows.\n" +
-			_perk_lines()},
-		{"title": "VETERANS", "body":
-			"Beat a boss with anyone left and one survivor becomes a VETERAN: a name, a beret in their trait's colour, and a trait the whole squad feels. " +
-			"DEADEYE: %s. TOUGH: %s. FIELD MEDIC: %s. LUCKY: %s. " % [Veterans.description("deadeye"), Veterans.description("tough"), Veterans.description("medic"), Veterans.description("lucky")] +
-			"Up to %d a run; they ride in the front ranks and do not carry over. Any heavy bite (brutes, tanks, bosses, lightning, spit, saws, the horde) has a %d%% chance to take a veteran with it, by name. Dodge, and you keep them." % [Veterans.MAX, int(Veterans.RISK * 100.0)]},
-		{"title": "THE CONVOY", "body":
-			"Soldiers can become vehicles. Once your squad is big enough, a gate offers an olive panel like JEEP -%d: walk through it and that many soldiers climb aboard. " % Convoy.cost("jeep") +
-			"A JEEP (%d soldiers, up to %d) rides on your flank with a mounted gun: fast, straight, through two zombies at a time. " % [Convoy.cost("jeep"), int(Convoy.spec("jeep").max)] +
-			"A TANK (%d soldiers, from level %d) leads up the middle firing shells that burst on a crowd. " % [Convoy.cost("tank"), int(Convoy.spec("tank").level)] +
-			"A HELICOPTER (%d soldiers, from level %d) hovers above the squad, hunts thieves, runners and clingers on its own, and nothing on the ground can touch it; only lightning can. " % [Convoy.cost("heli"), int(Convoy.spec("heli").level)] +
-			"A MECH (%d soldiers, from level %d) walks out front and burns a laser through a column of zombies. " % [Convoy.cost("mech"), int(Convoy.spec("mech").level)] +
-			"Every %d kills a vehicle earns a RANK (up to %d): harder hitting, tougher, healed up, a gold stripe. Once you own a vehicle, perk gates can offer PLATING and OVERDRIVE for the convoy. " % [int(Convoy.RANK_KILLS[0]), Convoy.RANK_KILLS.size()] +
-			"Vehicles have their own health bar: brutes, boss chews and lightning damage them, and a wrecked one is gone. " +
-			"But they stay with you from level to level while the soldiers reset, and each one still rolling at the boss pays %d points. Fewer bodies now, a convoy later." % Convoy.LEVEL_BONUS_PER_VEHICLE},
-		{"title": "THE ROAD WATCHES YOU", "body":
-			"Every level expects a squad of a certain size. Run bigger than that and the zombies come a little thicker and bite a little harder, up to half again as much. " +
-			"Run smaller and they ease off, up to a quarter. It is a nudge, not a wall: a strong player stays busy, a new one gets a chance. " +
-			"The convoy counts toward the read. A won bet pays at most %d soldiers, and a big squad finds flat gains at the fork instead of multipliers. A mid squad can push a shot multiplier to x%d and a big one to x%.1f, so a squad left to take panels at random shrinks rather than holds. " % [Difficulty.BET_WIN_CAP, int(Economy.MUL_CAP_MID), Economy.MUL_CAP_BIG] +
-			"Bosses are sized for the squad that meets them (%d%% of it when that is more than the level expects), the first saw of every level is thrown at where you stand, and the crowds carry health to match your guns." % int(Difficulty.BOSS_SQUAD_FRACTION * 100.0)},
-		{"title": "ZOMBIES", "body":
-			"Walkers shamble at you. Runners are fast and thin and find you. Brutes are big, soak a lot of fire, and take a slice of the squad when they reach you. " +
-			"Tanks are bullet sponges that shield whatever is behind them. Thieves sprint for the next gate and knock its number down, so shoot them first. " +
-			"Purple latchers, and from level %d any walker or runner that reaches you, cling to your flanks and eat until you tap them or dash: a soldier a bite on a small squad, a slice of %d in a thousand on a big one, so a squad nobody is steering gets eaten. " % [Progression.CLING_LEVEL, int(Difficulty.LATCH_BITE_FRACTION * 1000.0)] +
-			"On wide roads, flankers hop the curbs beside you. From level %d the bloated yellow-green SPLITTER bursts into %d fast runners when it dies: kill it far away. " % [Difficulty.SPLITTER_LEVEL, Difficulty.SPLIT_INTO] +
-			"From level %d a buzz SAW rolls down the bridge at you now and then, wobbling across its lane: steer round it or dash through it, or it takes a slice (%d%% of the squad). It cuts zombies too. " % [Difficulty.SAW_LEVEL, int(Difficulty.SAW_BITE_FRACTION * 100.0)] +
-			"From level %d a WALL stands across half the road a little after a gate (two a level from level %d): shoot it down before it arrives, or steer onto the open half; run into it and it shatters and takes %d%% of the squad. " % [Difficulty.BARRICADE_LEVEL, Difficulty.BARRICADE_TWO_LEVEL, int(Difficulty.BARRICADE_BITE_FRACTION * 100.0)] +
-			"Zombies that get past you without being killed break your wave streak."},
-		{"title": "BOSSES", "body":
-			"At the end of every level the road slows and the boss comes. The WALKER marches up and chews your squad once it arrives. " +
-			"The SPITTER hangs back and lobs globs: you see each one leave the boss, its shadow crossing the road, and a red ring that closes in on where it lands. Only the ring is wet; step out of it. " +
-			"Lightning warns for %.1f seconds with a ring that fills up before the bolt lands, and only the ring is hit. The STORM hangs back and calls lightning in lines across the whole road with one gap: find the gap. " % Difficulty.STRIKE_WARNING +
-			"Every fourth level THE FOREMAN takes the road: it hangs back, hurls buzz saws down your lane (two when it is angry) and drops supply crates between you, so the fight is dodge, grab and shoot. " +
-			"All of them call runners and get angrier below half health; all but the foreman drop red rings that turn into lightning bolts. " +
-			"Hit the glowing yellow core for triple damage. Kill the boss fast: from level %d a horde creeps up behind you while the road is stopped, and eats if it arrives. The same horde closes in any mode, from level %d, whenever your hands leave the road for a few seconds: it eats %d%% of the squad a bite until you steer again." % [int(Modifiers.get_value("normal", "horde_level")), Difficulty.HANDS_OFF_HORDE_LEVEL, 5]},
-		{"title": "POWER-UPS", "body":
-			"BOMB: tap the bomb button to throw one. It aims itself at the boss or the nearest brute or tank in reach, and the button pulses when there is something worth it. Big blast, kills most things in it.\n" +
-			"SLOW-MO: the road and the zombies slow down for a while.\n" +
-			"SHIELD: nothing bites you until it runs out.\n" +
-			"FRENZY: your guns fire much faster.\n" +
-			"MYSTERY: one of the above, you find out when you grab it.\n" +
-			"They come from purple panels, from crates on the road, and from trades."},
-		{"title": "COMBOS AND SCORE", "body":
-			"Kills within %.1f seconds of each other chain into a combo. Every %d kills in a chain raises the multiplier, up to x%.0f. " % [Combo.WINDOW, Combo.STEP, Combo.MAX_MULT] +
-			"Score is mostly distance, plus kills times the multiplier, PERFECT gates, cleared waves, and a bonus for each boss. " +
-			"Every level you clear gets a GRADE from S to D for perfect gates, soldiers kept and how fast the boss went down. S pays %d points, down to nothing for a D." % Grades.bonus("S")},
-		{"title": "TWO KINDS OF MONEY", "body":
-			"The BOUNTY is this run's money. Every zombie you kill pays it: walkers and runners %d, thieves and latchers %d, brutes %d, tanks %d; bosses %d and every gate %d. The counter under the level shows it growing. " % [Bounty.for_kind("normal"), Bounty.for_kind("thief"), Bounty.for_kind("brute"), Bounty.for_kind("tank"), Bounty.BOSS, Bounty.GATE] +
-			"You can spend it on the road, at GOLD supply panels and at the PIT STOP, on gear that lasts the run. " +
-			"COINS are your save's money. At the end of a run what is left of the bounty turns into coins: one for one up to %d, then with diminishing returns, so a monster run pays well but not without end. Coins buy the SHOP's upgrades, which last forever. " % Economy.GOLD_LINEAR +
-			"The bridge holds %d soldiers at most, and a big squad cannot shoot a multiplier panel as high as a small one can.\n" % Economy.SQUAD_CAP},
-		{"title": "PIT STOP", "body":
-			"From level %d a pit lane pulls off the right side of the road once a level. PIT LANE AHEAD flashes, the camera backs off, and a ramp with yellow chevrons peels away past a pit wall to a garage with its door up, tyre stacks, floodlights and a crew waving you in. Steer right onto the ramp and ride the lane to the garage: the road waits while you spend this run's bounty on this run's gear, and the crew clears the next wave ahead for you. A second ramp brings you back. The gear: " % PitStop.PIT_LEVEL +
-			"%s (%s), %s (%s), %s (%s), %s, %s, and the GOLD TURRET: a gun that rides the curb beside you and fires on its own at whatever is nearest, its damage on top of the squad's and outside its cap, %d at most. Each costs more the more you hold. Nothing here outlives the run." % [PitStop.title("rounds"), PitStop.effect_text("rounds", 1), PitStop.title("rifles"), PitStop.effect_text("rifles", 1), PitStop.title("armor"), PitStop.effect_text("armor", 1), PitStop.title("bomb"), PitStop.title("dressing"), Difficulty.MAX_TURRETS]},
-		{"title": "COINS AND THE SHOP", "body":
-			"The SHOP sells permanent upgrades as a wall of tiles: a picture of each, its level in gold pips, what it does now and what the next level does, and the price. Tiles you can afford glow. They are: more soldiers at every level start, harder-hitting bullets, extra soldiers on every blue gate, armor against brutes, bosses and lightning, bombs at the start of a run, a SECOND WIND that turns one wipe per run into a comeback with %d soldiers and ten seconds of AGRO (double fire, double damage, nothing bites), extra boss core damage, more coins, earlier hidden-panel reveals, and the shotgun and medic squads. " % Meta.SECOND_WIND_SOLDIERS +
-			"Each upgrade costs more every time you buy it. The daily and the weekly pay no coins and use no upgrades.\n" +
-			"Past MAX an upgrade does not stop: the tile says MAXED and what it does now, and ENLIST buys one more step. Every step buys something the tile shows: one percent of damage, coins or hero move, half a percent off bites, a metre of reveal, or one whole soldier at level start or per blue gate (those two cost more). The line under the shop says what you just got and what the total is now. Each step costs more than the last. ARMOR stops being sold once bites cannot be softened any further.\n" +
-			"The top of the SHOP is FOR THE NEXT RUN: boosts you buy once and spend on your next normal, endless or boss rush run. BOMB DROP (%d extra bombs), HOT ROUNDS (+%d%% damage), DOUBLE PAY (twice the coins) and SPARE WIND (one more comeback). The home screen says what is armed. The daily and the weekly leave them armed for later." % [Boosts.BOMBS, int(round((Boosts.DAMAGE_MULT - 1.0) * 100.0))]},
-		{"title": "STARS AND THE LOCKER", "body":
-			"Stars are the other currency. A run pays one star per boss, one per four perfect gates, and one for getting through at least three gates. " +
-			"The daily pays one extra, the weekly two, and hard and nightmare pay bonus stars. Achievements pay stars too. " +
-			"The LOCKER holds %d heroes, outfits, %d hats, weapon skins, backs and crew styles, all bought with stars. (CHARACTERS in SETTINGS turns the whole thing off and puts the squad back in plain kit.) " % [heroes, hats] +
-			"Your hero leads the squad with a name tag, and always escapes. The ROAD tab sells paint for the bridge deck, and GOLD SQUAD dresses the whole crew in gold."},
-		{"title": "HEROES", "body":
-			"A hero is not only a face. Each one changes how the run plays: one thing that is always on, and one thing your hero move does on top of its usual job. Pick the hero that suits how you play, or the one that goes with the cards you like.\n" +
-			_hero_lines() +
-			"Hero powers work in normal runs, endless and the boss rush. The daily and the weekly are the same road for everyone, so everyone runs them plain. With CHARACTERS off there is no hero and no power."},
-		{"title": "MODES", "body":
-			"NORMAL is the road as it comes. HARD opens at %d trophies: bigger waves, meaner bosses, 1.5x score and coins. " % int(Road.UNLOCKS["hard"]) +
-			"NIGHTMARE opens at %d trophies: everything at once, 2.5x score and coins. Each mode keeps its own best.\n" % int(Road.UNLOCKS["nightmare"]) +
-			"ENDLESS opens at %d trophies: no bosses, no reset, the road just keeps getting harder. The last gate of every endless level brings an ELITE wave instead of a boss: three brutes or more, a tank, extra latchers. From level %d the road speeds up again and the crowds keep growing.\n" % [int(Road.UNLOCKS["endless"]), Difficulty.LATE_LEVEL] +
-			"DAILY: the same road for everyone today, no upgrades, rifles only. Best of the day counts and you can copy your result to share.\n" +
-			"WEEKLY: the same road for everyone all week, on hard, no upgrades, and a CHALLENGE that changes every week (fog, a saw storm, elite waves, a fast road), so the weekly board is a new contest each week.\n" +
-			"BOSS RUSH opens at %d trophies: one gate, then the boss, level after level, with %d extra soldiers to start. Its best is kept on its own.\n" % [int(Road.UNLOCKS["rush"]), Difficulty.RUSH_START_SQUAD] +
-			"EVENTS: on Saturdays and Sundays the whole road carries a weekend event, named on the home screen: DOUBLE BOUNTY (every kill pays twice), a SAW STORM (two more saws a level, faster), or FOG ON THE BRIDGE (panels show late). Everyone gets the same one."},
-		{"title": "SQUADS", "body":
-			"RIFLES are balanced. SHOTGUNS fire three pellets with more damage but shorter reach. MEDICS do a little less damage and slowly revive soldiers. SNIPERS (from %d trophies on the ROAD, or the SHOP) fire slowly, hit more than twice as hard, and every shot goes through one more zombie. " % int(Road.UNLOCKS["snipers"]) +
-			"The front %d soldiers' worth of guns count toward firepower one for one; past that every extra soldier adds a little less (500 soldiers shoot like %d). A bigger squad is mostly extra health, and the crowds grow to match its guns, so a huge squad is never a free ride." % [Progression.DPS_CAP_SOLDIERS, Progression.firing_count(500)]},
-		{"title": "THE HERO MOVE", "body":
-			"Tap the squad, or the HERO button bottom left, and the squad does its move. Rifles fire a VOLLEY: one hard shot per soldier dead ahead (up to %d), each through the first thing it meets. Shotguns burst a SHOCKWAVE: everything within %d metres takes %.1f seconds of the squad's fire and is thrown back. Medics send a HEAL PULSE: %d%% of the squad back on their feet (at least %d) and a shield for %d seconds. " % [Abilities.VOLLEY_MAX_SHOTS, int(Abilities.SHOCKWAVE_RADIUS), Abilities.SHOCKWAVE_SECONDS, int(Abilities.HEAL_FRACTION * 100.0), Abilities.HEAL_MIN, int(Abilities.HEAL_SHIELD_SECONDS)] +
-			"Snipers fire a LONGSHOT: one beam down the squad's line, %d seconds of its fire into everything in it. " % int(Abilities.LONGSHOT_SECONDS) +
-			"Then it recharges: %d seconds, and the button fills as it does. HERO POWER in the SHOP takes %d seconds off per level and adds %d%% to the move."  % [int(Abilities.COOLDOWN_BASE), int(Abilities.COOLDOWN_PER_LEVEL), int(Abilities.POWER_PER_LEVEL * 100.0)]},
-		{"title": "THE TROPHY ROAD", "body":
-			"Every run adds trophies and nothing takes them away: %d for every level you reach, more for good grades, double on hard, triple on nightmare. " % Road.PER_LEVEL +
-			"The ROAD is one long track. Every %d trophies is a milestone that pays coins, stars or a locker item, and the big things open at fixed points: ENDLESS at %d, HARD at %d, the WEEKLY at %d, NIGHTMARE at %d, the SNIPERS squad at %d, then named locker items every 500 to the end. The home screen shows a bar to the next milestone. " % [Road.MILESTONE, int(Road.UNLOCKS["endless"]), int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["weekly"]), int(Road.UNLOCKS["nightmare"]), int(Road.UNLOCKS["snipers"])] +
-			"Every %d is a checkpoint: where you stand for good." % Road.CHECKPOINT},
-		{"title": "STUCK ON A LEVEL", "body":
-			"Wiped out? The results card gives you one TIP about how it went, and once a run you can RETRY the level you died on, from its first gate, with the squad you walked into it with. Everything else (perks, bounty, the convoy) stays. The daily, the weekly and endless have no retry."},
-		{"title": "RALLY", "body":
-			"When the squad hits zero, once a run, a RALLY offer appears for five seconds: %d soldiers back, a shield, the clingers shaken off, for a few stars (%d the first time in a day, then %d, then %d). " % [Revive.SOLDIERS, Revive.PRICES[0], Revive.PRICES[1], Revive.PRICES[2]] +
-			"Take it or let them go, and either way the comeback brings ten seconds of AGRO: double fire, double damage, nothing bites. Not in the daily or the weekly, where everyone shares one road. SECOND WIND from the shop is the free version and fires first."},
-		{"title": "QUESTS AND THE SEASON", "body":
-			"Every day has %d QUESTS, the same for everyone: kill so many zombies, shoot so many perfect gates, form a vehicle, and so on. " % Quests.PER_DAY +
-			"Every quest done also pays %d coins per point, and a day with all three done pays %d more. Play on consecutive days for a STREAK: %d%% more coins at the end of every run for each day after the first, up to %d%%; miss a day and it starts over. " % [Quests.COINS_PER_POINT, Quests.ALL_DONE_BONUS, int(Streak.BONUS_PER_DAY * 100.0), int(Streak.BONUS_CAP * 100.0)] +
-			"Progress adds up across the day's runs. Each quest done pays points, and points climb the SEASON track: %d tiers over %d days, a reward at every one. " % [Season.TIERS, Season.DAYS] +
-			"Coins, stars, and every fifth tier a locker item for free. There is nothing to buy; just play. All of these arrive as CHESTS."},
-		{"title": "CHESTS", "body":
-			"Quests, the season and the trophy road pay in CHESTS. A quest done is a QUEST CHEST, a road milestone is a ROAD CHEST, and a season tier or a day with all three quests done is a GOLD CHEST. The results card and the home screen show how many are waiting: tap, the chest rattles, and it opens.\n" +
-			"Every chest holds what it was earned for, and it may hold a BONUS on top: extra coins, extra stars, or once in a long while a JACKPOT. About %d in 100 quest chests have a bonus, %d in 100 road chests and %d in 100 gold chests, and a gold chest's jackpot is %d coins and %d stars. A locker item you already own pays its price in stars instead.\n" % [int(round(Chests.bonus_chance("wood") * 100.0)), int(round(Chests.bonus_chance("silver") * 100.0)), int(round(Chests.bonus_chance("gold") * 100.0)), int(Chests.JACKPOT["gold"][0]), int(Chests.JACKPOT["gold"][1])] +
-			"What is inside is decided when you earn the chest, not when you open it, and chests wait for you as long as you like."},
-		{"title": "RIVALS", "body":
-			"Under your score the game shows who is next above you and how far there is to go. In every mode that is YOUR BEST; beat it and the run says NEW BEST the moment it happens. In the DAILY and the WEEKLY it is also the names on the leaderboard: you see the next player up, and PASSED and their name when you go by. The results card lists everyone you passed."},
-		{"title": "LEADERBOARD", "body":
-			"The LEADERBOARD is under MORE. Daily and weekly scores only, because everyone plays the same road there, under a name you pick. " +
-			"Nothing else leaves the phone: a random id, your name, the score, the level, the kills and the run time. FORGET ME wipes it all. A local build without a server shows no board."},
-		{"title": "RECORDS", "body":
-			"The RECORDS page keeps your lifetime numbers and your achievements. Each achievement pays stars once, the moment you earn it."},
-	]
-
-
-static func _theme_lines() -> String:
-	var out := ""
+	var powers := []
+	for id in Powerups.ORDER:
+		powers.append("%s: %s" % [Powerups.title(id), Powerups.description(id)])
+	var cards := []
+	for id in Cards.ORDER:
+		cards.append("%s: %s." % [Cards.title(id), Cards.description(id)])
+	var combos := []
+	for id in Cards.COMBO_ORDER:
+		combos.append(Cards.combo_title(id))
+	var pit := []
+	for id in PitStop.ORDER:
+		pit.append(PitStop.title(id))
+	var places := []
 	for id in Themes.ORDER:
 		if Themes.rule(id) != "":
-			out += "%s: %s\n" % [Themes.title(id), Themes.rule(id)]
+			places.append("%s: %s" % [Themes.title(id), Themes.rule(id)])
+	var out := [
+		{"title": "THE IDEA", "body":
+			"You lead a squad down a bridge full of zombies. The road moves on its own and your soldiers shoot on their own. " +
+			"You steer, pick gates that grow the squad, and beat the boss at the end of each level. " +
+			"More soldiers means more bullets. Lose them all and the run is over."},
+		{"title": "CONTROLS", "body":
+			"DRAG left and right to move.\n" +
+			"HOLD a finger on the road and every gun aims there.\n" +
+			"TAP a zombie that has grabbed your squad to shoot it off, or SHAKE the phone to throw them all off (from level %d).\n" % Progression.CLING_LEVEL +
+			"FLICK sideways to dash through danger (from level %d).\n" % Progression.DASH_LEVEL +
+			"The button at the bottom left is your hero move. BOMB appears under it when you carry one."},
+		{"title": "GATES", "body":
+			"Every gate has one panel per lane. Walk through the one you want.\n" +
+			"BLUE adds soldiers (+5) or, from level %d, multiplies them (x2).\n" % Progression.MUL_LEVEL +
+			"RED takes soldiers away.\n" +
+			"PURPLE gives a power-up, named on the panel (from level %d).\n" % Progression.POWER_PANEL_LEVEL +
+			"OLIVE trades soldiers for a vehicle that fights beside you (from level %d).\n" % Progression.VEHICLE_LEVEL +
+			"Your bullets push a panel's number up while you aim at it. Push one up %d steps before you walk through and it is a PERFECT." % Difficulty.PERFECT_STEPS},
+		{"title": "LEVELS", "body":
+			"A level is %d gates and a boss. Level 1 is slow on purpose: two lanes, plain numbers, and every bullet kills a zombie. " % Difficulty.GATES_PER_LEVEL +
+			"Each level after that is a little faster, with faster bullets and more of them, and brings one new thing. " +
+			"The road slows down for a gate worth thinking about (a multiplier or a power-up), then speeds up again."},
+		{"title": "WHAT ARRIVES WHEN", "body":
+			"Level %d: x2 gates, power-up boxes, big brutes.\n" % Progression.MUL_LEVEL +
+			"Level %d: zombies that grab on, and the dash.\n" % Progression.CLING_LEVEL +
+			"Level %d: the pit stop, and fast runners.\n" % Progression.PIT_LEVEL +
+			"Level %d: saw blades.\n" % Progression.SAW_LEVEL +
+			"Level %d: purple grabbers.\n" % Progression.LATCHER_LEVEL +
+			"Level %d: walls.\n" % Progression.BARRICADE_LEVEL +
+			"Level %d: thieves.\n" % Progression.THIEF_LEVEL +
+			"Level %d: tanks.\n" % Progression.TANK_LEVEL +
+			"Level %d: yellow splitters.\n" % Progression.SPLITTER_LEVEL +
+			"Level %d: vehicles."  % Progression.VEHICLE_LEVEL},
+		{"title": "ZOMBIES", "body":
+			"A walker that reaches you takes a soldier. You cannot walk past them: one you do not shoot turns round and runs you down. " +
+			"BRUTES and TANKS are the exception. They are big and slow and take a bite out of the whole squad, so step round them.\n" +
+			"Purple ones grab on and keep eating: tap them or shake. Thieves run at the next gate and shrink its number. " +
+			"Yellow splitters burst into %d runners when they die, so kill them far away." % Difficulty.SPLIT_INTO},
+		{"title": "BOSSES", "body":
+			"The first boss only walks at you. From level %d they throw things, and everything they throw can be dodged.\n" % Progression.BOSS_ATTACK_LEVEL +
+			"GREEN and PURPLE globs: watch the shadow, step out of the red ring.\n" +
+			"ORANGE BOMBS: a much bigger ring. Move early.\n" +
+			"SAW BLADES roll down your lane: step aside.\n" +
+			"LIGHTNING: a red ring fills, then the bolt lands. The STORM boss (from level %d) draws a line of bolts with one gap.\n" % Difficulty.STORM_BOSS_LEVEL +
+			"Shoot the glowing core for x%d damage." % int(Boss.CORE_MULT)},
+		{"title": "POWER-UPS", "body":
+			"Boxes on the road (from level %d) and purple panels hand them out. A box with a ? is a surprise.\n" % Progression.CRATE_LEVEL +
+			"\n".join(powers)},
+		{"title": "PIT STOP", "body":
+			"From level %d there is a pit stop once a level. A lit sign over the road says PIT STOP with an arrow: steer right, onto the yellow lane. " % Progression.PIT_LEVEL +
+			"The road waits while you spend this run's coins on %s. What you buy lasts until the run ends." % ", ".join(pit).to_lower()},
+		{"title": "BUILD CARDS", "body":
+			"After every boss from the second, pick one of three cards. It is yours for the run. COMMON, RARE and EPIC say how often a card turns up.\n" +
+			"\n".join(cards) + "\n" +
+			"Some pairs make a COMBO: %s." % ", ".join(combos)},
+		{"title": "GETTING HARDER", "body":
+			"The road gets faster up to level 10 and keeps creeping up after. From level %d every bite also grows, every level, and armor never takes more than %d%% off one. " % [Difficulty.DANGER_FROM + 1, int(round((1.0 - Difficulty.MITIGATION_FLOOR) * 100.0))] +
+			"Nobody is unbeatable: sooner or later the road wins, and how far you got is the score.\n" +
+			"Stop steering (from level %d) and the zombies behind you catch up." % Difficulty.HANDS_OFF_HORDE_LEVEL},
+		{"title": "PLACES", "body":
+			"Levels change place: the sky, the light, the weather. From level %d each place also has a rule.\n" % Progression.THEME_RULE_LEVEL +
+			"\n".join(places)},
+		{"title": "COINS, STARS AND CHESTS", "body":
+			"Every kill pays coins. Spend them in a run at the pit stop, or take what is left home to the SHOP for upgrades that last. " +
+			"When an upgrade is MAXED, ENLIST keeps buying a little more of it, and each tier adds one whole soldier or one whole percent.\n" +
+			"Stars come from bosses and achievements and buy looks and heroes in the LOCKER.\n" +
+			"QUESTS, the TROPHY ROAD and the season pay in chests: QUEST CHEST, ROAD CHEST, GOLD CHEST. Open them from the home screen."},
+		{"title": "HEROES AND SQUADS", "body":
+			"The hero leads the squad and changes one rule. " + _heroes() + "\n" +
+			"Squads have a hero move on the bottom-left button: RIFLES fire a %s, SHOTGUNS a %s, MEDICS a %s, SNIPERS a %s." % [Abilities.title("volley"), Abilities.title("shockwave"), Abilities.title("heal"), Abilities.title("longshot")]},
+		{"title": "MODES", "body":
+			"PLAY is a normal run through the levels. MODES on the home screen has the rest.\n" +
+			"ENDLESS: no bosses, no end.\n" +
+			"DAILY: one road a day, the same for everyone.\n" +
+			"WEEKLY: a week-long road with its own twist.\n" +
+			"BOSS RUSH: one gate, then a boss, again and again.\n" +
+			"HARD and NIGHTMARE are tougher roads that pay more. They open on the TROPHY ROAD at %d and %d trophies.\n" % [int(Road.UNLOCKS["hard"]), int(Road.UNLOCKS["nightmare"])] +
+			"Wiped out? Once a run you can RALLY: %d soldiers back for a few stars." % Revive.SOLDIERS},
+		{"title": "IF IT FREEZES OR SLOWS DOWN", "body":
+			"On the home screen or the pause menu, SHAKE the phone and a card asks what went wrong. REPORT A PROBLEM under MORE does the same. " +
+			"In a run a shake throws zombies off instead.\n" +
+			"With SEND REPORTS on in SETTINGS, freezes and slow stretches under %d frames a second report themselves, never with your name. " % int(Telemetry.SLOW_FPS) +
+			"LOGGING in SETTINGS sends the game's FLIGHT RECORDER as you play, for a phone that keeps having trouble.\n" +
+			"SETTINGS also has SOUND, MUSIC, HAPTICS, SHADOWS and SAFE GRAPHICS."},
+	]
 	return out
 
 
-static func _hero_lines() -> String:
-	var out := ""
-	for id in Heroes.ORDER:
-		out += "%s: %s. %s.\n" % [Wardrobe.title(id), Heroes.passive_text(id), Heroes.twist_text(id)]
-	return out
-
-
-static func _card_lines() -> String:
-	var out := ""
-	for id in Cards.ORDER:
-		var text := Cards.description(id, 1)
-		if Cards.max_stack(id) > 1:
-			text += " (up to %d)" % Cards.max_stack(id)
-		out += "%s (%s): %s.\n" % [Cards.title(id), Cards.rarity(id), text]
-	return out
-
-
-static func _combo_lines() -> String:
-	var out := ""
-	for id in Cards.COMBO_ORDER:
-		var needs: Array = Cards.COMBOS[id]["needs"]
-		out += "%s = %s + %s: %s.\n" % [Cards.combo_title(id), Cards.title(str(needs[0])), Cards.title(str(needs[1])), Cards.combo_description(id)]
-	return out
-
-
-static func _perk_lines() -> String:
+## One short line a hero, from the same text the locker shows.
+static func _heroes() -> String:
 	var lines := []
-	for id in Perks.CATALOG:
-		lines.append("%s: %s (up to %d)." % [Perks.title(id), Perks.description(id), Perks.max_stack(id)])
-	return "\n".join(lines)
+	for id in Heroes.ORDER:
+		lines.append("%s: %s." % [Wardrobe.title(id), Heroes.short(id)])
+	return " ".join(lines)

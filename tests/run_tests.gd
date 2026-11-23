@@ -26,6 +26,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_road.gd",
 	"res://tests/test_report.gd",
 	"res://tests/test_perf.gd",
+	"res://tests/test_notices.gd",
 	"res://tests/test_bounty.gd",
 	"res://tests/test_lessons.gd",
 	"res://tests/test_veterans.gd",

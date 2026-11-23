@@ -40,6 +40,8 @@ signal fork_chosen(route: Dictionary, side: int)
 signal fork_merged
 signal gate_robbed(gate: Gate, index: int)
 signal spit_landed(hit: bool)
+## Something a boss lobbed came down: which kind, where, and on whom.
+signal lob_landed(kind: String, at: Vector3, hit: bool)
 signal saw_spawned
 ## A wall is ahead; the squad hit one (or steered clear); one broke.
 signal barricade_spawned
@@ -207,6 +209,13 @@ var turrets: Array = []
 var supply_funds := 0
 var _saws: Array[Saw] = []
 var _foreman_saw_timer := 0.0
+## Things the boss lobs (Difficulty.LOB_CYCLE): the clock and the count.
+var _lob_timer := 0.0
+var _lob_count := 0
+## Zombies that were passed and turned to run the squad down, this run.
+var chased := 0
+## Things bosses lobbed this run.
+var lobs := 0
 var _bay: PitBay = null
 var _bay_due := false
 var _foreman_crate_timer := 0.0
@@ -301,7 +310,7 @@ func start_level(n: int) -> void:
 	phase = Phase.GATES
 	Bullet.speed = Difficulty.bullet_speed(n)
 	theme = Themes.for_level(n)
-	mods_now = Events.merge(event_mods.duplicate(), Themes.mods(theme))
+	mods_now = Events.merge(event_mods.duplicate(), Themes.mods(theme) if n >= Progression.THEME_RULE_LEVEL else {})
 	_theme_strike_timer = Themes.STRIKE_FIRST
 	_refresh_turrets()
 	# Waves that outlived the level are gone with it; so is any open bet.
@@ -326,7 +335,7 @@ func start_level(n: int) -> void:
 	_barricade_plan = gen.barricades_for_level(level, _saw_plan, int(mods_now.get("barricades_extra", 0))) if gen != null else []
 	_bay_due = PitStop.has_bay(level)
 	_bay_lane_open = false
-	_fork_routes = gen.make_fork(level, squad.count if squad != null else 0) if gen != null else {}
+	_fork_routes = gen.fork_for_level(level, squad.count if squad != null else 0) if gen != null else {}
 	fork_side = 0
 	if squad != null:
 		squad.set_lane(-squad.road_half, squad.road_half)
@@ -339,6 +348,8 @@ func start_level(n: int) -> void:
 	_adds_timer = Difficulty.BOSS_ADDS_INTERVAL
 	_foreman_saw_timer = Difficulty.FOREMAN_SAW_FIRST
 	_foreman_crate_timer = Difficulty.FOREMAN_CRATE_FIRST
+	_lob_timer = Difficulty.LOB_FIRST
+	_lob_count = 0
 	level_started.emit(level)
 
 
@@ -525,11 +536,16 @@ func latched_near_screen(cam: Camera3D, screen: Vector2, max_px: float) -> Zombi
 	return best
 
 
-## A dash throws the first few clingers off the flanks.
-func shake_off() -> void:
+func latched_count() -> int:
+	return _latched.size()
+
+
+## A dash throws the first few clingers off the flanks; shaking the
+## phone throws them all.
+func shake_off(limit: int = Progression.DASH_SHAKES_OFF) -> void:
 	var n := 0
 	for z in _latched.duplicate():
-		if n >= Progression.DASH_SHAKES_OFF:
+		if n >= limit:
 			break
 		_latched.erase(z)
 		zombies.erase(z)
@@ -718,7 +734,7 @@ func _spawn() -> void:
 	while _next_gate < limit and Difficulty.gate_distance(_next_gate) - level_distance <= SPAWN_AHEAD:
 		var z := -(Difficulty.gate_distance(_next_gate) - level_distance)
 		var has_vehicles: bool = squad != null and squad.vehicles_alive() > 0
-		var offer: Array = perks.offer(gen.rng, has_vehicles) if (perks != null and Perks.is_pick_gate(_gate_index(_next_gate))) else []
+		var offer: Array = perks.offer(gen.rng, has_vehicles) if (perks != null and level >= Progression.PERK_GATE_LEVEL and Perks.is_pick_gate(_gate_index(_next_gate))) else []
 		if Difficulty.is_fork_gate(_gate_index(_next_gate)) and not _fork_routes.is_empty():
 			var k := _gate_index(_next_gate) - Difficulty.FORK_INDEX
 			if k == 0:
@@ -1160,11 +1176,25 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			_tick_latched(delta, z, p_squad)
 			continue
 		var pace: float = _pace() * z.pace_mult() * float(mods_now.get("pace_mult", 1.0))
-		z.position.z += (world_speed + z.speed * pace) * delta
-		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-road_half + 0.4, z.lane_min), minf(road_half - 0.4, z.lane_max))
-		z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * delta)
-		var in_reach: bool = absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius
 		var same_route: bool = p_squad.position.x >= z.lane_min - 0.6 and p_squad.position.x <= z.lane_max + 0.6
+		var aim_x := clampf(p_squad.position.x + z.lane_offset, maxf(-road_half + 0.4, z.lane_min), minf(road_half - 0.4, z.lane_max))
+		if z.chasing:
+			# Passed, and it turned: it keeps pace just behind the front rank
+			# and closes from the side. What you do not shoot, bites.
+			z.chase_left -= delta
+			z.position.z = BITE_Z + Difficulty.CHASE_BEHIND
+			z.position.x = move_toward(z.position.x, clampf(p_squad.position.x, z.lane_min, z.lane_max), Difficulty.CHASE_SPEED * delta)
+			if z.chase_left <= 0.0 or not same_route:
+				zombies.erase(z)
+				_note_wave_leak(z)
+				z.consume()
+				continue
+		else:
+			z.position.z += (world_speed + z.speed * pace) * delta
+			# The last few metres are a lunge: no sidestepping a walker.
+			var lunge: float = 1.0 if (z.brute or z.is_tank()) else Difficulty.lunge_mult(BITE_Z - z.position.z)
+			z.position.x = move_toward(z.position.x, aim_x, z.homing * pace * lunge * delta)
+		var in_reach: bool = absf(z.position.x - p_squad.position.x) <= p_squad.reach() + z.radius
 		if z.position.z >= BITE_Z and in_reach and same_route:
 			if p_squad.is_invulnerable():
 				# Dashed through it: it stumbles past and is gone.
@@ -1200,6 +1230,10 @@ func _move_zombies(delta: float, p_squad: Squad) -> void:
 			if z.brute or z.is_tank():
 				p_squad.damage_vehicle(Difficulty.VEHICLE_HIT_BRUTE)
 			squad_bitten.emit(bite, z.brute or z.is_tank())
+		elif not z.chasing and z.position.z > BITE_Z + Difficulty.CHASE_BEHIND and same_route and not (z.brute or z.is_tank()) and p_squad.count > 0:
+			z.chasing = true
+			z.chase_left = Difficulty.CHASE_SECONDS
+			chased += 1
 		elif z.position.z > DESPAWN_Z:
 			zombies.erase(z)
 			_note_wave_leak(z)
@@ -1296,7 +1330,10 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 	var enraged := boss_enraged()
 	# Lightning: rings near the squad, then bolts. Move or dash out. The
 	# storm calls lines across the road instead: find the gap.
-	_strike_timer -= delta * _pace()
+	# The first boss of a run only walks: nothing falls from the sky.
+	var armed := Difficulty.boss_attacks(level)
+	if armed:
+		_strike_timer -= delta * _pace()
 	if boss.is_storm():
 		if _strike_timer <= 0.0 and boss.position.z > BOSS_ENGAGE_Z - 2.0:
 			_strike_timer = Difficulty.STORM_INTERVAL_ENRAGED if enraged else Difficulty.STORM_INTERVAL
@@ -1327,6 +1364,13 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			zb.position = Vector3(gen.rng.randf_range(-road_half + 0.6, road_half - 0.6), 0.0, boss.position.z + 1.0)
 			add_child(zb)
 			zombies.append(zb)
+	# The walker and the storm lob things between their lightning: globs
+	# you can watch all the way down, and now and then a bomb or a saw.
+	if armed and not boss.is_spitter() and not boss.is_foreman() and boss.position.z > BOSS_ENGAGE_Z - 2.0 and boss.position.z < -6.0:
+		_lob_timer -= delta * _pace()
+		if _lob_timer <= 0.0:
+			_lob_timer = Difficulty.LOB_INTERVAL_ENRAGED if enraged else Difficulty.LOB_INTERVAL
+			_lob(p_squad, enraged)
 	if boss.is_storm():
 		return
 	if boss.is_foreman():
@@ -1363,10 +1407,14 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 			var volley := Difficulty.SPIT_VOLLEY if enraged else 1
 			for i in range(volley):
 				var to_x := clampf(aim + (float(i) - float(volley - 1) * 0.5) * 1.6, -road_half + 0.3, road_half - 0.3)
-				var sp := Spit.new()
+				# The middle one of a volley takes its colour from the cycle,
+				# so every so often it is a bomb.
+				var sp := Spit.new(Difficulty.lob_kind(_lob_count) if i == volley / 2 else "glob")
 				add_child(sp)
 				sp.launch(from, to_x, self)
 				_spits.append(sp)
+			_lob_count += 1
+			lobs += 1
 		return
 	if boss.position.z < BOSS_CHEW_Z:
 		return
@@ -1385,12 +1433,32 @@ func _tick_boss(delta: float, p_squad: Squad) -> void:
 		squad_bitten.emit(bite, true)
 
 
+## One thing from the cycle, aimed where the squad is heading: a glob,
+## a bomb, or (from an angry boss) a saw down the lane.
+func _lob(p_squad: Squad, enraged: bool) -> void:
+	var n := _lob_count
+	_lob_count += 1
+	lobs += 1
+	if Difficulty.lob_is_saw(n, enraged, level):
+		var lane := clampf(p_squad.position.x + p_squad.velocity_x * 1.2, -road_half + 0.6, road_half - 0.6)
+		spawn_saw(lane, boss.position.z + 1.5, true, Difficulty.FOREMAN_SAW_SPEED_BONUS)
+		foreman_threw.emit("saw")
+		return
+	var sp := Spit.new(Difficulty.lob_kind(n))
+	var from := boss.position + Vector3(0.0, 3.3, 0.8)
+	var flight := -from.z / sp.speed
+	var to_x := clampf(p_squad.position.x + p_squad.velocity_x * flight * 0.8, -road_half + 0.3, road_half - 0.3)
+	add_child(sp)
+	sp.launch(from, to_x, self)
+	_spits.append(sp)
+
+
 func _move_spits(p_squad: Squad) -> void:
 	for sp in _spits.duplicate():
 		if not sp.landed():
 			continue
 		_spits.erase(sp)
-		var hit := absf(sp.position.x - p_squad.position.x) <= p_squad.reach() * 0.7 + Spit.SPLASH
+		var hit: bool = absf(sp.position.x - p_squad.position.x) <= p_squad.reach() * 0.7 + sp.splash
 		if hit and p_squad.is_invulnerable():
 			dodged.emit()
 			hit = false
@@ -1398,9 +1466,10 @@ func _move_spits(p_squad: Squad) -> void:
 			shield_blocked.emit()
 			hit = false
 		elif hit:
-			var bite := _bite(Difficulty.spit_bite(p_squad.count))
+			var bite := _bite(int(ceil(float(Difficulty.spit_bite(p_squad.count)) * float(Difficulty.LOB_BITE_MULT[sp.kind]))))
 			p_squad.add(-bite)
 			squad_bitten.emit(bite, true)
+		lob_landed.emit(sp.kind, Vector3(sp.target_x, 0.3, -0.4), hit)
 		spit_landed.emit(hit)
 		sp.queue_free()
 
@@ -1556,7 +1625,7 @@ func _think() -> float:
 		if g.passed or g.position.z < -Difficulty.THINK_FROM or g.position.z > -Difficulty.THINK_TO:
 			continue
 		for panel in g.panels:
-			if GateMath.is_expr(panel) or GateMath.is_deal(panel) or GateMath.is_bet(panel) or GateMath.is_vehicle(panel) or GateMath.is_supply(panel):
+			if GateMath.asks_thought(panel):
 				slow = true
 	if fork != null and not fork.chosen and fork.position.z >= -Difficulty.THINK_FROM and fork.position.z <= -Difficulty.THINK_TO:
 		slow = true

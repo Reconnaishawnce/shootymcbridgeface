@@ -64,10 +64,10 @@ func test_deals_in_lanes() -> void:
 			check(deals <= 1, "one deal per gate")
 			if lanes <= 3:
 				check_eq(deals, 0, "deals need a fourth lane")
-	check(trades > 2 and bets > 1, "deals appear (%d trades, %d bets)" % [trades, bets])
-	check_eq(int(Difficulty.wave_for(3, 4).flankers), 0, "no flankers early")
-	check(int(Difficulty.wave_for(4, 4).flankers) >= 1, "flankers from level 4")
-	check_eq(int(Difficulty.wave_for(8, 0).flankers), 0, "never on the opener")
+	check_eq(trades + bets, 0, "no deals on the road: they needed a paragraph each (%d trades, %d bets)" % [trades, bets])
+	check_eq(int(Difficulty.wave_for(Difficulty.FLANKER_LEVEL - 1, 4).flankers), 0, "no flankers early")
+	check(int(Difficulty.wave_for(Difficulty.FLANKER_LEVEL, 4).flankers) >= 1, "flankers from FLANKER_LEVEL")
+	check_eq(int(Difficulty.wave_for(Difficulty.FLANKER_LEVEL + 2, 0).flankers), 0, "never on the opener")
 	check(Difficulty.horde_bite(10) >= 2 and Difficulty.horde_bite(200) == 10, "horde bite")
 
 

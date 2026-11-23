@@ -1181,6 +1181,46 @@ hopping coins; `shake` rattles it for 0.45 s before the open.
 The bot opens its chests into thin air (`SMOKE_CHESTS`) so the code
 runs and nothing is saved.
 
+## The ladder, and the rule of few words (0.63)
+
+Two rules hold everything in this section together.
+
+ONE NEW THING A LEVEL. `Progression` is the single place that says
+when a mechanic exists. Level 1 has gates of plain numbers and walkers.
+Each level after brings one thing, and the level's first seconds say
+it in one line (`LEVEL_HINTS`, shown by `Game._coach` while the level
+is still new to the player: `coach_due`). A mechanic that cannot be
+taught in that one line does not go on the ladder. That is why sums,
+deals, hidden and flashing panels, coin panels, the perk gate and the
+fork are at `NEVER`: each needed a paragraph. Their generators still
+exist and are still tested; the road calls gated wrappers
+(`fork_for_level`) or level constants that never come true.
+
+THE ROAD IS QUIET BY DEFAULT. `Notices` ranks every line: CHATTER is
+never shown, NICE shows after 1.4 seconds of quiet, MUST always shows
+and holds the banner against lesser lines. `hud.show_float` and
+`hud.show_banner` take the rank as their last argument and default to
+CHATTER, so a new line is silent until someone decides it matters. A
+line is eight words at most; a card six; a pit tile six; a level
+banner four; a HOW TO PLAY section 110. The tests count.
+
+What follows from those two:
+
+- No stop-and-read teaching on the road. `_teach` only runs in a
+  learning round, which no button starts any more.
+- Zombies cannot be walked past (`LUNGE_RANGE`, `CHASE_*` in
+  `Difficulty`): a rule a player can hold in their head is "shoot it or
+  it bites", and the old drift toward the squad at a metre a second
+  made the real rule "or just step aside".
+- Bosses fight with things in the air (`LOB_CYCLE`): a glob has a
+  shadow and a ring, so the player sees it coming and decides.
+  Lightning is a ring and a wait, so there is a quarter less of it.
+  The first boss has no attack at all.
+- One bullet, one walker, for three levels (`ONE_SHOT_LEVELS`): the
+  player sees a round leave and sees what it did.
+- A shake in a run is a move (`Shake.quick`), not a request for the
+  report card.
+
 ## The draw budget (0.62)
 
 The Compatibility renderer draws every mesh instance on its own: no

@@ -378,6 +378,37 @@ if the reports still show a phone under sixty: the scenery (lamps,
 rails, rubble: about 400 draws on an empty road) is welded the same
 way, and the crowd behind the front rank moves to a MultiMesh.
 
+## The revamp (0.63 onward)
+
+The people playing it said: overwhelming, not exciting, nobody knows
+what things mean. The plan is six phases, each a release.
+
+1. QUIET (0.63, shipped). The ladder: one new thing a level. Wordy
+   gates off the road. Notices ranked, silence by default. A coach
+   line a level. Zombies that cannot be walked past. Bosses that throw
+   things. See DESIGN, "The ladder, and the rule of few words".
+2. JUICE. The same small game, made to feel great every second: a
+   progress strip for the level (eight pips and a boss), soldiers
+   pouring out of a gate one by one, coins that fly to the counter, a
+   kill that pops, a level-clear fanfare with the squad cheering, a
+   boss entrance with a name card. Delete the cut systems' code or
+   fold perks into cards. One "next unlock" line on the home screen.
+3. CHARACTERS. New soldiers and zombies on the welded-mesh system:
+   chunky toy proportions, a run cycle with squash and stretch, a
+   wind-up before a lunge, hit reactions, deaths that tumble, faces
+   that react. Every zombie kind a silhouette you can name from the
+   top of the screen.
+4. SKINS. Whole-squad outfits (astronauts, knights, pirates, robots)
+   and zombie packs per place (snow, circus, shipwreck), from chests
+   and the trophy road. Looks only: no skin changes a number.
+5. BOSSES AS SET PIECES. Each boss a fight with three telegraphed
+   patterns and a weak-point phase; a mid-level mini-boss from level
+   10; arenas with something in them.
+6. THE HOOK. A map of bridges, five levels each with its own boss and
+   look; three stars a level for clear goals; a daily chest. Then
+   tuning from the flight logs, to targets: most new players clear
+   level 3 on day one, level 10 takes practice, level 20 is a brag.
+
 ## The graphics arc: from stick figures to a stylized, polished look
 
 An Epic-style look needs modelled, textured, rigged characters and a

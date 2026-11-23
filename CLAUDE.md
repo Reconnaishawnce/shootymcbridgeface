@@ -8,6 +8,14 @@
   teenager: short sections, plain words, numbers taken from the constants.
   `tests/test_run13.gd::test_help_text` fails if a mode, power-up or panel
   colour goes unmentioned; extend that test when you add one.
+- The game is kept small on purpose (DESIGN, "The ladder, and the rule of
+  few words"). A new mechanic goes on the ladder in
+  `scripts/core/progression.gd`: one level, one line for the coach
+  (`LEVEL_HINTS`). If it cannot be taught in that line, it does not go in.
+- The road is quiet by default. `hud.show_float` and `hud.show_banner`
+  take a `Notices` rank and default to CHATTER, which is never shown.
+  Lines are short and the tests count the words: eight on the road, six
+  on a card or a pit tile, 110 in a HOW TO PLAY section.
 - Phones freeze where the bot does not: keep `Diag.set_state` /
   `Diag.mark` breadcrumbs on new states and on long steps, and keep
   `Report` pure. `scripts/ci/soak.sh <godot>` before a release that

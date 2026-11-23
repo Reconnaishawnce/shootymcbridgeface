@@ -33,35 +33,45 @@ func test_achievements() -> void:
 
 func test_help_text() -> void:
 	var sections := HelpText.sections()
-	check(sections.size() >= 12, "enough sections (%d)" % sections.size())
+	check(sections.size() >= 12 and sections.size() <= 18, "a page, not a manual: %d sections" % sections.size())
 	var all := ""
 	for sec in sections:
 		check(str(sec.title) != "" and str(sec.body).length() > 40, "section has a title and a body")
+		# Short sections, plain words: the page had grown to thirty-eight
+		# sections nobody read.
+		check(Notices.words(str(sec.body)) <= HelpText.MAX_SECTION_WORDS, "%s is short enough to read: %d words" % [sec.title, Notices.words(str(sec.body))])
 		all += str(sec.body) + "\n"
-	for word in ["BLUE", "RED", "TEAL", "PURPLE", "AMBER", "PERFECT", "coins", "Stars", "LOCKER", "HARD", "NIGHTMARE", "ENDLESS", "DAILY", "WEEKLY", "GRADE", "horde", "STORM", "dash", "OLIVE", "JEEP", "TANK", "HELICOPTER", "MECH", "RANK", "QUESTS", "SEASON", "ROAD", "RALLY", "trophies", "STRAIGHT", "bounty", "SAW", "THICK SKIN", "RECRUITER", "GOLD", "SUPPLY", "LEARN", "VETERAN", "FOREMAN", "PIT STOP", "AGRO", "RETRY", "BOUNTY", "LEADERBOARD", "TURRET", "WALL", "SPLITTER", "VOLLEY", "SHOCKWAVE", "HEAL PULSE", "HERO", "SNIPERS", "LONGSHOT", "STREAK", "BOSS RUSH", "EVENT", "CHALLENGE", "HAPTICS", "SHAKE", "REPORT A PROBLEM", "SHOW FPS", "ENLIST", "FOR THE NEXT RUN", "BOMB DROP", "HOT ROUNDS", "DOUBLE PAY", "SPARE WIND", "GOLD SQUAD", "ROAD tab"]:
+	# Every panel colour that is on the road, and none that is not.
+	for word in ["BLUE", "RED", "PURPLE", "OLIVE"]:
+		check(all.contains(word), "help explains %s panels" % word)
+	for word in ["TEAL", "AMBER", "GREY panels", "GOLD panels", "PERK gate", "forks"]:
+		check(not all.contains(word), "help does not explain %s: it is not in the game" % word)
+	for word in ["PERFECT", "coins", "Stars", "LOCKER", "SHOP", "HARD", "NIGHTMARE", "ENDLESS", "DAILY", "WEEKLY", "BOSS RUSH", "RALLY", "ENLIST", "MAXED", "one whole soldier", "Nobody is unbeatable", "PIT STOP", "DRAG", "HOLD", "TAP", "SHAKE", "FLICK", "core", "BRUTES", "TANKS", "Thieves", "splitters", "QUEST CHEST", "ROAD CHEST", "GOLD CHEST", "FLIGHT RECORDER", "LOGGING in SETTINGS", "REPORT A PROBLEM", "SAFE GRAPHICS", "GREEN", "ORANGE BOMBS", "SAW BLADES", "LIGHTNING", "cannot walk past"]:
 		check(all.contains(word), "help mentions %s" % word)
 	for id in Powerups.ORDER:
 		check(all.contains(Powerups.title(id)), "help mentions power-up %s" % id)
 	for id in Cards.ORDER:
-		check(all.contains(Cards.title(id)), "help mentions build card %s" % id)
+		check(all.contains(Cards.title(id)) and all.contains(Cards.description(id)), "help says what the card %s does" % id)
 	for id in Cards.COMBO_ORDER:
 		check(all.contains(Cards.combo_title(id)), "help mentions combo %s" % id)
-	check(all.contains("BUILD CARDS") and all.contains("EPIC"), "help explains the draft")
+	check(all.contains("COMMON") and all.contains("RARE") and all.contains("EPIC"), "help explains the draft")
 	for id in Heroes.ORDER:
-		check(all.contains(Heroes.passive_text(id)) and all.contains(Heroes.twist_text(id)), "help says what %s does" % id)
-	check(all.contains("MODES holds") and all.contains("Along the bottom: SHOP"), "help maps the home screen")
-	for word in ["QUEST CHEST", "ROAD CHEST", "GOLD CHEST", "JACKPOT", "BONUS", "YOUR BEST", "PASSED", "A combo sings", "its own tune", "rising beeps", "FLIGHT RECORDER", "LOGGING in SETTINGS", "REPORT A PROBLEM is also under MORE", "SLOW ROAD", "DANGER", "Nobody is unbeatable", "one whole soldier", "MAXED"]:
-		check(all.contains(word), "help mentions %s" % word)
+		check(all.contains(Wardrobe.title(id)) and all.contains(Heroes.short(id)), "help says what %s does" % id)
+	for id in PitStop.ORDER:
+		check(all.contains(PitStop.title(id).to_lower()), "help lists the pit stop's %s" % id)
 	for id in Themes.ORDER:
-		check(all.contains(Themes.title(id)), "help names the theme %s" % id)
 		if Themes.rule(id) != "":
-			check(all.contains(Themes.rule(id)), "help says the rule of %s" % id)
+			check(all.contains(Themes.title(id)) and all.contains(Themes.rule(id)), "help says the rule of %s" % id)
+	# The ladder is on the page, with the numbers the game uses.
+	for level in [Progression.MUL_LEVEL, Progression.CLING_LEVEL, Progression.PIT_LEVEL, Progression.SAW_LEVEL, Progression.LATCHER_LEVEL, Progression.BARRICADE_LEVEL, Progression.THIEF_LEVEL, Progression.TANK_LEVEL, Progression.SPLITTER_LEVEL, Progression.VEHICLE_LEVEL]:
+		check(all.contains("Level %d:" % level), "the ladder lists level %d" % level)
 	check(all.contains("level %d" % Progression.DASH_LEVEL), "dash level comes from the constant")
 	check(all.contains("%d gates and a boss" % Difficulty.GATES_PER_LEVEL), "gates per level from the constant")
+	check(all.contains("every bullet kills a zombie"), "and it says what level 1 is")
 
 
 func test_storm() -> void:
-	check_eq(Difficulty.boss_kind(3), Boss.Kind.STORM, "level 3 is the storm")
+	check_eq(Difficulty.boss_kind(Difficulty.STORM_BOSS_LEVEL), Boss.Kind.STORM, "the storm arrives at STORM_BOSS_LEVEL")
 	check_eq(Difficulty.boss_kind(1), Boss.Kind.WALKER, "level 1 walker")
 	check_eq(Difficulty.boss_kind(2), Boss.Kind.SPITTER, "level 2 spitter")
 	check_eq(Difficulty.boss_kind(6), Boss.Kind.STORM, "level 6 storm again")

@@ -42,7 +42,7 @@ else
 fi
 rm -f "$DUMP"
 # Level 1 is a stroll: a slow road, slow bullets, a few fat rounds.
-grep "SMOKE_PACE" "$LOG" | grep -q '"level":1,' && grep "SMOKE_PACE" "$LOG" | grep -q '"bullet":26' && grep "SMOKE_PACE" "$LOG" | grep -q '"max_shots":12' && grep "SMOKE_PACE" "$LOG" | grep -q '"danger":1' || { echo "::error::level 1 is not at the slow starting tempo"; exit 1; }
+grep "SMOKE_PACE" "$LOG" | grep -q '"level":1,' && grep "SMOKE_PACE" "$LOG" | grep -q '"bullet":22' && grep "SMOKE_PACE" "$LOG" | grep -q '"max_shots":10' && grep "SMOKE_PACE" "$LOG" | grep -q '"danger":1' || { echo "::error::level 1 is not at the slow starting tempo"; exit 1; }
 grep "SMOKE_TELEMETRY" "$LOG" | grep -q '"traced":true' || { echo "::error::the report carries no performance trace with game gauges"; exit 1; }
 
 grep "SMOKE_ABILITY" "$LOG" | grep -q '"id":"volley"' || { echo "::error::the rifle squad never fired its volley"; exit 1; }
@@ -71,7 +71,7 @@ grep -q "SMOKE_RUSH" "$LOG" || { echo "::error::the boss rush never killed a bos
 grep -q "SMOKE_CARD " "$LOG" || { echo "::error::a boss fell and no build card was drafted"; exit 1; }
 
 echo "== rivals: the run passes the names above it, lowest first"
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1300 --smoke-rivals 2>&1 | tee "$LOG"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=1900 --smoke-rivals 2>&1 | tee "$LOG"
 fail_on_script_errors "rivals smoke"
 grep "SMOKE_RIVALS" "$LOG" | grep -q '"passed":\["BOT B","YOUR BEST","BOT A"\]' || { echo "::error::the rivals were not passed in order"; exit 1; }
 
@@ -81,15 +81,17 @@ fail_on_script_errors "chests smoke"
 grep "SMOKE_CHESTS" "$LOG" | grep -q '"n":[1-9]' || { echo "::error::a run that finished quests earned no chests"; exit 1; }
 
 echo "== level themes: a storm level throws lightning, a long run changes places"
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2100 --smoke-level=4 --smoke-upgrades 2>&1 | tee "$LOG"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2100 --smoke-level=11 --smoke-upgrades 2>&1 | tee "$LOG"
 fail_on_script_errors "storm smoke"
-grep "SMOKE_THEMES" "$LOG" | grep -q '"now":"storm"' || { echo "::error::level 4 is not the storm front"; exit 1; }
+grep "SMOKE_THEMES" "$LOG" | grep -q '"now":"storm"' || { echo "::error::level 11 is not the storm front"; exit 1; }
 grep "SMOKE_THEMES" "$LOG" | grep -q '"strikes":[1-9]' || { echo "::error::the storm front threw no lightning"; exit 1; }
 "$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=6500 2>&1 | tee "$LOG"
 fail_on_script_errors "themes smoke"
 # By level 3 the run has wound up a notch, and the road has slowed for
 # at least one gate that needed reading.
-grep "SMOKE_PACE" "$LOG" | grep -q '"bullet":3[0-9]' || { echo "::error::bullets did not speed up with the levels"; exit 1; }
+grep "SMOKE_PACE" "$LOG" | grep -Eq '"bullet":(2[4-9]|3[0-9])' || { echo "::error::bullets did not speed up with the levels"; exit 1; }
+# The second boss throws things: something was lobbed at the squad.
+grep "SMOKE_PACE" "$LOG" | grep -q '"lobs":[1-9]' || { echo "::error::no boss lobbed anything in three levels"; exit 1; }
 grep "SMOKE_PACE" "$LOG" | grep -q '"think_zones":[1-9]' || { echo "::error::the road never slowed for a thinking gate"; exit 1; }
 grep "SMOKE_THEME " "$LOG" | grep -q '"id":"gold"' && grep "SMOKE_THEME " "$LOG" | grep -q '"id":"night"' || { echo "::error::a run through three levels did not change theme twice"; exit 1; }
 
@@ -102,14 +104,16 @@ for pair in max:move_soldiers zuri:gate_soldiers luna:ghost kofi:calm rex:shove 
 done
 
 echo "== build cards: every card held, every effect fires"
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2100 --smoke-cards=all 2>&1 | tee "$LOG"
+# From level 6: on the first levels one bullet kills a walker, and a
+# zombie has to outlive a hit to be slowed or finished off.
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=2100 --smoke-cards=all --smoke-level=6 2>&1 | tee "$LOG"
 fail_on_script_errors "cards smoke"
 for fx in ricochet burn slow blast crit execute medic; do
   grep "SMOKE_CARDFX" "$LOG" | grep -q "\"$fx\":[1-9]" || { echo "::error::the $fx card effect never fired"; exit 1; }
 done
 grep "SMOKE_CARDFX" "$LOG" | grep -q '"firestorm","shatter","wildfire","chain"' || { echo "::error::the combos did not all form"; exit 1; }
 grep "SMOKE_CARDFX" "$LOG" | grep -q '"turrets":2' || { echo "::error::the sentry cards put no turrets on the curb"; exit 1; }
-"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=4200 --smoke-event=saw_storm --smoke-seed=3 2>&1 | tee "$LOG"
+"$GODOT" --headless --path . --fixed-fps 60 ++ --smoke --smoke-frames=4200 --smoke-event=saw_storm --smoke-seed=3 --smoke-level=5 2>&1 | tee "$LOG"
 fail_on_script_errors "saw storm smoke"
 grep -q "SMOKE_SAW" "$LOG" || { echo "::error::the saw storm rolled no saw past the squad"; exit 1; }
 

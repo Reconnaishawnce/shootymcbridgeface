@@ -50,6 +50,10 @@ var lane_max := 3.0
 var latched := false
 var latch_offset_x := 0.0
 var latch_timer := 0.0
+## Passed the squad unshot: it has turned and is running it down. Seconds
+## of chase left; zero when it is not chasing.
+var chase_left := 0.0
+var chasing := false
 
 var _body: Node3D
 var _bar: MeshInstance3D
@@ -467,7 +471,7 @@ func _process(delta: float) -> void:
 	if _status != null and _status.visible:
 		_status.scale = Vector3.ONE * (1.0 + 0.25 * sin(Time.get_ticks_msec() * 0.02 + _phase))
 	# A stumbling lurch so a wave reads as a crowd, not a grid.
-	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() or latched else 7.0) + _phase
+	var t := Time.get_ticks_msec() * 0.001 * (14.0 if is_thief() or is_runner() or latched or chasing else 7.0) + _phase
 	_body.rotation.z = sin(t * 0.8) * 0.1
 	_body.position.y = absf(sin(t * 0.5)) * 0.07
 	var swing := 0.65 if is_runner() or is_thief() else 0.5

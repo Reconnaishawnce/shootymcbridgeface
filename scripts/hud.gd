@@ -775,7 +775,7 @@ func _build_draft(root: Control) -> void:
 	head.add_theme_color_override("font_color", COIN)
 	box.add_child(head)
 	var sub := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	sub.text = "Yours until the run ends. Some pairs make a COMBO."
+	sub.text = "Yours for this run."
 	sub.modulate = Color(0.85, 0.85, 0.9)
 	box.add_child(sub)
 	_draft_rows = VBoxContainer.new()
@@ -1247,6 +1247,9 @@ func _build_title(root: Control) -> void:
 	_learn_button = _button("LEARN THE ROAD", 32)
 	_learn_button.pressed.connect(func() -> void: learn_pressed.emit())
 	box.add_child(_learn_button)
+	# The stop-and-read lessons taught the thirty-three mechanics of 0.62.
+	# The road now teaches a line at a time; HOW TO PLAY has the rest.
+	_learn_button.visible = false
 	var more_help := _button("HOW TO PLAY", 32)
 	more_help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(more_help)
@@ -1523,20 +1526,21 @@ func show_pitstop(pit: PitStop, funds: int, count: int) -> void:
 	_bomb_button.visible = false
 	_ability_button.visible = false
 	_bounty_row.visible = false
-	_pit_sub.text = "The crew has you. The road waits."
-	_pit_funds.text = "BOUNTY  %d   ·   gear for this run only" % funds
+	_pit_sub.text = "Buy for this run. The road waits."
+	_pit_funds.text = "COINS  %d" % funds
 	for id in PitStop.ORDER:
 		var n := pit.stack(id)
 		var max_n := int(PitStop.ITEMS[id]["max"])
-		var effect := "%s\n%s" % [PitStop.ITEMS[id]["desc"], PitStop.effect_text(id, 1, count)]
+		# One line a tile: what the next one gives.
+		var effect := PitStop.effect_text(id, 1, count)
 		if n > 0 and max_n < 99:
-			effect = "%s now  >  %s" % [PitStop.effect_text(id, n, count), PitStop.effect_text(id, n + 1, count)]
+			effect = PitStop.effect_text(id, 1, count)
 		_fill_tile(_pit_tiles[id], PitStop.title(id), n, max_n, effect, pit.cost(id), pit.is_maxed(id), pit.can_buy(id, funds), "")
 
 func hide_pitstop() -> void:
 	_pit_card.visible = false
 	if _pause_button.visible:
-		_formation_button.visible = true
+		_formation_button.visible = FIRE_MODE_BUTTON
 		_bounty_row.visible = true
 		_bomb_button.visible = _bombs_held > 0
 
@@ -1620,6 +1624,9 @@ func _build_settings(root: Control) -> void:
 	_settings_characters = _button("CHARACTERS: OFF", 22)
 	_settings_characters.pressed.connect(_on_characters_pressed)
 	grid.add_child(_settings_characters)
+	# Four switches nobody needed on the page: the code behind each
+	# still works, the page no longer asks.
+	_settings_characters.visible = false
 	_settings_shadows = _button("SHADOWS: ON", 22)
 	_settings_shadows.pressed.connect(func() -> void:
 		var on := not _settings_shadows.text.ends_with("ON")
@@ -1632,6 +1639,7 @@ func _build_settings(root: Control) -> void:
 		set_lessons(on)
 		lessons_toggled.emit(on))
 	grid.add_child(_settings_lessons)
+	_settings_lessons.visible = false
 	_settings_safe = _button("SAFE GRAPHICS: OFF", 22)
 	_settings_safe.pressed.connect(func() -> void:
 		var on := not _settings_safe.text.ends_with("ON")
@@ -1644,6 +1652,7 @@ func _build_settings(root: Control) -> void:
 		set_notch_mode(next)
 		notch_changed.emit(next))
 	grid.add_child(_settings_notch)
+	_settings_notch.visible = false
 	_settings_haptics = _button("HAPTICS: ON", 22)
 	_settings_haptics.pressed.connect(func() -> void:
 		var on := not _settings_haptics.text.ends_with("ON")
@@ -1662,6 +1671,7 @@ func _build_settings(root: Control) -> void:
 		set_show_fps(on)
 		show_fps_toggled.emit(on))
 	grid.add_child(_settings_fps)
+	_settings_fps.visible = false
 	for b in grid.get_children():
 		(b as Button).custom_minimum_size = Vector2(288.0, 56.0)
 	# Logging: the flight recorder goes to the server as the game runs.
@@ -1675,7 +1685,7 @@ func _build_settings(root: Control) -> void:
 	_settings_log_line.modulate = Color(1.0, 0.95, 0.8)
 	box.add_child(_settings_log_line)
 	var blurb := _label(20, HORIZONTAL_ALIGNMENT_CENTER)
-	blurb.text = "Safe graphics: plain rendering for phones that glitch.  Notch room: moves the top of the HUD out from under a camera cutout.  Send reports: crashes, freezes and slowdowns reach the developer on their own; never your name.  Shake the phone after a slowdown to send one yourself."
+	blurb.text = "Shake the phone on this screen to report a problem."
 	blurb.autowrap_mode = TextServer.AUTOWRAP_WORD
 	blurb.custom_minimum_size.x = 560.0
 	blurb.modulate = Color(0.85, 0.85, 0.9)
@@ -1763,7 +1773,7 @@ func _build_shop(root: Control) -> void:
 	next_head.text = "FOR THE NEXT RUN"
 	box.add_child(next_head)
 	var next_blurb := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
-	next_blurb.text = "Spent on your next normal, endless or rush run."
+	next_blurb.text = "Used up by your next run."
 	next_blurb.modulate = Color(0.85, 0.85, 0.9)
 	box.add_child(next_blurb)
 	var next_grid := GridContainer.new()
@@ -1781,7 +1791,7 @@ func _build_shop(root: Control) -> void:
 	up_head.text = "UPGRADES"
 	box.add_child(up_head)
 	var up_blurb := _label(18, HORIZONTAL_ALIGNMENT_CENTER)
-	up_blurb.text = "Forever. Past MAX, ENLIST adds a tier at a time with no end."
+	up_blurb.text = "These last forever."
 	up_blurb.modulate = Color(0.85, 0.85, 0.9)
 	box.add_child(up_blurb)
 	var grid := GridContainer.new()
@@ -1995,6 +2005,9 @@ func _build_over(root: Control) -> void:
 	_over_copy = _button("COPY RESULT", 28)
 	_over_copy.pressed.connect(func() -> void: copy_pressed.emit())
 	box.add_child(_over_copy)
+	# One fewer button on the card; the share text is still built for
+	# whoever asks for it back.
+	_over_copy.visible = false
 	var menu := _button("MENU", 30)
 	menu.pressed.connect(func() -> void: menu_pressed.emit())
 	box.add_child(menu)
@@ -2025,6 +2038,7 @@ func _build_pause(root: Control) -> void:
 	_pause_characters = _button("CHARACTERS: OFF", 34)
 	_pause_characters.pressed.connect(_on_characters_pressed)
 	box.add_child(_pause_characters)
+	_pause_characters.visible = false
 	var help := _button("HOW TO PLAY", 34)
 	help.pressed.connect(func() -> void: help_opened.emit())
 	box.add_child(help)
@@ -2043,7 +2057,7 @@ func update_stats(count: int, level: int, distance: float, score: int) -> void:
 		_bump_count()
 	_count.text = "%d" % count
 	_level.text = "LV %d" % level
-	_subline.text = "%d m   ·   %d" % [int(distance), score]
+	_subline.text = str(score)
 
 
 ## The rival line under the score: "SAM  4210   ·   350 to go", or "".
@@ -2074,6 +2088,10 @@ func set_characters(on: bool) -> void:
 
 
 ## TIGHT is a focused column, WIDE a fan: the button says so.
+## The fire-mode button (TIGHT, NORMAL, WIDE, STRAIGHT) is off the
+## screen: one more thing to read, and NORMAL was what nearly everyone
+## left it on.
+const FIRE_MODE_BUTTON := false
 const FORMATION_TEXT := {"TIGHT": "TIGHT", "NORMAL": "NORMAL", "WIDE": "WIDE", "STRAIGHT": "STRAIGHT"}
 
 
@@ -2133,6 +2151,12 @@ func set_bomb_hint(on: bool) -> void:
 
 
 ## A teaching line that holds for a while, then fades.
+## When the road last said anything, and until when a banner that must
+## be read is up (seconds since launch).
+var _said_at := -100.0
+var _must_until := -100.0
+
+
 func show_hint(text: String, seconds: float = 3.2) -> void:
 	if text == "":
 		return
@@ -2148,8 +2172,10 @@ func show_hint(text: String, seconds: float = 3.2) -> void:
 
 ## Dash readiness under the squad: "DASH" when ready, cooling bar when not.
 func set_dash(enabled: bool, ready: bool) -> void:
-	_dash.modulate.a = 0.75 if enabled else 0.0
-	_dash.text = "DASH READY" if ready else "..."
+	# The label is kept off the screen: a line of text under the squad for
+	# the whole run, for a move the coach teaches in one line.
+	_dash.modulate.a = 0.0
+	_dash.text = "DASH" if (enabled and ready) else ""
 
 
 ## Show both routes of the coming fork. [param routes] is the fork dict.
@@ -2217,7 +2243,6 @@ func _hide_cards() -> void:
 func show_title(t: Dictionary) -> void:
 	var best: int = t.get("best", 0)
 	var best_level: int = t.get("best_level", 0)
-	var best_endless: int = t.get("best_endless", 0)
 	var coins: int = t.get("coins", 0)
 	var endless_unlocked: bool = t.get("endless_unlocked", false)
 	var squad_type: String = t.get("squad_type", "rifle")
@@ -2255,7 +2280,7 @@ func show_title(t: Dictionary) -> void:
 	var trophies: int = t.get("trophies", 0)
 	_road_line.visible = bool(buttons.get("road", false))
 	var nxt := Road.next_milestone(trophies)
-	_road_line.text = "%d trophies   ·   next at %d: %s" % [trophies, nxt, Road.reward_text(Road.reward(nxt / Road.MILESTONE))]
+	_road_line.text = "%d trophies   ·   next reward at %d" % [trophies, nxt]
 	_road_bar.visible = _road_line.visible
 	_road_bar_fill.offset_right = 420.0 * Road.progress_to_next(trophies)
 	_streak_line.text = str(t.get("streak_line", ""))
@@ -2264,14 +2289,10 @@ func show_title(t: Dictionary) -> void:
 	_pause_button.visible = false
 	_boss_box.visible = false
 	var lines := []
+	# One line of record. The rest (what a difficulty does, what opens
+	# next) is on the pages you open to change them.
 	if best > 0:
-		lines.append("Best %d   ·   Level %d" % [best, best_level])
-	if best_endless > 0:
-		lines.append("Endless best %d" % best_endless)
-	if lines.is_empty() and modifier != "normal":
-		lines.append(Modifiers.blurb(modifier))
-	if mode_hint != "":
-		lines.append(mode_hint)
+		lines.append("Best: level %d" % best_level)
 	if str(t.get("boost_line", "")) != "":
 		lines.append(str(t.get("boost_line", "")))
 	_records.text = "\n".join(lines)
@@ -2509,7 +2530,7 @@ func show_shop(meta: Meta, coins: int, boosts: Boosts = null) -> void:
 func show_running() -> void:
 	_hide_cards()
 	_pause_button.visible = true
-	_formation_button.visible = true
+	_formation_button.visible = FIRE_MODE_BUTTON
 	_bounty_row.visible = true
 	if _prompt_tween != null:
 		_prompt_tween.kill()
@@ -2519,18 +2540,14 @@ func show_running() -> void:
 ## coins_earned, mode, stars_earned, hero_name, locker_nudge, grades, modifier.
 func show_game_over(r: Dictionary) -> void:
 	var score: int = r.get("score", 0)
-	var best: int = r.get("best", 0)
 	var is_best: bool = r.get("is_best", false)
 	var level: int = r.get("level", 1)
 	var distance: int = r.get("distance", 0)
-	var kills: int = r.get("kills", 0)
-	var peak: int = r.get("peak", 1)
 	var coins_earned: int = r.get("coins_earned", 0)
 	var mode: String = r.get("mode", "levels")
 	var stars_earned: int = r.get("stars_earned", 0)
 	var hero_name: String = r.get("hero_name", "")
 	var locker_nudge: bool = r.get("locker_nudge", false)
-	var grades: String = r.get("grades", "")
 	var modifier: String = r.get("modifier", "normal")
 	_hide_cards()
 	_over_card.visible = true
@@ -2538,74 +2555,32 @@ func show_game_over(r: Dictionary) -> void:
 	_boss_box.visible = false
 	# With characters on, the hero always gets out. Kids keep their people.
 	_over_title.text = "%s ESCAPED" % hero_name if hero_name != "" else "WIPED OUT"
-	var head := "NEW BEST!  {SCORE}" if is_best else "Score {SCORE}   (best %d)" % best
-	var where := "Level %d   %d m" % [level, distance]
+	# The card says four things: the score, how far, what you earned, and
+	# (if it was close) how close. It used to say fourteen.
+	var head := "NEW BEST!  {SCORE}" if is_best else "Score {SCORE}"
+	var where := "Level %d" % level
 	if mode == "endless":
 		where = "Endless   %d m" % distance
 	elif mode == "daily":
-		where = "Daily   level %d   %d m" % [level, distance]
+		where = "Daily   level %d" % level
 	elif mode == "weekly":
-		where = "Weekly   level %d   %d m" % [level, distance]
+		where = "Weekly   level %d" % level
 	if modifier != "normal" and mode != "daily" and mode != "weekly":
 		where = "%s   ·   %s" % [Modifiers.title(modifier), where]
-	if grades != "":
-		where += "\nGrades  %s" % grades
-	var run_bounty := int(r.get("bounty", 0))
-	var coins_line := "no coins in the daily" if mode == "daily" else ("no coins in the weekly" if mode == "weekly" else ("bounty %d  >  +%d coins" % [run_bounty, coins_earned] if run_bounty > Economy.GOLD_LINEAR else "+%d coins" % coins_earned))
+	var coins_line := "" if (mode == "daily" or mode == "weekly") else "+%d coins" % coins_earned
 	if stars_earned > 0:
-		coins_line += "   +%d %s" % [stars_earned, "star" if stars_earned == 1 else "stars"]
-	if locker_nudge:
-		coins_line += "\nSomething new is waiting in the locker!"
-	# Extras: achievements, quests, season tiers. Few: list them. Many:
-	# one summary line each, so the card stays on the screen.
-	var unlocked: Array = r.get("achievements", [])
-	var quests: Array = r.get("quests_done", [])
-	var rewards: Array = r.get("season_rewards", [])
-	var road: Array = r.get("road_rewards", [])
-	var trophies_earned := int(r.get("trophies_earned", 0))
-	if trophies_earned > 0:
-		var total := int(r.get("trophies_total", 0))
-		coins_line += "\n+%d trophies on the road  ·  %d to the next milestone" % [trophies_earned, Road.next_milestone(total) - total]
-	if int(r.get("streak_percent", 0)) > 0:
-		coins_line += "\nDAY %d STREAK: +%d%% coins" % [int(r.get("streak_days", 0)), int(r.get("streak_percent", 0))]
-	elif int(r.get("streak_days", 0)) == 1:
-		coins_line += "\nDay 1: play tomorrow for +%d%% coins" % Streak.bonus_percent(2)
-	if int(r.get("quest_coins", 0)) > 0:
-		coins_line += "\nQUESTS: +%d coins%s" % [int(r.get("quest_coins", 0)), "  (all three done!)" if bool(r.get("all_quests_done", false)) else ""]
-	var extras := unlocked.size() + quests.size() + rewards.size() + road.size()
-	if extras <= 4:
-		for rw in road:
-			coins_line += "\nROAD %d: %s" % [int(rw.at), Road.reward_text(rw) if str(rw.kind) == "unlock" else "a ROAD CHEST"]
-		for id in unlocked:
-			var a := Achievements.find(str(id))
-			if not a.is_empty():
-				coins_line += "\nACHIEVEMENT: %s  +%d %s" % [a.title, int(a.stars), "star" if int(a.stars) == 1 else "stars"]
-		for q in quests:
-			coins_line += "\nQUEST DONE: %s  +%d pts" % [q.title, int(q.points)]
-		for rw in rewards:
-			coins_line += "\nSEASON TIER %d: a GOLD CHEST" % int(rw.tier)
-	else:
-		var bits := []
-		if unlocked.size() > 0:
-			bits.append("%d %s" % [unlocked.size(), "achievement" if unlocked.size() == 1 else "achievements"])
-		if quests.size() > 0:
-			bits.append("%d %s done" % [quests.size(), "quest" if quests.size() == 1 else "quests"])
-		if rewards.size() > 0:
-			bits.append("%d season %s" % [rewards.size(), "tier" if rewards.size() == 1 else "tiers"])
-		if road.size() > 0:
-			bits.append("%d road %s" % [road.size(), "milestone" if road.size() == 1 else "milestones"])
-		coins_line += "\n" + ", ".join(bits) + ": see RECORDS, QUESTS and the ROAD"
-	var goal := str(r.get("goal", ""))
-	if goal != "":
-		coins_line += "\n\nNEXT: " + goal
-	# How close that was, and what the run was built from.
+		coins_line += "%s+%d %s" % ["   " if coins_line != "" else "", stars_earned, "star" if stars_earned == 1 else "stars"]
+	# Achievements, quests, season tiers, road milestones: one line for
+	# all of them. Their own pages have the detail.
+	var extras: int = (r.get("achievements", []) as Array).size() + (r.get("quests_done", []) as Array).size() + (r.get("season_rewards", []) as Array).size() + (r.get("road_rewards", []) as Array).size()
+	if extras > 0:
+		coins_line += "\n%d new %s" % [extras, "reward" if extras == 1 else "rewards"]
+	elif locker_nudge:
+		coins_line += "\nNew in the locker!"
+	# How close that was.
 	if str(r.get("near_miss", "")) != "":
 		head += "\n" + str(r.get("near_miss", ""))
-	if str(r.get("build", "")) != "":
-		where += "\nBUILD  " + str(r.get("build", ""))
-	if str(r.get("rivals", "")) != "":
-		head += "\n" + str(r.get("rivals", ""))
-	_over_template = "%s\n\n%s\n%d kills   peak squad %d\n\n%s" % [head, where, kills, peak, coins_line]
+	_over_template = "%s\n\n%s\n\n%s" % [head, where, coins_line]
 	if _over_count_tween != null:
 		_over_count_tween.kill()
 	if bool(r.get("instant", false)) or score <= 0:
@@ -2623,17 +2598,16 @@ func show_game_over(r: Dictionary) -> void:
 			if frac - _over_tick_at >= 0.08 or frac >= 1.0:
 				_over_tick_at = frac
 				count_tick.emit(frac), 0.0, float(score), 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	var tip := str(r.get("tip", ""))
-	_over_tip.text = "TIP: " + tip if tip != "" else ""
-	_over_tip.visible = tip != ""
+	_over_tip.text = ""
+	_over_tip.visible = false
 	var retry_level := int(r.get("retry_level", 0))
 	_over_retry.visible = retry_level > 0
 	_over_lb.visible = bool(r.get("leaderboard", false))
 	var waiting := int(r.get("chests", 0))
 	_over_chests.visible = waiting > 0
 	_over_chests.text = "OPEN %d %s" % [waiting, "CHEST" if waiting == 1 else "CHESTS"]
-	_over_retry.text = "RETRY LEVEL %d  ·  once a run" % retry_level
-	_over_prompt.text = "TAP TO START OVER" if retry_level > 0 else "TAP TO RETRY"
+	_over_retry.text = "RETRY LEVEL %d" % retry_level
+	_over_prompt.text = "TAP TO PLAY AGAIN"
 	_pulse_prompt()
 	if is_best:
 		flash(0.5)
@@ -2682,7 +2656,13 @@ func set_boss_ratio(ratio: float) -> void:
 
 
 ## Big centred text that drifts up and fades, used for gate results.
-func show_float(text: String, good: bool) -> void:
+## A line over the squad. [param rank] is a Notices rank: the default
+## is CHATTER, which the road does not show.
+func show_float(text: String, good: bool, rank: int = Notices.CHATTER) -> void:
+	var now := Time.get_ticks_msec() * 0.001
+	if not Notices.shows(rank, now - _said_at):
+		return
+	_said_at = now
 	_float.text = text
 	_float.modulate = GAIN if good else LOSS
 	_float.modulate.a = 1.0
@@ -2695,7 +2675,13 @@ func show_float(text: String, good: bool) -> void:
 
 
 ## Level banner: fades in, holds, fades.
-func show_banner(text: String, seconds: float = 1.6) -> void:
+func show_banner(text: String, seconds: float = 1.6, rank: int = Notices.CHATTER) -> void:
+	var now := Time.get_ticks_msec() * 0.001
+	if not Notices.banner_shows(rank, now - _said_at, now < _must_until):
+		return
+	_said_at = now
+	if rank >= Notices.MUST:
+		_must_until = now + seconds
 	_banner.text = text
 	_banner.modulate.a = 0.0
 	if _banner_tween != null:

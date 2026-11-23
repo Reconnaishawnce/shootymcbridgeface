@@ -8,17 +8,17 @@ extends RefCounted
 
 const ORDER := ["day", "gold", "night", "storm", "fog", "works", "saws"]
 ## Seconds between lightning lines in a STORM FRONT, and before the first.
-const STRIKE_INTERVAL := 6.0
+const STRIKE_INTERVAL := 8.0
 const STRIKE_FIRST := 4.0
 
 const CATALOG := {
 	"day": {"name": "DAYBREAK", "rule": "", "mods": {}, "min_level": 1},
 	"gold": {"name": "GOLD HOUR", "rule": "The road runs fast and every kill pays double.", "mods": {"speed_bonus": 1.5, "bounty_mult": 2.0}, "min_level": 2},
 	"night": {"name": "NIGHT SHIFT", "rule": "They are faster in the dark. Kills pay half again.", "mods": {"pace_mult": 1.2, "bounty_mult": 1.5}, "min_level": 2},
-	"storm": {"name": "STORM FRONT", "rule": "Lightning walks the road. Stand in the gap.", "mods": {"strikes": true}, "min_level": 3},
+	"storm": {"name": "STORM FRONT", "rule": "Lightning walks the road. Stand in the gap.", "mods": {"strikes": true}, "min_level": 6},
 	"fog": {"name": "FOG BANK", "rule": "Panels show late and the far road is grey. Read fast.", "mods": {"fog": true, "reveal_penalty": 9.0}, "min_level": 2},
-	"works": {"name": "ROADWORKS", "rule": "Two more walls across the road. Shoot through or steer round.", "mods": {"barricades_extra": 2}, "min_level": 3},
-	"saws": {"name": "SAW MILL", "rule": "Two more saws, and faster. Keep moving.", "mods": {"saws_extra": 2, "saw_speed": 1.5}, "min_level": 2},
+	"works": {"name": "ROADWORKS", "rule": "Two more walls across the road. Shoot through or steer round.", "mods": {"barricades_extra": 2}, "min_level": 7},
+	"saws": {"name": "SAW MILL", "rule": "Two more saws, and faster. Keep moving.", "mods": {"saws_extra": 2, "saw_speed": 1.5}, "min_level": 5},
 }
 
 ## The look of each theme. Colours for the sky, the two lights, the fog
@@ -111,13 +111,11 @@ static func blend(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
 	return out
 
 
-## The banner at the start of a level: "LEVEL 3  ·  NIGHT SHIFT" and the
-## rule under it. Daybreak has no rule and no second line.
+## The banner at the start of a level: "LEVEL 3", and the name of the
+## place under it once places have rules. The rule itself is not read
+## out (it took a sentence, at a run): the sky says night, the saws say
+## saw mill. The pause menu and HOW TO PLAY have the words.
 static func banner(level: int, id: String) -> String:
-	var text := "LEVEL %d" % level if rule(id) == "" else "LEVEL %d  ·  %s\n%s" % [level, title(id), rule(id)]
-	# Past the early levels the banner also says how much harder the
-	# road now bites.
-	var d := Difficulty.danger(level)
-	if d > 1.001:
-		text += "\nDANGER +%d%%" % int(round((d - 1.0) * 100.0))
-	return text
+	if rule(id) == "" or level < Progression.THEME_RULE_LEVEL:
+		return "LEVEL %d" % level
+	return "LEVEL %d\n%s" % [level, title(id)]
